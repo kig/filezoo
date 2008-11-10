@@ -10,6 +10,7 @@ class Filezoo : DrawingArea
 
   private static Gtk.Window win = null;
   private string TopDirName = null;
+  private DirStats TopDirStats = null;
   private double TotalSize = 0.0;
   private ArrayList Files = null;
 
@@ -26,8 +27,7 @@ class Filezoo : DrawingArea
 
   Filezoo (string topDirName)
   {
-    TopDirName = System.IO.Path.GetFullPath(topDirName);
-    BuildDirs (TopDirName);
+    BuildDirs (topDirName);
     win = new Window ("Filezoo");
     win.SetDefaultSize (768, 768);
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
@@ -38,9 +38,12 @@ class Filezoo : DrawingArea
 
   void BuildDirs (string dirname)
   {
+    TopDirName = System.IO.Path.GetFullPath(dirname);
     Files = new ArrayList ();
     UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
+    TopDirStats = new DirStats (dirname, "..", 1, FileTypes.Directory, di.FileAccessPermissions);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
+    Files.Add (TopDirStats);
     double size = 0.0;
     foreach (UnixFileSystemInfo f in files)
     {
@@ -53,7 +56,8 @@ class Filezoo : DrawingArea
       size += dsz;
       Files.Add (new DirStats (dirname, f.Name, dsz, f.FileType, f.FileAccessPermissions));
     }
-    TotalSize = size;
+    TopDirStats.Length = size / 30.0;
+    TotalSize = size + TopDirStats.Length;
   }
 
   static double dirSize (string dirname)
@@ -76,8 +80,8 @@ class Filezoo : DrawingArea
   {
     uint boxSize = Math.Min(width, height);
     cr.Scale (boxSize, boxSize);
-    cr.Translate (0.015, 0.015);
-    cr.Scale (0.97, 0.97);
+    cr.Translate (0.015, 0.04);
+    cr.Scale (0.95, 0.95);
   }
 
   void Draw (Context cr, uint width, uint height)
@@ -87,6 +91,12 @@ class Filezoo : DrawingArea
       cr.Rectangle (0,0, width, height);
       cr.Fill ();
       Transform (cr, width, height);
+      cr.Save ();
+        cr.Color = new Color (0,0,0);
+        cr.Translate (0.005, -0.01);
+        cr.SetFontSize (0.03);
+        cr.ShowText(TopDirName);
+      cr.Restore ();
       cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
         d.Draw (cr, TotalSize);
@@ -102,8 +112,7 @@ class Filezoo : DrawingArea
       foreach (DirStats d in Files) {
         if (d.Click (cr, TotalSize, x, y)) {
           if (d.Control) {
-            TopDirName = d.GetFullPath ();
-            BuildDirs (TopDirName);
+            BuildDirs (d.GetFullPath ());
           }
           win.QueueDraw();
           break;

@@ -47,7 +47,9 @@ public class DirStats
       double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * Height));
       cr.SetFontSize(fs);
       cr.MoveTo (0.21, Height / 2 + fs / 4);
-      cr.ShowText (Name + " " + Length.ToString() + " bytes");
+      cr.ShowText (Name);
+      if (Name != "..")
+        cr.ShowText (" " + Length.ToString() + " bytes");
     cr.Restore ();
   }
 
