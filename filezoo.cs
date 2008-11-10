@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using Gtk;
 using Cairo;
+using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
@@ -11,7 +12,6 @@ class Filezoo : DrawingArea
   private string TopDirName = null;
   private double TotalSize = 0.0;
   private ArrayList Files = null;
-  private ArrayList Dirs = null;
 
   /**
     The Main method inits the Gtk application and creates a Filezoo instance
@@ -38,35 +38,35 @@ class Filezoo : DrawingArea
   void BuildDirs (string dirname)
   {
     Files = new ArrayList ();
-    Dirs = new ArrayList ();
-    DirectoryInfo di = new DirectoryInfo(dirname);
-    FileInfo[] files = di.GetFiles ();
-    DirectoryInfo[] dirs = di.GetDirectories ();
+    UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
+    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
     double size = 0.0;
-    foreach (FileInfo f in files)
+    foreach (UnixFileSystemInfo f in files)
     {
-      size += (double)f.Length;
-      Files.Add (new DirStats (f.Name, (double)f.Length));
-    }
-    foreach (DirectoryInfo d in dirs)
-    {
-      double dsz = dirSize(System.IO.Path.Combine(dirname, d.Name));
+      double dsz;
+      if (f.FileType == FileTypes.Directory) {
+        dsz = dirSize(System.IO.Path.Combine(dirname, f.Name));
+      } else {
+        dsz = (double)f.Length;
+      }
       size += dsz;
-      Dirs.Add (new DirStats (d.Name, dsz));
+      Files.Add (new DirStats (f.Name, dsz, f.FileType, f.FileAccessPermissions));
     }
     TotalSize = size;
   }
 
   static double dirSize (string dirname)
   {
-    DirectoryInfo di = new DirectoryInfo(dirname);
-    FileInfo[] files = di.GetFiles ();
-    DirectoryInfo[] dirs = di.GetDirectories ();
+    UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
+    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
     double size = 0.0;
-    foreach (FileInfo f in files)
-      size += (double)f.Length;
-    foreach (DirectoryInfo d in dirs)
-      size += dirSize(System.IO.Path.Combine(dirname, d.Name));
+    foreach (UnixFileSystemInfo f in files) {
+      if (f.FileType == FileTypes.Directory) {
+        size += dirSize(System.IO.Path.Combine(dirname, f.Name));
+      } else {
+        size += (double)f.Length;
+      }
+    }
     return size;
   }
 
@@ -80,37 +80,11 @@ class Filezoo : DrawingArea
       cr.Fill ();
       cr.Scale (boxSize, boxSize);
       cr.Save ();
-        cr.LineWidth = 0.002;
+        cr.LineWidth = 0.001;
         cr.Translate (0.015, 0.015);
         cr.Scale (0.97, 0.97);
-        cr.Color = new Color (0,0,1);
-        foreach (DirStats d in Dirs)
-        {
-          double scaled = d.Length / TotalSize;
-          cr.Rectangle (0.0, 0.0, 0.2, scaled);
-          cr.Stroke ();
-          cr.Save ();
-            double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * scaled));
-            cr.SetFontSize(fs);
-            cr.MoveTo (0.21, scaled / 2 + fs / 4);
-            cr.ShowText (d.Name + "/ " + d.Length.ToString() + " bytes");
-          cr.Restore ();
-          cr.Translate (0, scaled);
-        }
-        cr.Color = new Color (0,0,0);
         foreach (DirStats d in Files)
-        {
-          double scaled = d.Length / TotalSize;
-          cr.Rectangle (0.0, 0.0, 0.2, scaled);
-          cr.Stroke ();
-          cr.Save ();
-            double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * scaled));
-            cr.SetFontSize(fs);
-            cr.MoveTo (0.21, scaled / 2 + fs / 4);
-            cr.ShowText (d.Name + " " + d.Length.ToString() + " bytes");
-          cr.Restore ();
-          cr.Translate (0, scaled);
-        }
+          cr.Translate (0, d.Draw (cr, TotalSize));
       cr.Restore ();
     cr.Restore ();
   }
