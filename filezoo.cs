@@ -31,6 +31,7 @@ class Filezoo : DrawingArea
     win = new Window ("Filezoo");
     win.SetDefaultSize (768, 768);
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
+    AddEvents((int)Gdk.EventMask.ButtonPressMask);
     win.Add (this);
     win.ShowAll ();
   }
@@ -71,22 +72,55 @@ class Filezoo : DrawingArea
   }
 
 
-  void Draw (Context cr, uint width, uint height)
+  void Transform (Context cr, uint width, uint height)
   {
     uint boxSize = Math.Min(width, height);
+    cr.Scale (boxSize, boxSize);
+    cr.Translate (0.015, 0.015);
+    cr.Scale (0.97, 0.97);
+  }
+
+  void Draw (Context cr, uint width, uint height)
+  {
     cr.Save ();
       cr.Color = new Color (1,1,1);
       cr.Rectangle (0,0, width, height);
       cr.Fill ();
-      cr.Scale (boxSize, boxSize);
-      cr.Save ();
-        cr.LineWidth = 0.001;
-        cr.Translate (0.015, 0.015);
-        cr.Scale (0.97, 0.97);
-        foreach (DirStats d in Files)
-          cr.Translate (0, d.Draw (cr, TotalSize));
-      cr.Restore ();
+      Transform (cr, width, height);
+      cr.LineWidth = 0.001;
+      foreach (DirStats d in Files) {
+        d.Draw (cr, TotalSize);
+        cr.Translate (0, d.Height);
+      }
     cr.Restore ();
+  }
+
+  void Click (Context cr, uint width, uint height, double x, double y)
+  {
+    Console.WriteLine("Click on {0}, {1}", x, y);
+    cr.Save ();
+      Transform (cr, width, height);
+      foreach (DirStats d in Files) {
+        if (d.Click (cr, TotalSize, x, y)) {
+          win.QueueDraw();
+          break;
+        }
+        cr.Translate (0, d.Height);
+      }
+    cr.Restore ();
+  }
+
+  protected override bool OnButtonPressEvent (Gdk.EventButton e)
+  {
+    if (e.Button == 1) {
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        Click (cr, (uint)w, (uint)h, e.X, e.Y);
+      }
+    }
+    return true;
   }
 
   /**

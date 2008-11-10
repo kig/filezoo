@@ -5,6 +5,7 @@ using Cairo;
 public class DirStats
 {
   public double Length;
+  public double Height;
   public string Name;
   public FileTypes Filetype;
   public FileAccessPermissions Permissions;
@@ -21,27 +22,41 @@ public class DirStats
   public DirStats (string name, double length, FileTypes ft, FileAccessPermissions perm)
   {
     Length = length;
+    Height = 0.0;
     Name = name;
     Filetype = ft;
     Permissions = perm;
   }
 
-  public double Draw (Context cr, double totalSize)
+  public void Draw (Context cr, double totalSize)
   {
-    double height = Length / totalSize;
+    Height = Length / totalSize;
     cr.Save ();
-      cr.Rectangle (0.0, 0.0, 0.2, height);
+      cr.Rectangle (0.0, 0.0, 0.2, Height);
       cr.Color = GetColor (Filetype, Permissions);
       cr.FillPreserve ();
       cr.Color = new Color (1,1,1);
       cr.Stroke ();
       cr.Color = GetColor (Filetype, Permissions);
-      double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * height));
+      double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * Height));
       cr.SetFontSize(fs);
-      cr.MoveTo (0.21, height / 2 + fs / 4);
+      cr.MoveTo (0.21, Height / 2 + fs / 4);
       cr.ShowText (Name + " " + Length.ToString() + " bytes");
     cr.Restore ();
-    return height;
+  }
+
+  public bool Click (Context cr, double totalSize, double x, double y)
+  {
+    Height = Length / totalSize;
+    bool retval;
+    cr.Save ();
+      cr.NewPath ();
+      cr.Rectangle (0.0, 0.0, 0.2, Height);
+      cr.IdentityMatrix ();
+      retval = cr.InFill(x,y);
+    cr.Restore ();
+    if (retval) Console.WriteLine("Clicked {0}", Name);
+    return retval;
   }
 
   Color GetColor (FileTypes filetype, FileAccessPermissions perm)
