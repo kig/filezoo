@@ -51,7 +51,7 @@ class Filezoo : DrawingArea
         dsz = (double)f.Length;
       }
       size += dsz;
-      Files.Add (new DirStats (f.Name, dsz, f.FileType, f.FileAccessPermissions));
+      Files.Add (new DirStats (dirname, f.Name, dsz, f.FileType, f.FileAccessPermissions));
     }
     TotalSize = size;
   }
@@ -97,11 +97,14 @@ class Filezoo : DrawingArea
 
   void Click (Context cr, uint width, uint height, double x, double y)
   {
-    Console.WriteLine("Click on {0}, {1}", x, y);
     cr.Save ();
       Transform (cr, width, height);
       foreach (DirStats d in Files) {
         if (d.Click (cr, TotalSize, x, y)) {
+          if (d.Control) {
+            TopDirName = d.GetFullPath ();
+            BuildDirs (TopDirName);
+          }
           win.QueueDraw();
           break;
         }

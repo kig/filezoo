@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using Mono.Unix;
 using Cairo;
 
@@ -6,7 +8,9 @@ public class DirStats
 {
   public double Length;
   public double Height;
+  public string Dirname;
   public string Name;
+  public bool Control;
   public FileTypes Filetype;
   public FileAccessPermissions Permissions;
 
@@ -19,10 +23,12 @@ public class DirStats
   public static Color executableColor = new Color (0,1,0);
   public static Color fileColor = new Color (0,0,0);
 
-  public DirStats (string name, double length, FileTypes ft, FileAccessPermissions perm)
+  public DirStats (string dirname, string name, double length, FileTypes ft, FileAccessPermissions perm)
   {
     Length = length;
     Height = 0.0;
+    Control = false;
+    Dirname = dirname;
     Name = name;
     Filetype = ft;
     Permissions = perm;
@@ -55,8 +61,30 @@ public class DirStats
       cr.IdentityMatrix ();
       retval = cr.InFill(x,y);
     cr.Restore ();
-    if (retval) Console.WriteLine("Clicked {0}", Name);
+    if (retval)
+      OpenFile ();
     return retval;
+  }
+
+  public string GetFullPath ()
+  {
+    return System.IO.Path.Combine(Dirname, Name);
+  }
+
+  void OpenFile ()
+  {
+    if (Filetype == FileTypes.Directory)
+    {
+      Control = true;
+    } else {
+      Console.WriteLine("Opening {0}", GetFullPath ());
+      Process proc = new Process ();
+      proc.EnableRaisingEvents = false;
+      proc.StartInfo.FileName = "gnome-open";
+      proc.StartInfo.Arguments = GetFullPath ();
+      proc.Start ();
+      proc.WaitForExit ();
+    }
   }
 
   Color GetColor (FileTypes filetype, FileAccessPermissions perm)
