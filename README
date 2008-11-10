@@ -1,0 +1,14 @@
+Filezoo is a simple visual disk usage program that shows the sizes of the files
+in the current directory (or in the directory passed to it as an argument.) It
+uses Cairo for the drawing and Gtk# for the windows.
+
+Requirements:
+  mono
+  libgtk2.0-cil
+  libmono-cairo2.0-cil
+
+Compile by:
+  gmcs -pkg:gtk-sharp-2.0 -r:Mono.Cairo filezoo.cs dirstats.cs
+
+Usage:
+  filezoo.exe [directory]
