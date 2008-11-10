@@ -40,16 +40,18 @@ public class DirStats
     cr.Save ();
       cr.Rectangle (0.0, 0.0, 0.2, Height);
       cr.Color = GetColor (Filetype, Permissions);
-      cr.FillPreserve ();
-      cr.Color = new Color (1,1,1);
+//       cr.FillPreserve ();
+//       cr.Color = new Color (1,1,1);
       cr.Stroke ();
-      cr.Color = GetColor (Filetype, Permissions);
+//       cr.Color = GetColor (Filetype, Permissions);
       double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * Height));
       cr.SetFontSize(fs);
       cr.MoveTo (0.21, Height / 2 + fs / 4);
       cr.ShowText (Name);
-      if (Name != "..")
-        cr.ShowText (" " + Length.ToString() + " bytes");
+      if (Name != "..") {
+        cr.SetFontSize(fs * 0.7);
+        cr.ShowText (String.Format("  {0} bytes", Length.ToString("N0")));
+      }
     cr.Restore ();
   }
 
@@ -70,7 +72,7 @@ public class DirStats
 
   public string GetFullPath ()
   {
-    return System.IO.Path.Combine(Dirname, Name);
+    return System.IO.Path.GetFullPath(System.IO.Path.Combine(Dirname, Name));
   }
 
   void OpenFile ()

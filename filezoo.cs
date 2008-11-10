@@ -80,8 +80,8 @@ class Filezoo : DrawingArea
   {
     uint boxSize = Math.Min(width, height);
     cr.Scale (boxSize, boxSize);
-    cr.Translate (0.015, 0.04);
-    cr.Scale (0.95, 0.95);
+    cr.Translate (0.015, 0.045);
+    cr.Scale (0.94, 0.94);
   }
 
   void Draw (Context cr, uint width, uint height)
@@ -92,12 +92,12 @@ class Filezoo : DrawingArea
       cr.Fill ();
       Transform (cr, width, height);
       cr.Save ();
-        cr.Color = new Color (0,0,0);
-        cr.Translate (0.005, -0.01);
+        cr.Color = new Color (0,0,1);
+        cr.Translate (0.005, -0.015);
         cr.SetFontSize (0.03);
         cr.ShowText(TopDirName);
       cr.Restore ();
-      cr.LineWidth = 0.001;
+      cr.LineWidth = 0.0015;
       foreach (DirStats d in Files) {
         d.Draw (cr, TotalSize);
         cr.Translate (0, d.Height);
