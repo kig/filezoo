@@ -16,7 +16,7 @@ public class DirStats
         if (a.Info.IsDirectory) return -1;
         if (b.Info.IsDirectory) return 1;
       }
-      return -(a.GetRecursiveSize().CompareTo(b.GetRecursiveSize()));
+      return (a.GetRecursiveSize().CompareTo(b.GetRecursiveSize()));
     }
   }
 
@@ -61,23 +61,30 @@ public class DirStats
 
   public string GetSubTitle ()
   {
-    return String.Format("{0} bytes", Info.Length.ToString("N0"));
+    double len = (recursiveSizeComputed ? GetRecursiveSize() : Info.Length);
+    string extras = "";
+    if (Info.IsDirectory && recursiveCountComputed) {
+      extras = String.Format(", {0} files", GetRecursiveCount().ToString("N0"));
+    }
+    return String.Format("{0} bytes{1}", len.ToString("N0"), extras);
   }
+
+  public double BoxWidth = 0.1;
 
   public void Draw (Context cr)
   {
     double h = GetScaledHeight ();
     cr.Save ();
-      cr.Rectangle (0.0, 0.0, 0.2, h);
+      cr.Rectangle (0.0, 0.0, BoxWidth, h);
       Color c = GetColor (Info.FileType, Info.FileAccessPermissions);
       cr.Color = c;
       cr.FillPreserve ();
       cr.Color = new Color (1,1,1);
       cr.Stroke ();
       cr.Color = c;
-      double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * h));
+      double fs = Math.Max(0.001, Math.Min(0.02, 0.7 * h));
       cr.SetFontSize (fs);
-      cr.MoveTo (0.21, h / 2 + fs / 4);
+      cr.MoveTo (BoxWidth + 0.01, h / 2 + fs / 4);
       cr.ShowText (Info.Name);
       cr.SetFontSize(fs * 0.7);
       cr.ShowText ("  ");
@@ -91,7 +98,9 @@ public class DirStats
     bool[] retval = {false, false};
     cr.Save ();
       cr.NewPath ();
-      cr.Rectangle (0.0, 0.0, 0.2, h);
+      double fs = Math.Max(0.001, Math.Min(0.02, 0.7 * h));
+      cr.SetFontSize (fs);
+      cr.Rectangle (0.0, 0.0, BoxWidth + 0.01 + cr.TextExtents(Info.Name).Width, h);
       cr.IdentityMatrix ();
       retval[0] = cr.InFill(x,y);
     cr.Restore ();
@@ -111,24 +120,37 @@ public class DirStats
   public double GetRecursiveSize ()
   {
     if (!recursiveSizeComputed) {
-      recursiveSize = Info.IsDirectory ? dirSize(GetFullPath()) : Info.Length;
+      recursiveSize = Info.IsDirectory ? dirSize(GetFullPath(), out recursiveCount) : Info.Length;
+      recursiveCountComputed = true;
       recursiveSizeComputed = true;
     }
     return recursiveSize;
   }
 
+  bool recursiveCountComputed = false;
+  double recursiveCount = 0.0;
+
   public double GetRecursiveCount ()
   {
-    return Info.IsDirectory ? dirCount(GetFullPath()) : 1.0;
+    if (!recursiveCountComputed) {
+      recursiveCount = Info.IsDirectory ? dirCount(GetFullPath()) : 1.0;
+      recursiveCountComputed = true;
+    }
+    return recursiveCount;
   }
 
-  static double dirSize (string dirname)
+  static double dirSize (string dirname, out double count)
   {
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
     double size = 0.0;
-    foreach (UnixFileSystemInfo f in files)
-      size += f.IsDirectory ? dirSize(f.FullName) : (double)f.Length;
+    double subCount = 0.0;
+    count = 0.0;
+    foreach (UnixFileSystemInfo f in files) {
+      subCount = 1.0;
+      size += f.IsDirectory ? dirSize(f.FullName, out subCount) : (double)f.Length;
+      count += subCount;
+    }
     return size;
   }
 
@@ -136,7 +158,7 @@ public class DirStats
   {
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    double size = 1.0;
+    double size = 0.0;
     foreach (UnixFileSystemInfo f in files)
       size += f.IsDirectory ? dirCount(f.FullName) : 1.0;
     return size;
