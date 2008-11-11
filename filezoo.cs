@@ -43,7 +43,6 @@ class Filezoo : DrawingArea
     UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
     TopDirStats = new DirStats (dirname, "..", 1, FileTypes.Directory, di.FileAccessPermissions);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    Files.Add (TopDirStats);
     double size = 0.0;
     foreach (UnixFileSystemInfo f in files)
     {
@@ -56,6 +55,9 @@ class Filezoo : DrawingArea
       size += dsz;
       Files.Add (new DirStats (dirname, f.Name, dsz, f.FileType, f.FileAccessPermissions));
     }
+    Files.Sort(new DirStats.sizeComparer());
+    Files.Reverse();
+    Files.Insert(0, TopDirStats);
     TopDirStats.Length = size / 30.0;
     TotalSize = size + TopDirStats.Length;
   }
@@ -97,7 +99,7 @@ class Filezoo : DrawingArea
         cr.SetFontSize (0.03);
         cr.ShowText(TopDirName);
       cr.Restore ();
-      cr.LineWidth = 0.0015;
+      cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
         d.Draw (cr, TotalSize);
         cr.Translate (0, d.Height);

@@ -1,11 +1,37 @@
 using System;
 using System.Diagnostics;
+using System.Collections;
 using System.IO;
 using Mono.Unix;
 using Cairo;
 
 public class DirStats
 {
+
+  public class sizeComparer : IComparer {
+    int IComparer.Compare ( object x, object y ) {
+      DirStats a = (DirStats) x;
+      DirStats b = (DirStats) y;
+      if (a.Filetype != b.Filetype) {
+        if (a.Filetype == FileTypes.Directory) return -1;
+        if (b.Filetype == FileTypes.Directory) return 1;
+      }
+      return a.Length.CompareTo(b.Length);
+    }
+  }
+
+  public class nameComparer : IComparer {
+    int IComparer.Compare ( object x, object y ) {
+      DirStats a = (DirStats) x;
+      DirStats b = (DirStats) y;
+      if (a.Filetype != b.Filetype) {
+        if (a.Filetype == FileTypes.Directory) return -1;
+        if (b.Filetype == FileTypes.Directory) return 1;
+      }
+      return String.Compare(a.Name, b.Name);
+    }
+  }
+
   public double Length;
   public double Height;
   public string Dirname;
@@ -40,10 +66,10 @@ public class DirStats
     cr.Save ();
       cr.Rectangle (0.0, 0.0, 0.2, Height);
       cr.Color = GetColor (Filetype, Permissions);
-//       cr.FillPreserve ();
-//       cr.Color = new Color (1,1,1);
+      cr.FillPreserve ();
+      cr.Color = new Color (1,1,1);
       cr.Stroke ();
-//       cr.Color = GetColor (Filetype, Permissions);
+      cr.Color = GetColor (Filetype, Permissions);
       double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * Height));
       cr.SetFontSize(fs);
       cr.MoveTo (0.21, Height / 2 + fs / 4);
