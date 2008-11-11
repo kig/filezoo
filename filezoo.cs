@@ -47,13 +47,15 @@ class Filezoo : DrawingArea
 
   public class CountMeasurer : IMeasurer {
     public double Measure (DirStats d) {
-      return d.GetRecursiveCount ();
+      double mul = (d.Info.Name[0] == '.') ? 0.1 : 1.0;
+      return d.GetRecursiveCount () * mul;
     }
   }
 
   public class FlatMeasurer : IMeasurer {
     public double Measure (DirStats d) {
-      return 1.0;
+      double mul = (d.Info.Name[0] == '.') ? 0.1 : 1.0;
+      return 1.0 * mul;
     }
   }
 
