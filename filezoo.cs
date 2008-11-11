@@ -36,47 +36,72 @@ class Filezoo : DrawingArea
     win.ShowAll ();
   }
 
+  interface IMeasurer {
+    double Measure (DirStats d);
+  }
+
+  public class SizeMeasurer : IMeasurer {
+    public double Measure (DirStats d) {
+      return d.GetRecursiveSize ();
+    }
+  }
+
+  public class CountMeasurer : IMeasurer {
+    public double Measure (DirStats d) {
+      return d.GetRecursiveCount ();
+    }
+  }
+
+  public class FlatMeasurer : IMeasurer {
+    public double Measure (DirStats d) {
+      return 1.0;
+    }
+  }
+
+  interface IZoomer {
+    double Zoom (double position);
+  }
+
+  public class FlatZoomer : IZoomer {
+    public double Zoom (double position) {
+      return 1.0;
+    }
+  }
+
+  ArrayList GetDirStats (string dirname)
+  {
+    ArrayList stats = new ArrayList ();
+    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
+    foreach (UnixFileSystemInfo f in files)
+      stats.Add (new DirStats (f));
+    return stats;
+  }
+
+  void UpdateLayout (ArrayList files, IMeasurer measurer, IZoomer zoomer, IComparer comparer)
+  {
+    files.Sort(comparer);
+    double totalHeight = 0.0;
+    foreach (DirStats f in files) {
+      double height = measurer.Measure(f);
+      f.Height = height;
+      totalHeight += height;
+    }
+    double position = 0.0;
+    foreach (DirStats f in files) {
+      double zoom = zoomer.Zoom(position);
+      f.Zoom = zoom;
+      f.Scale = 1.0 / totalHeight;
+      position += f.Height / totalHeight;
+    }
+  }
+
   void BuildDirs (string dirname)
   {
     TopDirName = System.IO.Path.GetFullPath(dirname);
-    Files = new ArrayList ();
-    UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
-    TopDirStats = new DirStats (dirname, "..", 1, FileTypes.Directory, di.FileAccessPermissions);
-    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    double size = 0.0;
-    foreach (UnixFileSystemInfo f in files)
-    {
-      double dsz;
-      if (f.FileType == FileTypes.Directory) {
-        dsz = dirSize(System.IO.Path.Combine(dirname, f.Name));
-      } else {
-        dsz = (double)f.Length;
-      }
-      size += dsz;
-      Files.Add (new DirStats (dirname, f.Name, dsz, f.FileType, f.FileAccessPermissions));
-    }
-    Files.Sort(new DirStats.sizeComparer());
-    Files.Reverse();
-    Files.Insert(0, TopDirStats);
-    TopDirStats.Length = size / 30.0;
-    TotalSize = size + TopDirStats.Length;
+    Files = GetDirStats (dirname);
+    UpdateLayout(Files, new FlatMeasurer(), new FlatZoomer(), new DirStats.nameComparer());
   }
-
-  static double dirSize (string dirname)
-  {
-    UnixDirectoryInfo di = new UnixDirectoryInfo(dirname);
-    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    double size = 0.0;
-    foreach (UnixFileSystemInfo f in files) {
-      if (f.FileType == FileTypes.Directory) {
-        size += dirSize(System.IO.Path.Combine(dirname, f.Name));
-      } else {
-        size += (double)f.Length;
-      }
-    }
-    return size;
-  }
-
 
   void Transform (Context cr, uint width, uint height)
   {
@@ -101,8 +126,8 @@ class Filezoo : DrawingArea
       cr.Restore ();
       cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
-        d.Draw (cr, TotalSize);
-        cr.Translate (0, d.Height);
+        d.Draw (cr);
+        cr.Translate (0, d.GetScaledHeight ());
       }
     cr.Restore ();
   }
@@ -112,14 +137,15 @@ class Filezoo : DrawingArea
     cr.Save ();
       Transform (cr, width, height);
       foreach (DirStats d in Files) {
-        if (d.Click (cr, TotalSize, x, y)) {
-          if (d.Control) {
+        bool[] action = d.Click (cr, TotalSize, x, y);
+        if (action[0]) {
+          if (action[1]) {
             BuildDirs (d.GetFullPath ());
           }
           win.QueueDraw();
           break;
         }
-        cr.Translate (0, d.Height);
+        cr.Translate (0, d.GetScaledHeight ());
       }
     cr.Restore ();
   }

@@ -12,11 +12,11 @@ public class DirStats
     int IComparer.Compare ( object x, object y ) {
       DirStats a = (DirStats) x;
       DirStats b = (DirStats) y;
-      if (a.Filetype != b.Filetype) {
-        if (a.Filetype == FileTypes.Directory) return -1;
-        if (b.Filetype == FileTypes.Directory) return 1;
+      if (a.Info.FileType != b.Info.FileType ) {
+        if (a.Info.IsDirectory) return -1;
+        if (b.Info.IsDirectory) return 1;
       }
-      return a.Length.CompareTo(b.Length);
+      return -(a.GetRecursiveSize().CompareTo(b.GetRecursiveSize()));
     }
   }
 
@@ -24,21 +24,19 @@ public class DirStats
     int IComparer.Compare ( object x, object y ) {
       DirStats a = (DirStats) x;
       DirStats b = (DirStats) y;
-      if (a.Filetype != b.Filetype) {
-        if (a.Filetype == FileTypes.Directory) return -1;
-        if (b.Filetype == FileTypes.Directory) return 1;
+      if (a.Info.FileType != b.Info.FileType ) {
+        if (a.Info.IsDirectory) return -1;
+        if (b.Info.IsDirectory) return 1;
       }
-      return String.Compare(a.Name, b.Name);
+      return String.Compare(a.Info.Name, b.Info.Name);
     }
   }
 
-  public double Length;
+  public double Scale;
+  public double Zoom;
   public double Height;
-  public string Dirname;
-  public string Name;
   public bool Control;
-  public FileTypes Filetype;
-  public FileAccessPermissions Permissions;
+  public UnixFileSystemInfo Info;
 
   public static Color directoryColor = new Color (0,0,1);
   public static Color blockDeviceColor = new Color (1,1,0);
@@ -49,63 +47,106 @@ public class DirStats
   public static Color executableColor = new Color (0,1,0);
   public static Color fileColor = new Color (0,0,0);
 
-  public DirStats (string dirname, string name, double length, FileTypes ft, FileAccessPermissions perm)
+  public DirStats (UnixFileSystemInfo f)
   {
-    Length = length;
-    Height = 0.0;
+    Scale = Zoom = Height = 0.0;
     Control = false;
-    Dirname = dirname;
-    Name = name;
-    Filetype = ft;
-    Permissions = perm;
+    Info = f;
   }
 
-  public void Draw (Context cr, double totalSize)
+  public double GetScaledHeight ()
   {
-    Height = Length / totalSize;
+    return Height * Scale * Zoom;
+  }
+
+  public string GetSubTitle ()
+  {
+    return String.Format("{0} bytes", GetRecursiveSize().ToString("N0"));
+  }
+
+  public void Draw (Context cr)
+  {
+    double h = GetScaledHeight ();
     cr.Save ();
-      cr.Rectangle (0.0, 0.0, 0.2, Height);
-      cr.Color = GetColor (Filetype, Permissions);
+      cr.Rectangle (0.0, 0.0, 0.2, h);
+      Color c = GetColor (Info.FileType, Info.FileAccessPermissions);
+      cr.Color = c;
       cr.FillPreserve ();
       cr.Color = new Color (1,1,1);
       cr.Stroke ();
-      cr.Color = GetColor (Filetype, Permissions);
-      double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * Height));
-      cr.SetFontSize(fs);
-      cr.MoveTo (0.21, Height / 2 + fs / 4);
-      cr.ShowText (Name);
-      if (Name != "..") {
-        cr.SetFontSize(fs * 0.7);
-        cr.ShowText (String.Format("  {0} bytes", Length.ToString("N0")));
-      }
+      cr.Color = c;
+      double fs = Math.Max(0.001, Math.Min(0.03, 0.8 * h));
+      cr.SetFontSize (fs);
+      cr.MoveTo (0.21, h / 2 + fs / 4);
+      cr.ShowText (Info.Name);
+      cr.SetFontSize(fs * 0.7);
+      cr.ShowText ("  ");
+      cr.ShowText (GetSubTitle ());
     cr.Restore ();
   }
 
-  public bool Click (Context cr, double totalSize, double x, double y)
+  public bool[] Click (Context cr, double totalSize, double x, double y)
   {
-    Height = Length / totalSize;
-    bool retval;
+    double h = GetScaledHeight ();
+    bool[] retval = {false, false};
     cr.Save ();
       cr.NewPath ();
-      cr.Rectangle (0.0, 0.0, 0.2, Height);
+      cr.Rectangle (0.0, 0.0, 0.2, h);
       cr.IdentityMatrix ();
-      retval = cr.InFill(x,y);
+      retval[0] = cr.InFill(x,y);
     cr.Restore ();
-    if (retval)
-      OpenFile ();
+    if (retval[0])
+      retval[1] = OpenFile ();
     return retval;
   }
 
   public string GetFullPath ()
   {
-    return System.IO.Path.GetFullPath(System.IO.Path.Combine(Dirname, Name));
+    return Info.FullName;
   }
 
-  void OpenFile ()
+  bool recursiveSizeComputed = false;
+  double recursiveSize = 0.0;
+
+  public double GetRecursiveSize ()
   {
-    if (Filetype == FileTypes.Directory)
-    {
-      Control = true;
+    if (!recursiveSizeComputed) {
+      recursiveSize = Info.IsDirectory ? dirSize(GetFullPath()) : Info.Length;
+      recursiveSizeComputed = true;
+    }
+    return recursiveSize;
+  }
+
+  public double GetRecursiveCount ()
+  {
+    return Info.IsDirectory ? dirCount(GetFullPath()) : 1.0;
+  }
+
+  static double dirSize (string dirname)
+  {
+    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
+    double size = 0.0;
+    foreach (UnixFileSystemInfo f in files)
+      size += f.IsDirectory ? dirSize(f.FullName) : (double)f.Length;
+    return size;
+  }
+
+  static double dirCount (string dirname)
+  {
+    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
+    double size = 1.0;
+    foreach (UnixFileSystemInfo f in files)
+      size += f.IsDirectory ? dirCount(f.FullName) : 1.0;
+    return size;
+  }
+
+  bool OpenFile ()
+  {
+    if (Info.IsDirectory) {
+      Console.WriteLine("Navigating to {0}", GetFullPath ());
+      return true;
     } else {
       Console.WriteLine("Opening {0}", GetFullPath ());
       Process proc = new Process ();
@@ -114,6 +155,7 @@ public class DirStats
       proc.StartInfo.Arguments = GetFullPath ();
       proc.Start ();
       proc.WaitForExit ();
+      return false;
     }
   }
 
