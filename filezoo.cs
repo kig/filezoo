@@ -10,7 +10,6 @@ class Filezoo : DrawingArea
 
   private static Gtk.Window win = null;
   private string TopDirName = null;
-  private DirStats TopDirStats = null;
   private double TotalSize = 0.0;
   private ArrayList Files = null;
 
@@ -105,7 +104,7 @@ class Filezoo : DrawingArea
 
   void Transform (Context cr, uint width, uint height)
   {
-    uint boxSize = Math.Min(width, height);
+    uint boxSize = height;
     cr.Scale (boxSize, boxSize);
     cr.Translate (0.015, 0.045);
     cr.Scale (0.94, 0.94);
@@ -122,7 +121,14 @@ class Filezoo : DrawingArea
         cr.Color = new Color (0,0,1);
         cr.Translate (0.005, -0.015);
         cr.SetFontSize (0.03);
-        cr.ShowText(TopDirName);
+        if (TopDirName == "/") {
+          cr.ShowText("/");
+        } else {
+          foreach (string s in TopDirName.Split('/')) {
+            cr.ShowText(s);
+            cr.ShowText("/ ");
+          }
+        }
       cr.Restore ();
       cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
@@ -136,16 +142,51 @@ class Filezoo : DrawingArea
   {
     cr.Save ();
       Transform (cr, width, height);
-      foreach (DirStats d in Files) {
-        bool[] action = d.Click (cr, TotalSize, x, y);
-        if (action[0]) {
-          if (action[1]) {
-            BuildDirs (d.GetFullPath ());
+      cr.Save ();
+        cr.Color = new Color (0,0,1);
+        cr.Translate (0.005, -0.015);
+        cr.SetFontSize (0.03);
+        double advance = 0.0;
+        int i = 0;
+        bool pathHit = false;
+        string[] segments = TopDirName.Split('/');
+        if (TopDirName != "/") {
+          foreach (string s in segments) {
+            TextExtents e = cr.TextExtents(s + "/ ");
+            cr.Save ();
+              cr.NewPath ();
+              cr.Rectangle (advance, -e.Height, e.XAdvance, e.Height);
+              cr.IdentityMatrix ();
+              if (cr.InFill (x, y)) {
+                pathHit = true;
+                break;
+              }
+            cr.Restore ();
+            advance += e.XAdvance;
+            i += 1;
           }
-          win.QueueDraw();
-          break;
         }
-        cr.Translate (0, d.GetScaledHeight ());
+      cr.Restore ();
+      if (pathHit) {
+        string newDir = String.Join("/", segments, 0, i+1);
+        if (newDir == "") newDir = "/";
+        if (newDir != TopDirName) {
+          Console.WriteLine("Navigating to {0}", newDir);
+          BuildDirs (newDir);
+          win.QueueDraw();
+        }
+      } else {
+        foreach (DirStats d in Files) {
+          bool[] action = d.Click (cr, TotalSize, x, y);
+          if (action[0]) {
+            if (action[1]) {
+              BuildDirs (d.GetFullPath ());
+            }
+            win.QueueDraw();
+            break;
+          }
+          cr.Translate (0, d.GetScaledHeight ());
+        }
       }
     cr.Restore ();
   }

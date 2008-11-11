@@ -61,7 +61,7 @@ public class DirStats
 
   public string GetSubTitle ()
   {
-    return String.Format("{0} bytes", GetRecursiveSize().ToString("N0"));
+    return String.Format("{0} bytes", Info.Length.ToString("N0"));
   }
 
   public void Draw (Context cr)
