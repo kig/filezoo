@@ -93,14 +93,11 @@ public class DirStats
   {
     double h = GetScaledHeight ();
     cr.Save ();
-      cr.Rectangle (0.0, 0.0, BoxWidth, h);
+      cr.Rectangle (0.0, 0.0, BoxWidth, h*0.98);
       Color c = GetColor (Info.FileType, Info.FileAccessPermissions);
       cr.Color = c;
-      cr.FillPreserve ();
-      cr.Color = new Color (1,1,1);
-      cr.Stroke ();
-      cr.Color = c;
-      double fs = Math.Max(0.001, Math.Min(0.02, 0.7 * h));
+      cr.Fill ();
+      double fs = GetFontSize(h);
       cr.SetFontSize (fs);
       cr.MoveTo (BoxWidth + 0.01, h / 2 + fs / 4);
       cr.ShowText (Info.Name);
@@ -110,15 +107,31 @@ public class DirStats
     cr.Restore ();
   }
 
+  double MinFontSize = 0.0005;
+  double MaxFontSize = 0.02;
+
+  double GetFontSize(double h) {
+    return Math.Max(MinFontSize, Quantize(Math.Min(MaxFontSize, 0.7 * h)));
+  }
+
+  double Quantize (double fs) {
+    return (Math.Floor(fs / 0.001) * 0.001);
+  }
+
   public bool[] Click (Context cr, double totalSize, double x, double y)
   {
     double h = GetScaledHeight ();
     bool[] retval = {false, false};
+    double advance = 0.0;
     cr.Save ();
       cr.NewPath ();
-      double fs = Math.Max(0.001, Math.Min(0.02, 0.7 * h));
+      double fs = GetFontSize(h);
       cr.SetFontSize (fs);
-      cr.Rectangle (0.0, 0.0, BoxWidth + 0.01 + cr.TextExtents(Info.Name).Width, h);
+      advance += cr.TextExtents(Info.Name).XAdvance;
+      cr.SetFontSize(fs * 0.7);
+      advance += cr.TextExtents("  ").XAdvance;
+      advance += cr.TextExtents(GetSubTitle ()).XAdvance;
+      cr.Rectangle (0.0, 0.0, BoxWidth + 0.01 + advance, h);
       cr.IdentityMatrix ();
       retval[0] = cr.InFill(x,y);
     cr.Restore ();

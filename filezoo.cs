@@ -56,20 +56,24 @@ class Filezoo : DrawingArea
 
   interface IZoomer {
     void SetZoom (double x, double y, double z);
-    double GetZ ();
+    double X { get; set; }
+    double Y { get; set; }
+    double Z { get; set; }
     double GetZoomAt (double position);
     void ResetZoom ();
   }
 
   public class FlatZoomer : IZoomer {
-    public double zoom = 1.0;
+    double xval = 0.0, yval = 0.0, zval = 1.0;
+    public double X { get { return xval; } set { xval = value; } }
+    public double Y { get { return yval; } set { yval = value; } }
+    public double Z { get { return zval; } set { zval = value; } }
     public void SetZoom (double x, double y, double z) {
-      zoom = z;
+      X = x; Y = y; Z = z;
     }
-    public void ResetZoom () { zoom = 1.0; }
-    public double GetZ () { return zoom; }
+    public void ResetZoom () { X = Y = 0.0; Z = 1.0; }
     public double GetZoomAt (double position) {
-      return zoom;
+      return Z;
     }
   }
 
@@ -157,17 +161,20 @@ class Filezoo : DrawingArea
     UpdateLayout();
   }
 
+  public double FilesMarginLeft = 10;
+  public double FilesMarginTop = 52;
+  public double FilesMarginBottom = 10;
+
   void Transform (Context cr, uint width, uint height)
   {
-    uint boxSize = height;
+    double boxSize = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
+    cr.Translate(FilesMarginLeft, FilesMarginTop);
     cr.Scale (boxSize, boxSize);
-    cr.Translate (0.01, 0.065);
-    cr.Scale (0.92, 0.92);
   }
 
-  public double TopDirFontSize = 0.02;
-  public double TopDirMarginTop = -0.042;
-  public double TopDirMarginLeft = 0.005;
+  public double TopDirFontSize = 15;
+  public double TopDirMarginTop = 20;
+  public double TopDirMarginLeft = 12;
 
   void DrawTopDir (Context cr)
   {
@@ -288,12 +295,12 @@ class Filezoo : DrawingArea
       cr.Color = new Color (1,1,1);
       cr.Rectangle (0,0, width, height);
       cr.Fill ();
-      Transform (cr, width, height);
       cr.Save ();
         DrawTopDir (cr);
         DrawSortBar (cr);
         DrawSizeBar (cr);
       cr.Restore ();
+      Transform (cr, width, height);
       cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
         d.Draw (cr);
@@ -305,7 +312,6 @@ class Filezoo : DrawingArea
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
-      Transform (cr, width, height);
       cr.Save ();
         cr.Translate (TopDirMarginLeft, TopDirMarginTop);
         cr.SetFontSize (TopDirFontSize);
@@ -353,6 +359,7 @@ class Filezoo : DrawingArea
           win.QueueDraw();
         }
       } else {
+        Transform (cr, width, height);
         foreach (DirStats d in Files) {
           bool[] action = d.Click (cr, TotalSize, x, y);
           if (action[0]) {
@@ -373,16 +380,26 @@ class Filezoo : DrawingArea
     Zoomer.ResetZoom ();
   }
 
-  void ZoomToward (Context cr, uint w, uint h, double x, double y)
+  void ZoomToward (Context cr, uint width, uint height, double x, double y)
   {
-    Zoomer.SetZoom (x, y, Zoomer.GetZ() * 1.2);
+    double xr = x, yr = y;
+    cr.Save ();
+      Transform (cr, width, height);
+      cr.InverseTransformPoint(ref xr, ref yr);
+      Zoomer.SetZoom (xr, yr, Zoomer.Z * 1.2);
+    cr.Restore ();
     UpdateLayout();
     win.QueueDraw();
   }
 
-  void ZoomAway (Context cr, uint w, uint h, double x, double y)
+  void ZoomAway (Context cr, uint width, uint height, double x, double y)
   {
-    Zoomer.SetZoom (x, y, Math.Max(1.0, Zoomer.GetZ() * 0.8));
+    double xr = x, yr = y;
+    cr.Save ();
+      Transform (cr, width, height);
+      cr.InverseTransformPoint(ref xr, ref yr);
+      Zoomer.SetZoom (xr, yr, Math.Max(1.0, Zoomer.Z / 1.2));
+    cr.Restore ();
     UpdateLayout();
     win.QueueDraw();
   }
