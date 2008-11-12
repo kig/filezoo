@@ -13,43 +13,6 @@ class Filezoo : DrawingArea
   private double TotalSize = 0.0;
   private ArrayList Files = null;
 
-  SortHandler[] SortFields = {
-    new SortHandler("Name", new DirStats.nameComparer()),
-    new SortHandler("Size", new DirStats.sizeComparer())
-  };
-  SizeHandler[] SizeFields = {
-    new SizeHandler("Uniform", new FlatMeasurer()),
-    new SizeHandler("Size", new SizeMeasurer()),
-    new SizeHandler("File count", new CountMeasurer())
-  };
-  SortHandler SortField;
-  SizeHandler SizeField;
-  bool SortDesc = false;
-
-  /**
-    The Main method inits the Gtk application and creates a Filezoo instance
-    to run.
-  */
-  static void Main (string[] args)
-  {
-    Application.Init ();
-    new Filezoo (args.Length > 0 ? args[0] : ".");
-    Application.Run ();
-  }
-
-  Filezoo (string topDirName)
-  {
-    SortField = SortFields[0];
-    SizeField = SizeFields[0];
-    BuildDirs (topDirName);
-    win = new Window ("Filezoo");
-    win.SetDefaultSize (400, 768);
-    win.DeleteEvent += new DeleteEventHandler (OnQuit);
-    AddEvents((int)Gdk.EventMask.ButtonPressMask);
-    win.Add (this);
-    win.ShowAll ();
-  }
-
   class SortHandler {
     public string Name;
     public IComparer Comparer;
@@ -92,13 +55,64 @@ class Filezoo : DrawingArea
   }
 
   interface IZoomer {
-    double Zoom (double position);
+    void SetZoom (double x, double y, double z);
+    double GetZ ();
+    double GetZoomAt (double position);
+    void ResetZoom ();
   }
 
   public class FlatZoomer : IZoomer {
-    public double Zoom (double position) {
-      return 1.0;
+    public double zoom = 1.0;
+    public void SetZoom (double x, double y, double z) {
+      zoom = z;
     }
+    public void ResetZoom () { zoom = 1.0; }
+    public double GetZ () { return zoom; }
+    public double GetZoomAt (double position) {
+      return zoom;
+    }
+  }
+
+
+  SortHandler[] SortFields = {
+    new SortHandler("Name", new DirStats.nameComparer()),
+    new SortHandler("Size", new DirStats.sizeComparer())
+  };
+  SizeHandler[] SizeFields = {
+    new SizeHandler("Uniform", new FlatMeasurer()),
+    new SizeHandler("Size", new SizeMeasurer()),
+    new SizeHandler("File count", new CountMeasurer())
+  };
+  SortHandler SortField;
+  SizeHandler SizeField;
+  bool SortDesc = false;
+
+  IZoomer Zoomer;
+
+  /**
+    The Main method inits the Gtk application and creates a Filezoo instance
+    to run.
+  */
+  static void Main (string[] args)
+  {
+    Application.Init ();
+    new Filezoo (args.Length > 0 ? args[0] : ".");
+    Application.Run ();
+  }
+
+  Filezoo (string topDirName)
+  {
+    SortField = SortFields[0];
+    SizeField = SizeFields[0];
+    Zoomer = new FlatZoomer ();
+    BuildDirs (topDirName);
+    win = new Window ("Filezoo");
+    win.SetDefaultSize (400, 768);
+    win.DeleteEvent += new DeleteEventHandler (OnQuit);
+    AddEvents((int)Gdk.EventMask.ButtonPressMask);
+    AddEvents((int)Gdk.EventMask.ScrollMask);
+    win.Add (this);
+    win.ShowAll ();
   }
 
   ArrayList GetDirStats (string dirname)
@@ -113,7 +127,7 @@ class Filezoo : DrawingArea
 
   void UpdateLayout ()
   {
-    IZoomer zoomer = new FlatZoomer ();
+    IZoomer zoomer = Zoomer;
     IMeasurer measurer = SizeField.Measurer;
     IComparer comparer = SortField.Comparer;
 
@@ -128,7 +142,7 @@ class Filezoo : DrawingArea
     }
     double position = 0.0;
     foreach (DirStats f in Files) {
-      double zoom = zoomer.Zoom(position);
+      double zoom = zoomer.GetZoomAt(position);
       f.Zoom = zoom;
       f.Scale = 1.0 / totalHeight;
       position += f.Height / totalHeight;
@@ -139,6 +153,7 @@ class Filezoo : DrawingArea
   {
     TopDirName = System.IO.Path.GetFullPath(dirname);
     Files = GetDirStats (dirname);
+    ResetZoom ();
     UpdateLayout();
   }
 
@@ -314,11 +329,19 @@ class Filezoo : DrawingArea
             i += 1;
           }
         }
-        if (!pathHit && (ClickSortBar (out advance, cr, x, y) || ClickSizeBar (advance, cr, x, y))) {
-          UpdateLayout ();
-          win.QueueDraw ();
-          cr.Restore ();
-          return;
+        if (!pathHit) {
+          if (ClickSortBar (out advance, cr, x, y)) {
+            UpdateLayout ();
+            win.QueueDraw ();
+            cr.Restore ();
+            return;
+          } else if (ClickSizeBar (advance, cr, x, y)) {
+            ResetZoom ();
+            UpdateLayout ();
+            win.QueueDraw ();
+            cr.Restore ();
+            return;
+          }
         }
       cr.Restore ();
       if (pathHit) {
@@ -345,6 +368,25 @@ class Filezoo : DrawingArea
     cr.Restore ();
   }
 
+  void ResetZoom ()
+  {
+    Zoomer.ResetZoom ();
+  }
+
+  void ZoomToward (Context cr, uint w, uint h, double x, double y)
+  {
+    Zoomer.SetZoom (x, y, Zoomer.GetZ() * 1.2);
+    UpdateLayout();
+    win.QueueDraw();
+  }
+
+  void ZoomAway (Context cr, uint w, uint h, double x, double y)
+  {
+    Zoomer.SetZoom (x, y, Math.Max(1.0, Zoomer.GetZ() * 0.8));
+    UpdateLayout();
+    win.QueueDraw();
+  }
+
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
     if (e.Button == 1) {
@@ -353,6 +395,27 @@ class Filezoo : DrawingArea
         int w, h;
         e.Window.GetSize (out w, out h);
         Click (cr, (uint)w, (uint)h, e.X, e.Y);
+      }
+    }
+    return true;
+  }
+
+  protected override bool OnScrollEvent (Gdk.EventScroll e)
+  {
+    if (e.Direction == Gdk.ScrollDirection.Up) {
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        ZoomToward (cr, (uint)w, (uint)h, e.X, e.Y);
+      }
+    }
+    if (e.Direction == Gdk.ScrollDirection.Down) {
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        ZoomAway (cr, (uint)w, (uint)h, e.X, e.Y);
       }
     }
     return true;
