@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Collections;
+using System.Threading;
 using System.IO;
 using Mono.Unix;
 using Cairo;
@@ -22,6 +23,17 @@ public class DirStats
   public double Height;
   public string Suffix;
   public UnixFileSystemInfo Info;
+  public bool TraversalInProgress = false;
+  public bool TraversalCancelled = false;
+
+  public double BoxWidth = 0.1;
+
+  public double MinFontSize = 0.0005;
+  public double MaxFontSize = 0.02;
+
+  private bool recursiveSizeComputed = false;
+  private double recursiveSize = 0.0;
+  private double recursiveCount = 1.0;
 
   public DirStats (UnixFileSystemInfo f)
   {
@@ -38,14 +50,14 @@ public class DirStats
 
   public string GetSubTitle ()
   {
-    string extras = "";
-    if (Info.IsDirectory) {
-      if (recursiveCountComputed)
-        extras += String.Format(", {0} files", GetRecursiveCount().ToString("N0"));
-      if (recursiveSizeComputed)
-        extras += String.Format(", {0} total", FormatSize(GetRecursiveSize()));
+    if (IsDirectory) {
+      string extras = "";
+      extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
+      extras += String.Format(", {0} total", FormatSize(GetRecursiveSize()));
+      return extras;
+    } else {
+      return String.Format("{0}", FormatSize(Info.Length));
     }
-    return String.Format("{0}{1}", FormatSize(Info.Length), extras);
   }
 
   public static string FormatSize (double sz)
@@ -66,8 +78,6 @@ public class DirStats
     return String.Format("{0} {1}B", sz.ToString("N1"), suffix);
   }
 
-  public double BoxWidth = 0.1;
-
   public void Draw (Context cr)
   {
     double h = GetScaledHeight ();
@@ -86,14 +96,11 @@ public class DirStats
     cr.Restore ();
   }
 
-  double MinFontSize = 0.0005;
-  double MaxFontSize = 0.02;
-
   double GetFontSize(double h) {
-    return Math.Max(MinFontSize, Quantize(Math.Min(MaxFontSize, 0.7 * h)));
+    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, 0.7 * h)));
   }
 
-  double Quantize (double fs) {
+  double QuantizeFontSize (double fs) {
     return (Math.Floor(fs / 0.001) * 0.001);
   }
 
@@ -119,54 +126,75 @@ public class DirStats
     return retval;
   }
 
+  public bool IsDirectory {
+    get {
+      bool isDir = false;
+      try { isDir = Info.IsDirectory; } catch (System.InvalidOperationException) {}
+      return isDir;
+    }
+  }
+
   public string GetFullPath ()
   {
     return Info.FullName;
   }
 
-  bool recursiveSizeComputed = false;
-  double recursiveSize = 0.0;
-
   public double GetRecursiveSize ()
   {
     if (!recursiveSizeComputed) {
-      recursiveSize = Info.IsDirectory ? dirSize(GetFullPath(), out recursiveCount) : Info.Length;
-      recursiveCountComputed = true;
       recursiveSizeComputed = true;
+      TraversalInProgress = true;
+      recursiveSize = 0.0;
+      recursiveCount = 1.0;
+      if (IsDirectory) {
+        ThreadPool.QueueUserWorkItem(new WaitCallback(DirSizeCallback));
+      } else {
+        recursiveSize = Info.Length;
+        TraversalInProgress = false;
+      }
     }
     return recursiveSize;
   }
 
-  bool recursiveCountComputed = false;
-  double recursiveCount = 1.0;
-
   public double GetRecursiveCount ()
   {
-    if (!recursiveCountComputed) {
+    if (!recursiveSizeComputed)
       GetRecursiveSize ();
-      recursiveCountComputed = true;
-    }
     return recursiveCount;
   }
 
-  static double dirSize (string dirname, out double count)
+  void DirSizeCallback (Object stateInfo)
   {
+    DirSize(GetFullPath());
+    TraversalInProgress = false;
+  }
+
+  void DirSize (string dirname)
+  {
+    if (TraversalCancelled) return;
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
-    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    double size = 0.0;
-    double subCount = 0.0;
-    count = 0.0;
-    foreach (UnixFileSystemInfo f in files) {
-      subCount = 1.0;
-      size += f.IsDirectory ? dirSize(f.FullName, out subCount) : (double)f.Length;
-      count += subCount;
+    UnixFileSystemInfo[] files;
+    try {
+      files = di.GetFileSystemEntries ();
+    } catch (System.UnauthorizedAccessException) {
+      return;
     }
-    return size;
+    foreach (UnixFileSystemInfo f in files) {
+      if (TraversalCancelled) return;
+      recursiveCount += 1.0;
+      bool isDir = false;
+      try { isDir = f.IsDirectory; }
+      catch (System.InvalidOperationException) {}
+      if (isDir)
+        DirSize(f.FullName);
+      else
+        recursiveSize += (double)f.Length;
+    }
   }
 
   bool OpenFile ()
   {
-    if (Info.IsDirectory) {
+    if (IsDirectory) {
       return true;
     } else {
       Process proc = Process.Start ("gnome-open", GetFullPath ());
