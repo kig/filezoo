@@ -43,7 +43,7 @@ class Filezoo : DrawingArea
   public class CountMeasurer : IMeasurer {
     public double Measure (DirStats d) {
       double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
-      return d.GetRecursiveCount () * mul;
+      return (d.Info.IsDirectory ? d.GetRecursiveCount () : 10.0) * mul;
     }
   }
 
@@ -66,10 +66,16 @@ class Filezoo : DrawingArea
   public class FlatZoomer : IZoomer {
     double xval = 0.0, yval = 0.0, zval = 1.0;
     public double X { get { return xval; } set { xval = value; } }
-    public double Y { get { return yval; } set { yval = value; } }
+    public double Y {
+      get { return yval; }
+      set {
+        yval = Math.Max(-zval+1, Math.Min(0.0, value));
+      }
+    }
     public double Z { get { return zval; } set { zval = value; } }
     public void SetZoom (double x, double y, double z) {
-      X = x; Y = y; Z = z;
+      Z = z;
+      X = x; Y = y;
     }
     public void ResetZoom () { X = Y = 0.0; Z = 1.0; }
     public double GetZoomAt (double position) {
@@ -115,6 +121,7 @@ class Filezoo : DrawingArea
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     AddEvents((int)Gdk.EventMask.ButtonPressMask);
     AddEvents((int)Gdk.EventMask.ScrollMask);
+    AddEvents((int)Gdk.EventMask.PointerMotionMask);
     win.Add (this);
     win.ShowAll ();
   }
@@ -162,6 +169,7 @@ class Filezoo : DrawingArea
   }
 
   public double FilesMarginLeft = 10;
+  public double FilesMarginRight = 10;
   public double FilesMarginTop = 52;
   public double FilesMarginBottom = 10;
 
@@ -169,6 +177,8 @@ class Filezoo : DrawingArea
   {
     double boxSize = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
     cr.Translate(FilesMarginLeft, FilesMarginTop);
+    cr.Rectangle (0, 0, width-FilesMarginLeft-FilesMarginRight, boxSize);
+    cr.Clip ();
     cr.Scale (boxSize, boxSize);
   }
 
@@ -301,6 +311,7 @@ class Filezoo : DrawingArea
         DrawSizeBar (cr);
       cr.Restore ();
       Transform (cr, width, height);
+      cr.Translate (0.0, Zoomer.Y);
       cr.LineWidth = 0.001;
       foreach (DirStats d in Files) {
         d.Draw (cr);
@@ -360,6 +371,7 @@ class Filezoo : DrawingArea
         }
       } else {
         Transform (cr, width, height);
+        cr.Translate (0.0, Zoomer.Y);
         foreach (DirStats d in Files) {
           bool[] action = d.Click (cr, TotalSize, x, y);
           if (action[0]) {
@@ -380,25 +392,36 @@ class Filezoo : DrawingArea
     Zoomer.ResetZoom ();
   }
 
-  void ZoomToward (Context cr, uint width, uint height, double x, double y)
+  void ZoomBy (Context cr, uint width, uint height, double x, double y, double factor)
   {
-    double xr = x, yr = y;
+    double xr = x, yr = y, nz = Math.Max(1.0, Zoomer.Z * factor);
     cr.Save ();
       Transform (cr, width, height);
       cr.InverseTransformPoint(ref xr, ref yr);
-      Zoomer.SetZoom (xr, yr, Zoomer.Z * 1.2);
+      double npy = (yr / nz) - (yr / Zoomer.Z) + (Zoomer.Y / Zoomer.Z);
+      Zoomer.SetZoom (0.0, npy*nz, nz);
     cr.Restore ();
     UpdateLayout();
     win.QueueDraw();
   }
 
+  void ZoomToward (Context cr, uint width, uint height, double x, double y)
+  {
+    ZoomBy (cr, width, height, x, y, 1.2);
+  }
+
   void ZoomAway (Context cr, uint width, uint height, double x, double y)
   {
-    double xr = x, yr = y;
+    ZoomBy (cr, width, height, x, y, 1 / 1.2);
+  }
+
+  void PanBy (Context cr, uint width, uint height, double dx, double dy)
+  {
+    double xr = dx, yr = dy;
     cr.Save ();
       Transform (cr, width, height);
-      cr.InverseTransformPoint(ref xr, ref yr);
-      Zoomer.SetZoom (xr, yr, Math.Max(1.0, Zoomer.Z / 1.2));
+      cr.InverseTransformDistance(ref xr, ref yr);
+      Zoomer.Y += yr;
     cr.Restore ();
     UpdateLayout();
     win.QueueDraw();
@@ -414,6 +437,27 @@ class Filezoo : DrawingArea
         Click (cr, (uint)w, (uint)h, e.X, e.Y);
       }
     }
+    dragX = e.X;
+    dragY = e.Y;
+    return true;
+  }
+
+  double dragX = 0.0;
+  double dragY = 0.0;
+  protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
+  {
+    if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask) {
+      double dx = e.X - dragX;
+      double dy = e.Y - dragY;
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        PanBy (cr, (uint)w, (uint)h, dx, dy);
+      }
+    }
+    dragX = e.X;
+    dragY = e.Y;
     return true;
   }
 
