@@ -138,12 +138,12 @@ public class DirStats
   }
 
   bool recursiveCountComputed = false;
-  double recursiveCount = 0.0;
+  double recursiveCount = 1.0;
 
   public double GetRecursiveCount ()
   {
     if (!recursiveCountComputed) {
-      recursiveCount = Info.IsDirectory ? dirCount(GetFullPath()) : 1.0;
+      GetRecursiveSize ();
       recursiveCountComputed = true;
     }
     return recursiveCount;
@@ -164,16 +164,6 @@ public class DirStats
     return size;
   }
 
-  static double dirCount (string dirname)
-  {
-    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
-    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    double size = 0.0;
-    foreach (UnixFileSystemInfo f in files)
-      size += f.IsDirectory ? dirCount(f.FullName) : 1.0;
-    return size;
-  }
-
   bool OpenFile ()
   {
     if (Info.IsDirectory) {
@@ -185,7 +175,7 @@ public class DirStats
     }
   }
 
-  Color GetColor (FileTypes filetype, FileAccessPermissions perm)
+  static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
       case FileTypes.Directory: return directoryColor;

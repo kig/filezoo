@@ -346,7 +346,6 @@ class Filezoo : DrawingArea
         string newDir = String.Join("/", segments, 0, i+1);
         if (newDir == "") newDir = "/";
         if (newDir != TopDirName) {
-          Console.WriteLine("Navigating to {0}", newDir);
           BuildDirs (newDir);
           win.QueueDraw();
         }
