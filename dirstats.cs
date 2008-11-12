@@ -61,12 +61,30 @@ public class DirStats
 
   public string GetSubTitle ()
   {
-    double len = (recursiveSizeComputed ? GetRecursiveSize() : Info.Length);
     string extras = "";
-    if (Info.IsDirectory && recursiveCountComputed) {
-      extras = String.Format(", {0} files", GetRecursiveCount().ToString("N0"));
+    if (Info.IsDirectory) {
+      if (recursiveCountComputed)
+        extras += String.Format(", {0} files", GetRecursiveCount().ToString("N0"));
+      if (recursiveSizeComputed)
+        extras += String.Format(", {0} total", FormatSize(GetRecursiveSize()));
     }
-    return String.Format("{0} bytes{1}", len.ToString("N0"), extras);
+    return String.Format("{0}{1}", FormatSize(Info.Length), extras);
+  }
+
+  public static string FormatSize (double sz)
+  {
+    string suffix = "";
+    if (sz >= 1e9) {
+      suffix = "G";
+      sz /= 1e9;
+    } else if (sz >= 1e6) {
+      suffix = "M";
+      sz /= 1e6;
+    } else if (sz >= 1e3) {
+      suffix = "k";
+      sz /= 1e3;
+    }
+    return String.Format("{0} {1}B", sz.ToString("N0"), suffix);
   }
 
   public double BoxWidth = 0.1;
