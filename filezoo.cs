@@ -138,7 +138,13 @@ class Filezoo : DrawingArea
     return stats;
   }
 
+  bool LayoutUpdateRequested = true;
   void UpdateLayout ()
+  {
+    LayoutUpdateRequested = true;
+  }
+
+  void ReCreateLayout ()
   {
     IZoomer zoomer = Zoomer;
     IMeasurer measurer = SizeField.Measurer;
@@ -303,6 +309,8 @@ class Filezoo : DrawingArea
 
   void Draw (Context cr, uint width, uint height)
   {
+    if (LayoutUpdateRequested) ReCreateLayout();
+    LayoutUpdateRequested = false;
     cr.Save ();
       cr.Color = new Color (1,1,1);
       cr.Rectangle (0,0, width, height);
@@ -407,14 +415,16 @@ class Filezoo : DrawingArea
     win.QueueDraw();
   }
 
+  double ZoomSpeed = 2.0;
+
   void ZoomToward (Context cr, uint width, uint height, double x, double y)
   {
-    ZoomBy (cr, width, height, x, y, 1.2);
+    ZoomBy (cr, width, height, x, y, ZoomSpeed);
   }
 
   void ZoomAway (Context cr, uint width, uint height, double x, double y)
   {
-    ZoomBy (cr, width, height, x, y, 1 / 1.2);
+    ZoomBy (cr, width, height, x, y, 1 / ZoomSpeed);
   }
 
   void PanBy (Context cr, uint width, uint height, double dx, double dy)

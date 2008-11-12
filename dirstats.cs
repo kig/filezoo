@@ -39,12 +39,12 @@ public class DirStats
   public UnixFileSystemInfo Info;
 
   public static Color directoryColor = new Color (0,0,1);
-  public static Color blockDeviceColor = new Color (1,1,0);
-  public static Color characterDeviceColor = new Color (1,1,0);
-  public static Color fifoColor = new Color (1,0,1);
-  public static Color socketColor = new Color (1,0,0);
-  public static Color symlinkColor = new Color (0,1,1);
-  public static Color executableColor = new Color (0,1,0);
+  public static Color blockDeviceColor = new Color (0.75,0.5,0);
+  public static Color characterDeviceColor = new Color (0.75,0.5,0);
+  public static Color fifoColor = new Color (0.75,0,0.82);
+  public static Color socketColor = new Color (0.75,0,0);
+  public static Color symlinkColor = new Color (0,0.75,0.93);
+  public static Color executableColor = new Color (0,0.75,0);
   public static Color fileColor = new Color (0,0,0);
 
   public DirStats (UnixFileSystemInfo f)
@@ -83,8 +83,10 @@ public class DirStats
     } else if (sz >= 1e3) {
       suffix = "k";
       sz /= 1e3;
+    } else {
+      return String.Format("{0} B", sz.ToString("N0"));
     }
-    return String.Format("{0} {1}B", sz.ToString("N0"), suffix);
+    return String.Format("{0} {1}B", sz.ToString("N1"), suffix);
   }
 
   public double BoxWidth = 0.1;
