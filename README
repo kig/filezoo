@@ -8,7 +8,7 @@ Requirements:
   libmono-cairo2.0-cil
 
 Compile by:
-  gmcs -pkg:gtk-sharp-2.0 -r:Mono.Cairo -r:Mono.Posix filezoo.cs dirstats.cs
+  gmcs -pkg:gtk-sharp-2.0 -r:Mono.Cairo -r:Mono.Posix filezoo.cs measurers.cs zoomers.cs comparers.cs dirstats.cs
 
 Usage:
   filezoo.exe [directory]
