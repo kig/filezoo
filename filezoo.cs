@@ -43,14 +43,15 @@ class Filezoo : DrawingArea
   public class CountMeasurer : IMeasurer {
     public double Measure (DirStats d) {
       double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
-      return (d.Info.IsDirectory ? d.GetRecursiveCount () : 10.0) * mul;
+      return (d.Info.IsDirectory ? d.GetRecursiveCount () : 5.0) * mul;
     }
   }
 
   public class FlatMeasurer : IMeasurer {
     public double Measure (DirStats d) {
-      double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
-      return 1.0 * mul;
+      bool isDotFile = d.Info.Name[0] == '.';
+      if (isDotFile) return 0.05;
+      return (d.Info.IsDirectory ? 1.5 : 1.0);
     }
   }
 
@@ -120,6 +121,7 @@ class Filezoo : DrawingArea
     win.SetDefaultSize (400, 768);
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     AddEvents((int)Gdk.EventMask.ButtonPressMask);
+    AddEvents((int)Gdk.EventMask.ButtonReleaseMask);
     AddEvents((int)Gdk.EventMask.ScrollMask);
     AddEvents((int)Gdk.EventMask.PointerMotionMask);
     win.Add (this);
@@ -241,7 +243,7 @@ class Filezoo : DrawingArea
   {
     bool retval = false;
     cr.Save ();
-      cr.Rectangle (advance, -te.Height, te.Width, te.Height);
+      cr.Rectangle (advance, -te.Height, te.Width, te.Height * 1.5);
       cr.IdentityMatrix ();
       retval = cr.InFill (x, y);
     cr.Restore ();
@@ -429,7 +431,15 @@ class Filezoo : DrawingArea
 
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
-    if (e.Button == 1) {
+    dragStartX = dragX = e.X;
+    dragStartY = dragY = e.Y;
+    dragging = false;
+    return true;
+  }
+
+  protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
+  {
+    if (e.Button == 1 && !dragging) {
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
       {
         int w, h;
@@ -437,16 +447,21 @@ class Filezoo : DrawingArea
         Click (cr, (uint)w, (uint)h, e.X, e.Y);
       }
     }
-    dragX = e.X;
-    dragY = e.Y;
+    dragging = false;
     return true;
   }
 
+  bool dragging = false;
+  double dragStartX = 0.0;
+  double dragStartY = 0.0;
   double dragX = 0.0;
   double dragY = 0.0;
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
-    if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask) {
+    if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
+        (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask
+    ) {
+      dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
       double dx = e.X - dragX;
       double dy = e.Y - dragY;
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
