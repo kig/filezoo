@@ -8,36 +8,6 @@ using Cairo;
 public class DirStats
 {
 
-  public class sizeComparer : IComparer {
-    int IComparer.Compare ( object x, object y ) {
-      DirStats a = (DirStats) x;
-      DirStats b = (DirStats) y;
-      if (a.Info.FileType != b.Info.FileType ) {
-        if (a.Info.IsDirectory) return -1;
-        if (b.Info.IsDirectory) return 1;
-      }
-      return (a.GetRecursiveSize().CompareTo(b.GetRecursiveSize()));
-    }
-  }
-
-  public class nameComparer : IComparer {
-    int IComparer.Compare ( object x, object y ) {
-      DirStats a = (DirStats) x;
-      DirStats b = (DirStats) y;
-      if (a.Info.FileType != b.Info.FileType ) {
-        if (a.Info.IsDirectory) return -1;
-        if (b.Info.IsDirectory) return 1;
-      }
-      return String.Compare(a.Info.Name, b.Info.Name);
-    }
-  }
-
-  public double Scale;
-  public double Zoom;
-  public double Height;
-  public bool Control;
-  public UnixFileSystemInfo Info;
-
   public static Color directoryColor = new Color (0,0,1);
   public static Color blockDeviceColor = new Color (0.75,0.5,0);
   public static Color characterDeviceColor = new Color (0.75,0.5,0);
@@ -47,11 +17,18 @@ public class DirStats
   public static Color executableColor = new Color (0,0.75,0);
   public static Color fileColor = new Color (0,0,0);
 
+  public double Scale;
+  public double Zoom;
+  public double Height;
+  public string Suffix;
+  public UnixFileSystemInfo Info;
+
   public DirStats (UnixFileSystemInfo f)
   {
     Scale = Zoom = Height = 0.0;
-    Control = false;
     Info = f;
+    string[] split = f.Name.Split('.');
+    Suffix = (f.Name[0] == '.') ? "" : split[split.Length-1];
   }
 
   public double GetScaledHeight ()
@@ -200,15 +177,9 @@ public class DirStats
   bool OpenFile ()
   {
     if (Info.IsDirectory) {
-      Console.WriteLine("Navigating to {0}", GetFullPath ());
       return true;
     } else {
-      Console.WriteLine("Opening {0}", GetFullPath ());
-      Process proc = new Process ();
-      proc.EnableRaisingEvents = false;
-      proc.StartInfo.FileName = "gnome-open";
-      proc.StartInfo.Arguments = GetFullPath ();
-      proc.Start ();
+      Process proc = Process.Start ("gnome-open", GetFullPath ());
       proc.WaitForExit ();
       return false;
     }

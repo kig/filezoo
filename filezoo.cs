@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.IO;
 using Gtk;
 using Cairo;
@@ -7,92 +8,47 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
-
   private static Gtk.Window win = null;
   private string TopDirName = null;
   private double TotalSize = 0.0;
   private ArrayList Files = null;
 
-  class SortHandler {
-    public string Name;
-    public IComparer Comparer;
-    public SortHandler (string name, IComparer comparer) {
-      Name = name;
-      Comparer = comparer;
-    }
-  }
-  class SizeHandler {
-    public string Name;
-    public IMeasurer Measurer;
-    public SizeHandler (string name, IMeasurer measurer) {
-      Name = name;
-      Measurer = measurer;
-    }
-  }
+  double ZoomSpeed = 1.5;
 
-  interface IMeasurer {
-    double Measure (DirStats d);
-  }
+  bool dragging = false;
+  double dragStartX = 0.0;
+  double dragStartY = 0.0;
+  double dragX = 0.0;
+  double dragY = 0.0;
 
-  public class SizeMeasurer : IMeasurer {
-    public double Measure (DirStats d) {
-      return d.GetRecursiveSize ();
-    }
-  }
+  Color ActiveColor = new Color (0,0,0,1);
+  Color InActiveColor = new Color (0,0,0,0.5);
+  Color TermColor = new Color (0,0,1,1);
 
-  public class CountMeasurer : IMeasurer {
-    public double Measure (DirStats d) {
-      double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
-      return (d.Info.IsDirectory ? d.GetRecursiveCount () : 5.0) * mul;
-    }
-  }
+  string SortLabel = "Sort ";
+  string SizeLabel = "Size ";
+  string OpenTerminalLabel = "Term";
 
-  public class FlatMeasurer : IMeasurer {
-    public double Measure (DirStats d) {
-      bool isDotFile = d.Info.Name[0] == '.';
-      if (isDotFile) return 0.05;
-      return (d.Info.IsDirectory ? 1.5 : 1.0);
-    }
-  }
+  public double TopDirFontSize = 15;
+  public double TopDirMarginTop = 20;
+  public double TopDirMarginLeft = 12;
 
-  interface IZoomer {
-    void SetZoom (double x, double y, double z);
-    double X { get; set; }
-    double Y { get; set; }
-    double Z { get; set; }
-    double GetZoomAt (double position);
-    void ResetZoom ();
-  }
-
-  public class FlatZoomer : IZoomer {
-    double xval = 0.0, yval = 0.0, zval = 1.0;
-    public double X { get { return xval; } set { xval = value; } }
-    public double Y {
-      get { return yval; }
-      set {
-        yval = Math.Max(-zval+1, Math.Min(0.0, value));
-      }
-    }
-    public double Z { get { return zval; } set { zval = value; } }
-    public void SetZoom (double x, double y, double z) {
-      Z = z;
-      X = x; Y = y;
-    }
-    public void ResetZoom () { X = Y = 0.0; Z = 1.0; }
-    public double GetZoomAt (double position) {
-      return Z;
-    }
-  }
-
+  public double FilesMarginLeft = 10;
+  public double FilesMarginRight = 10;
+  public double FilesMarginTop = 52;
+  public double FilesMarginBottom = 10;
 
   SortHandler[] SortFields = {
-    new SortHandler("Name", new DirStats.nameComparer()),
-    new SortHandler("Size", new DirStats.sizeComparer())
+    new SortHandler("Name", new NameComparer()),
+    new SortHandler("Size", new SizeComparer()),
+    new SortHandler("Date", new DateComparer()),
+    new SortHandler("Type", new TypeComparer())
   };
   SizeHandler[] SizeFields = {
-    new SizeHandler("Uniform", new FlatMeasurer()),
+    new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
-    new SizeHandler("File count", new CountMeasurer())
+    new SizeHandler("Count", new CountMeasurer()),
+    new SizeHandler("Total", new TotalMeasurer())
   };
   SortHandler SortField;
   SizeHandler SizeField;
@@ -116,8 +72,8 @@ class Filezoo : DrawingArea
     SortField = SortFields[0];
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
-    BuildDirs (topDirName);
     win = new Window ("Filezoo");
+    BuildDirs (topDirName);
     win.SetDefaultSize (400, 768);
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     AddEvents((int)Gdk.EventMask.ButtonPressMask);
@@ -142,6 +98,7 @@ class Filezoo : DrawingArea
   void UpdateLayout ()
   {
     LayoutUpdateRequested = true;
+    win.QueueDraw ();
   }
 
   void ReCreateLayout ()
@@ -176,11 +133,6 @@ class Filezoo : DrawingArea
     UpdateLayout();
   }
 
-  public double FilesMarginLeft = 10;
-  public double FilesMarginRight = 10;
-  public double FilesMarginTop = 52;
-  public double FilesMarginBottom = 10;
-
   void Transform (Context cr, uint width, uint height)
   {
     double boxSize = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
@@ -189,10 +141,6 @@ class Filezoo : DrawingArea
     cr.Clip ();
     cr.Scale (boxSize, boxSize);
   }
-
-  public double TopDirFontSize = 15;
-  public double TopDirMarginTop = 20;
-  public double TopDirMarginLeft = 12;
 
   void DrawTopDir (Context cr)
   {
@@ -204,45 +152,49 @@ class Filezoo : DrawingArea
     } else {
       foreach (string s in TopDirName.Split('/')) {
         cr.ShowText(s);
-        cr.ShowText("/ ");
+        cr.ShowText("/");
       }
     }
   }
-
-  Color ActiveColor = new Color (0,0,0,1);
-  Color InActiveColor = new Color (0,0,0,0.5);
 
   void DrawSortBar (Context cr)
   {
     cr.MoveTo (0.0, TopDirFontSize * 1.32);
-    cr.SetFontSize (TopDirFontSize * 0.8);
     cr.Color = ActiveColor;
-    cr.ShowText ("Sort: ");
+    cr.SetFontSize (TopDirFontSize * 0.5);
+    cr.ShowText (SortLabel);
+    cr.SetFontSize (TopDirFontSize * 0.8);
     foreach (SortHandler sf in SortFields) {
       cr.Color = (SortField == sf) ? ActiveColor : InActiveColor;
       cr.ShowText (sf.Name);
-      if (sf != SortFields[SortFields.Length-1]) {
-        cr.Color = InActiveColor;
-        cr.ShowText (" | ");
-      }
+      cr.ShowText (" ");
     }
     cr.Color = ActiveColor;
-    cr.ShowText ("  ");
-    cr.ShowText (" " + (SortDesc ? "▾" : "▴") + " ");
-    cr.ShowText ("   ");
+    cr.ShowText (" ");
+    cr.ShowText ((SortDesc ? "▾" : "▴") + " ");
+    cr.ShowText (" ");
   }
 
   void DrawSizeBar (Context cr)
   {
-    cr.ShowText ("Size: ");
+    cr.Color = ActiveColor;
+    cr.SetFontSize (TopDirFontSize * 0.5);
+    cr.ShowText (SizeLabel);
+    cr.SetFontSize (TopDirFontSize * 0.8);
     foreach (SizeHandler sf in SizeFields) {
       cr.Color = (SizeField == sf) ? ActiveColor : InActiveColor;
       cr.ShowText (sf.Name);
-      if (sf != SizeFields[SizeFields.Length-1]) {
-        cr.Color = InActiveColor;
-        cr.ShowText (" | ");
-      }
+      cr.ShowText (" ");
     }
+    cr.ShowText (" ");
+  }
+
+  void DrawOpenTerminal (Context cr)
+  {
+    cr.Color = InActiveColor;
+    cr.ShowText (" |  ");
+    cr.Color = TermColor;
+    cr.ShowText (OpenTerminalLabel);
   }
 
   bool CheckTextExtents (Context cr, double advance, TextExtents te, double x, double y)
@@ -256,13 +208,13 @@ class Filezoo : DrawingArea
     return retval;
   }
 
-  bool ClickSortBar (out double advance, Context cr, double x, double y)
+  bool ClickSortBar (ref double advance, Context cr, double x, double y)
   {
-    cr.Translate (0, TopDirFontSize * 1.32);
-    cr.SetFontSize (TopDirFontSize * 0.8);
     TextExtents te;
-    advance = 0.0;
-    advance += cr.TextExtents ("Sort: ").XAdvance;
+    cr.Translate (0, TopDirFontSize * 1.32);
+    cr.SetFontSize (TopDirFontSize * 0.5);
+    advance += cr.TextExtents (SortLabel).XAdvance;
+    cr.SetFontSize (TopDirFontSize * 0.8);
     foreach (SortHandler sf in SortFields) {
       te = cr.TextExtents (sf.Name);
       if (CheckTextExtents(cr, advance, te, x, y)) {
@@ -271,39 +223,60 @@ class Filezoo : DrawingArea
         } else {
           SortField = sf;
         }
+        ResetZoom ();
+        UpdateLayout ();
         return true;
       }
       advance += te.XAdvance;
-      if (sf != SortFields[SortFields.Length-1]) {
-        advance += cr.TextExtents (" | ").XAdvance;
-      }
+      advance += cr.TextExtents (" ").XAdvance;
     }
-    advance += cr.TextExtents ("  ").XAdvance;
-    te = cr.TextExtents (" " + (SortDesc ? "▾" : "▴") + " ");
+    advance += cr.TextExtents (" ").XAdvance;
+    te = cr.TextExtents ((SortDesc ? "▾" : "▴") + " ");
     if (CheckTextExtents(cr, advance, te, x, y)) {
       SortDesc = !SortDesc;
+      ResetZoom ();
+      UpdateLayout ();
       return true;
     }
     advance += te.XAdvance;
-    advance += cr.TextExtents ("   ").XAdvance;
+    advance += cr.TextExtents (" ").XAdvance;
     return false;
   }
 
-  bool ClickSizeBar (double advance, Context cr, double x, double y)
+  bool ClickSizeBar (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
-    advance += cr.TextExtents ("Size: ").XAdvance;
+    cr.SetFontSize (TopDirFontSize * 0.5);
+    advance += cr.TextExtents (SizeLabel).XAdvance;
+    cr.SetFontSize (TopDirFontSize * 0.8);
     foreach (SizeHandler sf in SizeFields) {
       te = cr.TextExtents (sf.Name);
       if (CheckTextExtents(cr, advance, te, x, y)) {
         SizeField = sf;
+        ResetZoom ();
+        UpdateLayout ();
         return true;
       }
       advance += te.XAdvance;
-      if (sf != SizeFields[SizeFields.Length-1]) {
-        advance += cr.TextExtents (" | ").XAdvance;
-      }
+      advance += cr.TextExtents (" ").XAdvance;
     }
+    advance += cr.TextExtents (" ").XAdvance;
+    return false;
+  }
+
+  bool ClickOpenTerminal (ref double advance, Context cr, double x, double y)
+  {
+    TextExtents te;
+    advance += cr.TextExtents (" |  ").XAdvance;
+    te = cr.TextExtents (OpenTerminalLabel);
+    if (CheckTextExtents (cr, advance, te, x, y)) {
+      string cd = UnixDirectoryInfo.GetCurrentDirectory ();
+      UnixDirectoryInfo.SetCurrentDirectory (TopDirName);
+      Process.Start ("urxvt");
+      UnixDirectoryInfo.SetCurrentDirectory (cd);
+      return true;
+    }
+    advance += te.XAdvance;
     return false;
   }
 
@@ -319,6 +292,7 @@ class Filezoo : DrawingArea
         DrawTopDir (cr);
         DrawSortBar (cr);
         DrawSizeBar (cr);
+        DrawOpenTerminal (cr);
       cr.Restore ();
       Transform (cr, width, height);
       cr.Translate (0.0, Zoomer.Y);
@@ -342,7 +316,7 @@ class Filezoo : DrawingArea
         string[] segments = TopDirName.Split('/');
         if (TopDirName != "/") {
           foreach (string s in segments) {
-            TextExtents e = cr.TextExtents(s + "/ ");
+            TextExtents e = cr.TextExtents(s + "/");
             cr.Save ();
               cr.NewPath ();
               cr.Rectangle (advance, -e.Height, e.XAdvance, e.Height);
@@ -357,15 +331,12 @@ class Filezoo : DrawingArea
           }
         }
         if (!pathHit) {
-          if (ClickSortBar (out advance, cr, x, y)) {
-            UpdateLayout ();
-            win.QueueDraw ();
-            cr.Restore ();
-            return;
-          } else if (ClickSizeBar (advance, cr, x, y)) {
-            ResetZoom ();
-            UpdateLayout ();
-            win.QueueDraw ();
+          advance = 0.0;
+          if (
+            ClickSortBar (ref advance, cr, x, y) ||
+            ClickSizeBar (ref advance, cr, x, y) ||
+            ClickOpenTerminal (ref advance, cr, x, y)
+          ) {
             cr.Restore ();
             return;
           }
@@ -412,10 +383,7 @@ class Filezoo : DrawingArea
       Zoomer.SetZoom (0.0, npy*nz, nz);
     cr.Restore ();
     UpdateLayout();
-    win.QueueDraw();
   }
-
-  double ZoomSpeed = 2.0;
 
   void ZoomToward (Context cr, uint width, uint height, double x, double y)
   {
@@ -436,7 +404,6 @@ class Filezoo : DrawingArea
       Zoomer.Y += yr;
     cr.Restore ();
     UpdateLayout();
-    win.QueueDraw();
   }
 
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
@@ -461,11 +428,6 @@ class Filezoo : DrawingArea
     return true;
   }
 
-  bool dragging = false;
-  double dragStartX = 0.0;
-  double dragStartY = 0.0;
-  double dragX = 0.0;
-  double dragY = 0.0;
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
     if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
@@ -533,3 +495,140 @@ class Filezoo : DrawingArea
     Application.Quit ();
   }
 }
+
+
+
+class SortHandler {
+  public string Name;
+  public IComparer Comparer;
+  public SortHandler (string name, IComparer comparer) {
+    Name = name;
+    Comparer = comparer;
+  }
+}
+class SizeHandler {
+  public string Name;
+  public IMeasurer Measurer;
+  public SizeHandler (string name, IMeasurer measurer) {
+    Name = name;
+    Measurer = measurer;
+  }
+}
+
+public class SizeComparer : IComparer {
+  int IComparer.Compare ( object x, object y ) {
+    DirStats a = (DirStats) x;
+    DirStats b = (DirStats) y;
+    if (a.Info.FileType != b.Info.FileType ) {
+      if (a.Info.IsDirectory) return -1;
+      if (b.Info.IsDirectory) return 1;
+    }
+    int rv = a.Info.Length.CompareTo(b.Info.Length);
+    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
+    return rv;
+  }
+}
+
+public class NameComparer : IComparer {
+  int IComparer.Compare ( object x, object y ) {
+    DirStats a = (DirStats) x;
+    DirStats b = (DirStats) y;
+    if (a.Info.FileType != b.Info.FileType ) {
+      if (a.Info.IsDirectory) return -1;
+      if (b.Info.IsDirectory) return 1;
+    }
+    return a.Info.Name.CompareTo(b.Info.Name);
+  }
+}
+
+public class DateComparer : IComparer {
+  int IComparer.Compare ( object x, object y ) {
+    DirStats a = (DirStats) x;
+    DirStats b = (DirStats) y;
+    if (a.Info.FileType != b.Info.FileType ) {
+      if (a.Info.IsDirectory) return -1;
+      if (b.Info.IsDirectory) return 1;
+    }
+    int rv = a.Info.LastWriteTime.CompareTo(b.Info.LastWriteTime);
+    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
+    return rv;
+  }
+}
+
+public class TypeComparer : IComparer {
+  int IComparer.Compare ( object x, object y ) {
+    DirStats a = (DirStats) x;
+    DirStats b = (DirStats) y;
+    if (a.Info.FileType != b.Info.FileType ) {
+      if (a.Info.IsDirectory) return -1;
+      if (b.Info.IsDirectory) return 1;
+    } else if (a.Info.IsDirectory) {
+      return a.Info.Name.CompareTo(b.Info.Name);
+    }
+    int rv = a.Suffix.CompareTo(b.Suffix);
+    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
+    return rv;
+  }
+}
+
+interface IMeasurer {
+  double Measure (DirStats d);
+}
+
+public class SizeMeasurer : IMeasurer {
+  public double Measure (DirStats d) {
+    return d.Info.Length;
+  }
+}
+
+public class TotalMeasurer : IMeasurer {
+  public double Measure (DirStats d) {
+    return d.GetRecursiveSize ();
+  }
+}
+
+public class CountMeasurer : IMeasurer {
+  public double Measure (DirStats d) {
+    double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
+    return (d.Info.IsDirectory ? d.GetRecursiveCount () : 5.0) * mul;
+  }
+}
+
+public class FlatMeasurer : IMeasurer {
+  public double Measure (DirStats d) {
+    bool isDotFile = d.Info.Name[0] == '.';
+    if (isDotFile) return 0.05;
+    return (d.Info.IsDirectory ? 1.5 : 1.0);
+  }
+}
+
+interface IZoomer {
+  void SetZoom (double x, double y, double z);
+  double X { get; set; }
+  double Y { get; set; }
+  double Z { get; set; }
+  double GetZoomAt (double position);
+  void ResetZoom ();
+}
+
+public class FlatZoomer : IZoomer {
+  double xval = 0.0, yval = 0.0, zval = 1.0;
+  public double X { get { return xval; } set { xval = value; } }
+  public double Y {
+    get { return yval; }
+    set {
+      yval = Math.Max(-zval+1, Math.Min(0.0, value));
+    }
+  }
+  public double Z { get { return zval; } set { zval = value; } }
+  public void SetZoom (double x, double y, double z) {
+    Z = z;
+    X = x; Y = y;
+  }
+  public void ResetZoom () { X = Y = 0.0; Z = 1.0; }
+  public double GetZoomAt (double position) {
+    return Z;
+  }
+}
+
+
