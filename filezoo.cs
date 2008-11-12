@@ -8,12 +8,22 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
+  public double TopDirFontSize = 15;
+  public double TopDirMarginTop = 20;
+  public double TopDirMarginLeft = 12;
+
+  public double FilesMarginLeft = 10;
+  public double FilesMarginRight = 10;
+  public double FilesMarginTop = 52;
+  public double FilesMarginBottom = 10;
+
   private static Gtk.Window win = null;
   private string TopDirName = null;
   private double TotalSize = 0.0;
   private ArrayList Files = null;
 
   double ZoomSpeed = 1.5;
+  bool LayoutUpdateRequested = true;
 
   bool dragging = false;
   double dragStartX = 0.0;
@@ -28,15 +38,6 @@ class Filezoo : DrawingArea
   string SortLabel = "Sort ";
   string SizeLabel = "Size ";
   string OpenTerminalLabel = "Term";
-
-  public double TopDirFontSize = 15;
-  public double TopDirMarginTop = 20;
-  public double TopDirMarginLeft = 12;
-
-  public double FilesMarginLeft = 10;
-  public double FilesMarginRight = 10;
-  public double FilesMarginTop = 52;
-  public double FilesMarginBottom = 10;
 
   SortHandler[] SortFields = {
     new SortHandler("Name", new NameComparer()),
@@ -53,7 +54,6 @@ class Filezoo : DrawingArea
   SortHandler SortField;
   SizeHandler SizeField;
   bool SortDesc = false;
-
   IZoomer Zoomer;
 
   /**
@@ -66,6 +66,9 @@ class Filezoo : DrawingArea
     new Filezoo (args.Length > 0 ? args[0] : ".");
     Application.Run ();
   }
+
+
+  /* Constructor */
 
   Filezoo (string topDirName)
   {
@@ -85,6 +88,19 @@ class Filezoo : DrawingArea
     win.ShowAll ();
   }
 
+
+  /* Files model */
+
+  void BuildDirs (string dirname)
+  {
+    TopDirName = System.IO.Path.GetFullPath(dirname);
+    foreach (DirStats f in Files)
+      f.TraversalCancelled = true;
+    Files = GetDirStats (dirname);
+    ResetZoom ();
+    UpdateLayout();
+  }
+
   ArrayList GetDirStats (string dirname)
   {
     ArrayList stats = new ArrayList ();
@@ -95,7 +111,9 @@ class Filezoo : DrawingArea
     return stats;
   }
 
-  bool LayoutUpdateRequested = true;
+
+  /* Layout */
+
   void UpdateLayout ()
   {
     LayoutUpdateRequested = true;
@@ -131,15 +149,8 @@ class Filezoo : DrawingArea
     }
   }
 
-  void BuildDirs (string dirname)
-  {
-    TopDirName = System.IO.Path.GetFullPath(dirname);
-    foreach (DirStats f in Files)
-      f.TraversalCancelled = true;
-    Files = GetDirStats (dirname);
-    ResetZoom ();
-    UpdateLayout();
-  }
+
+  /* Drawing */
 
   void Transform (Context cr, uint width, uint height)
   {
@@ -232,68 +243,69 @@ class Filezoo : DrawingArea
   }
 
 
+  /* Click handling */
 
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
-      cr.Save ();
-        cr.Translate (TopDirMarginLeft, TopDirMarginTop);
-        cr.SetFontSize (TopDirFontSize);
-        double advance = 0.0;
-        int i = 0;
-        bool pathHit = false;
-        string[] segments = TopDirName.Split('/');
-        if (TopDirName != "/") {
-          foreach (string s in segments) {
-            TextExtents e = cr.TextExtents(s + "/");
-            cr.Save ();
-              cr.NewPath ();
-              cr.Rectangle (advance, -e.Height, e.XAdvance, e.Height);
-              cr.IdentityMatrix ();
-              if (cr.InFill (x, y)) {
-                pathHit = true;
-                break;
-              }
-            cr.Restore ();
-            advance += e.XAdvance;
-            i += 1;
-          }
-        }
-        if (!pathHit) {
-          advance = 0.0;
-          if (
-            ClickSortBar (ref advance, cr, x, y) ||
-            ClickSizeBar (ref advance, cr, x, y) ||
-            ClickOpenTerminal (ref advance, cr, x, y)
-          ) {
-            cr.Restore ();
-            return;
-          }
-        }
-      cr.Restore ();
-      if (pathHit) {
-        string newDir = String.Join("/", segments, 0, i+1);
-        if (newDir == "") newDir = "/";
-        if (newDir != TopDirName) {
-          BuildDirs (newDir);
-          win.QueueDraw();
-        }
-      } else {
-        Transform (cr, width, height);
-        cr.Translate (0.0, Zoomer.Y);
-        foreach (DirStats d in Files) {
-          bool[] action = d.Click (cr, TotalSize, x, y);
-          if (action[0]) {
-            if (action[1]) {
-              BuildDirs (d.GetFullPath ());
-            }
-            win.QueueDraw();
-            break;
-          }
-          cr.Translate (0, d.GetScaledHeight ());
-        }
+      if (ClickTopDir (cr, x, y)) {
+        cr.Restore ();
+        return;
+      }
+      double advance = 0.0;
+      if (
+        ClickSortBar (ref advance, cr, x, y) ||
+        ClickSizeBar (ref advance, cr, x, y) ||
+        ClickOpenTerminal (ref advance, cr, x, y)
+      ) {
+        cr.Restore ();
+        return;
       }
     cr.Restore ();
+    cr.Save();
+      Transform (cr, width, height);
+      cr.Translate (0.0, Zoomer.Y);
+      foreach (DirStats d in Files) {
+        bool[] action = d.Click (cr, TotalSize, x, y);
+        if (action[0]) {
+          if (action[1]) {
+            BuildDirs (d.GetFullPath ());
+          }
+          win.QueueDraw();
+          break;
+        }
+        cr.Translate (0, d.GetScaledHeight ());
+      }
+    cr.Restore ();
+  }
+
+  bool ClickTopDir (Context cr, double x, double y)
+  {
+    cr.Translate (TopDirMarginLeft, TopDirMarginTop);
+    cr.SetFontSize (TopDirFontSize);
+    double advance = 0.0;
+    int hitIndex = 0;
+    string[] segments = TopDirName.Split('/');
+    if (TopDirName != "/") {
+      foreach (string s in segments) {
+        TextExtents e = cr.TextExtents(s + "/");
+        cr.Save ();
+          cr.NewPath ();
+          cr.Rectangle (advance, -e.Height, e.XAdvance, e.Height);
+          cr.IdentityMatrix ();
+          if (cr.InFill (x, y)) {
+            string newDir = String.Join("/", segments, 0, hitIndex+1);
+            if (newDir == "") newDir = "/";
+            if (newDir != TopDirName)
+              BuildDirs (newDir);
+            return true;
+          }
+        cr.Restore ();
+        advance += e.XAdvance;
+        hitIndex += 1;
+      }
+    }
+    return false;
   }
 
   bool ClickSortBar (ref double advance, Context cr, double x, double y)
@@ -380,6 +392,7 @@ class Filezoo : DrawingArea
   }
 
 
+  /* Zooming and panning */
 
   void ResetZoom ()
   {
@@ -418,6 +431,9 @@ class Filezoo : DrawingArea
     cr.Restore ();
     UpdateLayout();
   }
+
+
+  /* Event handlers */
 
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
@@ -510,7 +526,6 @@ class Filezoo : DrawingArea
 }
 
 
-
 class SortHandler {
   public string Name;
   public IComparer Comparer;
@@ -519,128 +534,13 @@ class SortHandler {
     Comparer = comparer;
   }
 }
+
 class SizeHandler {
   public string Name;
   public IMeasurer Measurer;
   public SizeHandler (string name, IMeasurer measurer) {
     Name = name;
     Measurer = measurer;
-  }
-}
-
-public class SizeComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
-    if (a.Info.FileType != b.Info.FileType ) {
-      if (a.IsDirectory) return -1;
-      if (b.IsDirectory) return 1;
-    }
-    int rv = a.Info.Length.CompareTo(b.Info.Length);
-    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
-    return rv;
-  }
-}
-
-public class NameComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
-    if (a.Info.FileType != b.Info.FileType ) {
-      if (a.IsDirectory) return -1;
-      if (b.IsDirectory) return 1;
-    }
-    return a.Info.Name.CompareTo(b.Info.Name);
-  }
-}
-
-public class DateComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
-    if (a.Info.FileType != b.Info.FileType ) {
-      if (a.IsDirectory) return -1;
-      if (b.IsDirectory) return 1;
-    }
-    int rv = a.Info.LastWriteTime.CompareTo(b.Info.LastWriteTime);
-    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
-    return rv;
-  }
-}
-
-public class TypeComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
-    if (a.Info.FileType != b.Info.FileType ) {
-      if (a.IsDirectory) return -1;
-      if (b.IsDirectory) return 1;
-    } else if (a.IsDirectory) {
-      return a.Info.Name.CompareTo(b.Info.Name);
-    }
-    int rv = a.Suffix.CompareTo(b.Suffix);
-    if (rv == 0) rv = a.Info.Name.CompareTo(b.Info.Name);
-    return rv;
-  }
-}
-
-interface IMeasurer {
-  double Measure (DirStats d);
-}
-
-public class SizeMeasurer : IMeasurer {
-  public double Measure (DirStats d) {
-    return Math.Max(1.0, d.Info.Length);
-  }
-}
-
-public class TotalMeasurer : IMeasurer {
-  public double Measure (DirStats d) {
-    return Math.Max(1.0, d.GetRecursiveSize ());
-  }
-}
-
-public class CountMeasurer : IMeasurer {
-  public double Measure (DirStats d) {
-    double mul = (d.Info.Name[0] == '.') ? 1.0 : 20.0;
-    return (d.IsDirectory ? d.GetRecursiveCount() : 5.0) * mul;
-  }
-}
-
-public class FlatMeasurer : IMeasurer {
-  public double Measure (DirStats d) {
-    bool isDotFile = d.Info.Name[0] == '.';
-    if (isDotFile) return 0.05;
-    return (d.IsDirectory ? 1.5 : 1.0);
-  }
-}
-
-interface IZoomer {
-  void SetZoom (double x, double y, double z);
-  double X { get; set; }
-  double Y { get; set; }
-  double Z { get; set; }
-  double GetZoomAt (double position);
-  void ResetZoom ();
-}
-
-public class FlatZoomer : IZoomer {
-  double xval = 0.0, yval = 0.0, zval = 1.0;
-  public double X { get { return xval; } set { xval = value; } }
-  public double Y {
-    get { return yval; }
-    set {
-      yval = Math.Max(-zval+1, Math.Min(0.0, value));
-    }
-  }
-  public double Z { get { return zval; } set { zval = value; } }
-  public void SetZoom (double x, double y, double z) {
-    Z = z;
-    X = x; Y = y;
-  }
-  public void ResetZoom () { X = Y = 0.0; Z = 1.0; }
-  public double GetZoomAt (double position) {
-    return Z;
   }
 }
 
