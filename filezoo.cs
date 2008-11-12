@@ -590,19 +590,19 @@ interface IMeasurer {
 
 public class SizeMeasurer : IMeasurer {
   public double Measure (DirStats d) {
-    return d.Info.Length;
+    return Math.Max(1.0, d.Info.Length);
   }
 }
 
 public class TotalMeasurer : IMeasurer {
   public double Measure (DirStats d) {
-    return d.GetRecursiveSize ();
+    return Math.Max(1.0, d.GetRecursiveSize ());
   }
 }
 
 public class CountMeasurer : IMeasurer {
   public double Measure (DirStats d) {
-    double mul = (d.Info.Name[0] == '.') ? 0.05 : 1.0;
+    double mul = (d.Info.Name[0] == '.') ? 1.0 : 20.0;
     return (d.IsDirectory ? d.GetRecursiveCount() : 5.0) * mul;
   }
 }
