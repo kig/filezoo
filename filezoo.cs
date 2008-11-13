@@ -185,11 +185,23 @@ class Filezoo : DrawingArea
       cr.LineWidth = 0.001;
       bool trav = LayoutUpdateRequested;
       cr.Scale(0.001, 0.001);
+      double y = Zoomer.Y * 1000.0;
+      uint count = 0;
       foreach (DirStats d in Files) {
-        d.Draw (cr);
-        cr.Translate (0, d.GetScaledHeight ());
-        trav = (trav || d.TraversalInProgress);
+        if (y < 1000.0) {
+          double h = d.GetScaledHeight();
+          if (y+h > 0.0) {
+            d.Draw (cr);
+            trav = (trav || d.TraversalInProgress);
+            count++;
+          }
+          cr.Translate (0, h);
+          y += h;
+        } else {
+          break;
+        }
       }
+//       Console.WriteLine("Drew {0} items", count);
     cr.Restore ();
     if (trav) UpdateLayout();
   }
@@ -277,16 +289,25 @@ class Filezoo : DrawingArea
       Transform (cr, width, height);
       cr.Translate (0.0, Zoomer.Y);
       cr.Scale(0.001, 0.001);
+      double yr = Zoomer.Y * 1000.0;
       foreach (DirStats d in Files) {
-        bool[] action = d.Click (cr, TotalSize, x, y);
-        if (action[0]) {
-          if (action[1]) {
-            BuildDirs (d.GetFullPath ());
+        if (yr < 1000.0) {
+          double h = d.GetScaledHeight();
+          if (yr+h > 0.0) {
+            bool[] action = d.Click (cr, TotalSize, x, y);
+            if (action[0]) {
+              if (action[1]) {
+                BuildDirs (d.GetFullPath ());
+              }
+              win.QueueDraw();
+              break;
+            }
           }
-          win.QueueDraw();
+          yr += h;
+          cr.Translate (0, h);
+        } else {
           break;
         }
-        cr.Translate (0, d.GetScaledHeight ());
       }
     cr.Restore ();
   }
