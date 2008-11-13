@@ -63,7 +63,7 @@ public class DirStats
       extras += String.Format(", {0} total", FormatSize(GetRecursiveSize()));
       return extras;
     } else {
-      return String.Format("{0}", FormatSize(Info.Length));
+      return String.Format("{0}", FormatSize(Length));
     }
   }
 
@@ -85,7 +85,9 @@ public class DirStats
     return String.Format("{0} {1}B", sz.ToString("N1"), suffix);
   }
 
-  public void Draw (Context cr)
+  public void Draw (Context cr) { Draw (cr, true); }
+
+  public void Draw (Context cr, bool showSubTitle)
   {
     double h = GetScaledHeight ();
     cr.Save ();
@@ -98,10 +100,12 @@ public class DirStats
       cr.RelMoveTo(0, h*0.5 - fs);
       if (fs > 4) {
         Helpers.DrawText (cr, fs, Name);
-        cr.RelMoveTo(0, fs*0.35);
-        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
+        if (showSubTitle) {
+          cr.RelMoveTo(0, fs*0.35);
+          Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
+        }
       } else if (fs > 1) {
-        Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle ());
+        Helpers.DrawText (cr, fs, Name + (showSubTitle ? "  " + GetSubTitle () : ""));
       } else {
         cr.Rectangle (BoxWidth * 1.1, h*0.5 - fs, fs / 2 * (Name.Length+15), fs/3);
         cr.Fill ();

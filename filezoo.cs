@@ -29,6 +29,8 @@ class Filezoo : DrawingArea
   double ZoomSpeed = 1.5;
   bool LayoutUpdateRequested = true;
 
+  bool FirstFrameOfDir = true;
+
   bool dragging = false;
   double dragStartX = 0.0;
   double dragStartY = 0.0;
@@ -103,6 +105,7 @@ class Filezoo : DrawingArea
     foreach (DirStats f in Files)
       f.TraversalCancelled = true;
     Files = GetDirStats (dirname);
+    FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort();
     UpdateLayout();
@@ -221,7 +224,7 @@ class Filezoo : DrawingArea
         if (y < 1000.0) {
           double h = d.GetScaledHeight();
           if (y+h > 0.0) {
-            d.Draw (cr);
+            d.Draw (cr, !FirstFrameOfDir);
             trav = (trav || d.TraversalInProgress);
             count++;
           }
@@ -236,6 +239,10 @@ class Filezoo : DrawingArea
     watch.Stop();
 //     Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
     if (trav) UpdateLayout();
+    if (FirstFrameOfDir) {
+      win.QueueDraw ();
+      FirstFrameOfDir = false;
+    }
   }
 
   void DrawTopDir (Context cr)
