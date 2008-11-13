@@ -8,7 +8,6 @@ using Cairo;
 
 public class DirStats
 {
-
   public static Color directoryColor = new Color (0,0,1);
   public static Color blockDeviceColor = new Color (0.75,0.5,0);
   public static Color characterDeviceColor = new Color (0.75,0.5,0);
@@ -26,10 +25,10 @@ public class DirStats
   public bool TraversalInProgress = false;
   public bool TraversalCancelled = false;
 
-  public double BoxWidth = 0.1;
+  public double BoxWidth = 100.0;
 
-  public double MinFontSize = 0.0005;
-  public double MaxFontSize = 0.02;
+  public double MinFontSize = 0.5;
+  public double MaxFontSize = 14.0;
 
   private bool recursiveSizeComputed = false;
   private double recursiveSize = 0.0;
@@ -45,7 +44,7 @@ public class DirStats
 
   public double GetScaledHeight ()
   {
-    return Height * Scale * Zoom;
+    return Height * Scale * Zoom * 1000;
   }
 
   public string GetSubTitle ()
@@ -87,12 +86,12 @@ public class DirStats
       cr.Color = c;
       cr.Fill ();
       double fs = GetFontSize(h);
-      cr.SetFontSize (fs);
-      cr.MoveTo (BoxWidth + 0.01, h / 2 + fs / 4);
-      cr.ShowText (Info.Name);
-      cr.SetFontSize(fs * 0.7);
-      cr.ShowText ("  ");
-      cr.ShowText (GetSubTitle ());
+      cr.MoveTo (BoxWidth * 1.1, 0.0);
+      cr.RelMoveTo(0, h*0.5 - fs);
+      Helpers.DrawText (cr, fs, Info.Name);
+      cr.RelMoveTo(0, fs*0.35);
+      Helpers.DrawText (cr, fs * 0.7, "  ");
+      Helpers.DrawText (cr, fs * 0.7, GetSubTitle ());
     cr.Restore ();
   }
 
@@ -101,7 +100,7 @@ public class DirStats
   }
 
   double QuantizeFontSize (double fs) {
-    return (Math.Floor(fs / 0.001) * 0.001);
+    return Math.Floor(fs);
   }
 
   public bool[] Click (Context cr, double totalSize, double x, double y)
@@ -112,12 +111,10 @@ public class DirStats
     cr.Save ();
       cr.NewPath ();
       double fs = GetFontSize(h);
-      cr.SetFontSize (fs);
-      advance += cr.TextExtents(Info.Name).XAdvance;
-      cr.SetFontSize(fs * 0.7);
-      advance += cr.TextExtents("  ").XAdvance;
-      advance += cr.TextExtents(GetSubTitle ()).XAdvance;
-      cr.Rectangle (0.0, 0.0, BoxWidth + 0.01 + advance, h);
+      advance += Helpers.GetTextExtents (cr, fs, Info.Name).XAdvance;
+      advance += Helpers.GetTextExtents (cr, fs*0.7, "  ").XAdvance;
+      advance += Helpers.GetTextExtents (cr, fs*0.7, GetSubTitle ()).XAdvance;
+      cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
       cr.IdentityMatrix ();
       retval[0] = cr.InFill(x,y);
     cr.Restore ();
