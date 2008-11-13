@@ -8,9 +8,15 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
-  public double TopDirFontSize = 15;
-  public double TopDirMarginTop = 20;
+  public Pango.FontDescription UIFont = Pango.FontDescription.FromString ("Verdana");
+
+  public double TopDirFontSize = 12;
+  public double TopDirMarginTop = 24;
   public double TopDirMarginLeft = 12;
+
+  public double ToolbarY = 19;
+  public double ToolbarTitleFontSize = 6;
+  public double ToolbarLabelFontSize = 9;
 
   public double FilesMarginLeft = 10;
   public double FilesMarginRight = 10;
@@ -31,30 +37,32 @@ class Filezoo : DrawingArea
   double dragX = 0.0;
   double dragY = 0.0;
 
-  Color ActiveColor = new Color (0,0,0,1);
-  Color InActiveColor = new Color (0,0,0,0.5);
-  Color TermColor = new Color (0,0,1,1);
+  double FontSize = 15;
 
-  string SortLabel = "Sort ";
-  string SizeLabel = "Size ";
-  string OpenTerminalLabel = "Term";
+  public Color ActiveColor = new Color (0,0,0,1);
+  public Color InActiveColor = new Color (0,0,0,0.5);
+  public Color TermColor = new Color (0,0,1,1);
 
-  SortHandler[] SortFields = {
+  public string SortLabel = "Sort ";
+  public string SizeLabel = "Size ";
+  public string OpenTerminalLabel = "Term";
+
+  public SortHandler[] SortFields = {
     new SortHandler("Name", new NameComparer()),
     new SortHandler("Size", new SizeComparer()),
     new SortHandler("Date", new DateComparer()),
     new SortHandler("Type", new TypeComparer())
   };
-  SizeHandler[] SizeFields = {
+  public SizeHandler[] SizeFields = {
     new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
     new SizeHandler("Count", new CountMeasurer()),
     new SizeHandler("Total", new TotalMeasurer())
   };
-  SortHandler SortField;
-  SizeHandler SizeField;
-  bool SortDesc = false;
-  IZoomer Zoomer;
+  public SortHandler SortField;
+  public SizeHandler SizeField;
+  public bool SortDesc = false;
+  public IZoomer Zoomer;
 
   /**
     The Main method inits the Gtk application and creates a Filezoo instance
@@ -191,55 +199,94 @@ class Filezoo : DrawingArea
   {
     cr.Color = new Color (0,0,1);
     cr.Translate (TopDirMarginLeft, TopDirMarginTop);
-    cr.SetFontSize (TopDirFontSize);
+    cr.MoveTo (0.0, 0.0);
+    FontSize = (TopDirFontSize);
     if (TopDirName == "/") {
-      cr.ShowText("/");
+      DrawText (cr, "/");
     } else {
       foreach (string s in TopDirName.Split('/')) {
-        cr.ShowText(s);
-        cr.ShowText("/");
+        DrawText (cr, s);
+        DrawText (cr, "/");
       }
     }
   }
 
   void DrawSortBar (Context cr)
   {
-    cr.MoveTo (0.0, TopDirFontSize * 1.32);
+    cr.MoveTo (0.0, ToolbarY);
     cr.Color = ActiveColor;
-    cr.SetFontSize (TopDirFontSize * 0.5);
-    cr.ShowText (SortLabel);
-    cr.SetFontSize (TopDirFontSize * 0.8);
+    FontSize = ToolbarTitleFontSize;
+    cr.RelMoveTo (0, -1);
+    DrawText (cr, SortLabel);
+    cr.RelMoveTo (0, 1);
+    FontSize = ToolbarLabelFontSize;
     foreach (SortHandler sf in SortFields) {
       cr.Color = (SortField == sf) ? ActiveColor : InActiveColor;
-      cr.ShowText (sf.Name);
-      cr.ShowText (" ");
+      DrawText (cr, sf.Name);
+      DrawText (cr, " ");
     }
     cr.Color = ActiveColor;
-    cr.ShowText (" ");
-    cr.ShowText ((SortDesc ? "▾" : "▴") + " ");
-    cr.ShowText (" ");
+    DrawText (cr, " ");
+    DrawText (cr, (SortDesc ? "▾" : "▴") + " ");
+    DrawText (cr, " ");
   }
 
   void DrawSizeBar (Context cr)
   {
     cr.Color = ActiveColor;
-    cr.SetFontSize (TopDirFontSize * 0.5);
-    cr.ShowText (SizeLabel);
-    cr.SetFontSize (TopDirFontSize * 0.8);
+    FontSize = ToolbarTitleFontSize;
+    cr.RelMoveTo (0, -1);
+    DrawText (cr, SizeLabel);
+    cr.RelMoveTo (0, 1);
+    FontSize = ToolbarLabelFontSize;
     foreach (SizeHandler sf in SizeFields) {
       cr.Color = (SizeField == sf) ? ActiveColor : InActiveColor;
-      cr.ShowText (sf.Name);
-      cr.ShowText (" ");
+      DrawText (cr, sf.Name);
+      DrawText (cr, " ");
     }
-    cr.ShowText (" ");
+    DrawText (cr, " ");
   }
 
   void DrawOpenTerminal (Context cr)
   {
+    FontSize = ToolbarLabelFontSize;
     cr.Color = InActiveColor;
-    cr.ShowText (" |  ");
+    DrawText (cr, " |  ");
     cr.Color = TermColor;
-    cr.ShowText (OpenTerminalLabel);
+    DrawText (cr, OpenTerminalLabel);
+  }
+
+  void DrawText (Context cr, string text)
+  {
+    Pango.Layout layout = Pango.CairoHelper.CreateLayout (cr);
+    UIFont.Size = (int)(FontSize * Pango.Scale.PangoScale);
+    layout.FontDescription = UIFont;
+    layout.SetText (text);
+    Pango.Rectangle pe, le;
+    layout.GetExtents(out pe, out le);
+    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+           h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    cr.RelMoveTo (0, -h);
+    Pango.CairoHelper.ShowLayout (cr, layout);
+    cr.RelMoveTo (w, h);
+  }
+
+  TextExtents GetTextExtents (Context cr, string text)
+  {
+    Pango.Layout layout = Pango.CairoHelper.CreateLayout (cr);
+    UIFont.Size = (int)(FontSize * Pango.Scale.PangoScale);
+    layout.FontDescription = UIFont;
+    layout.SetText (text);
+    Pango.Rectangle pe, le;
+    layout.GetExtents(out pe, out le);
+    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+           h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    TextExtents te = new TextExtents ();
+    te.Height = h;
+    te.Width = w;
+    te.XAdvance = w;
+    te.YAdvance = 0;
+    return te;
   }
 
 
@@ -282,13 +329,14 @@ class Filezoo : DrawingArea
   bool ClickTopDir (Context cr, double x, double y)
   {
     cr.Translate (TopDirMarginLeft, TopDirMarginTop);
-    cr.SetFontSize (TopDirFontSize);
+    cr.MoveTo (0.0, 0.0);
+    FontSize = (TopDirFontSize);
     double advance = 0.0;
     int hitIndex = 0;
     string[] segments = TopDirName.Split('/');
     if (TopDirName != "/") {
       foreach (string s in segments) {
-        TextExtents e = cr.TextExtents(s + "/");
+        TextExtents e = GetTextExtents (cr, s + "/");
         cr.Save ();
           cr.NewPath ();
           cr.Rectangle (advance, -e.Height, e.XAdvance, e.Height);
@@ -311,12 +359,12 @@ class Filezoo : DrawingArea
   bool ClickSortBar (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
-    cr.Translate (0, TopDirFontSize * 1.32);
-    cr.SetFontSize (TopDirFontSize * 0.5);
-    advance += cr.TextExtents (SortLabel).XAdvance;
-    cr.SetFontSize (TopDirFontSize * 0.8);
+    cr.Translate (0, ToolbarY);
+    FontSize = ToolbarTitleFontSize;
+    advance += GetTextExtents (cr, SortLabel).XAdvance;
+    FontSize = ToolbarLabelFontSize;
     foreach (SortHandler sf in SortFields) {
-      te = cr.TextExtents (sf.Name);
+      te = GetTextExtents (cr, sf.Name);
       if (CheckTextExtents(cr, advance, te, x, y)) {
         if (sf == SortField) {
           SortDesc = !SortDesc;
@@ -328,10 +376,10 @@ class Filezoo : DrawingArea
         return true;
       }
       advance += te.XAdvance;
-      advance += cr.TextExtents (" ").XAdvance;
+      advance += GetTextExtents (cr, " ").XAdvance;
     }
-    advance += cr.TextExtents (" ").XAdvance;
-    te = cr.TextExtents ((SortDesc ? "▾" : "▴") + " ");
+    advance += GetTextExtents (cr, " ").XAdvance;
+    te = GetTextExtents (cr, (SortDesc ? "▾" : "▴") + " ");
     if (CheckTextExtents(cr, advance, te, x, y)) {
       SortDesc = !SortDesc;
       ResetZoom ();
@@ -339,18 +387,18 @@ class Filezoo : DrawingArea
       return true;
     }
     advance += te.XAdvance;
-    advance += cr.TextExtents (" ").XAdvance;
+    advance += GetTextExtents (cr, " ").XAdvance;
     return false;
   }
 
   bool ClickSizeBar (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
-    cr.SetFontSize (TopDirFontSize * 0.5);
-    advance += cr.TextExtents (SizeLabel).XAdvance;
-    cr.SetFontSize (TopDirFontSize * 0.8);
+    FontSize = ToolbarTitleFontSize;
+    advance += GetTextExtents (cr, SizeLabel).XAdvance;
+    FontSize = ToolbarLabelFontSize;
     foreach (SizeHandler sf in SizeFields) {
-      te = cr.TextExtents (sf.Name);
+      te = GetTextExtents (cr, sf.Name);
       if (CheckTextExtents(cr, advance, te, x, y)) {
         SizeField = sf;
         ResetZoom ();
@@ -358,17 +406,18 @@ class Filezoo : DrawingArea
         return true;
       }
       advance += te.XAdvance;
-      advance += cr.TextExtents (" ").XAdvance;
+      advance += GetTextExtents (cr, " ").XAdvance;
     }
-    advance += cr.TextExtents (" ").XAdvance;
+    advance += GetTextExtents (cr, " ").XAdvance;
     return false;
   }
 
   bool ClickOpenTerminal (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
-    advance += cr.TextExtents (" |  ").XAdvance;
-    te = cr.TextExtents (OpenTerminalLabel);
+    FontSize = ToolbarLabelFontSize;
+    advance += GetTextExtents (cr, " |  ").XAdvance;
+    te = GetTextExtents (cr, OpenTerminalLabel);
     if (CheckTextExtents (cr, advance, te, x, y)) {
       string cd = UnixDirectoryInfo.GetCurrentDirectory ();
       UnixDirectoryInfo.SetCurrentDirectory (TopDirName);

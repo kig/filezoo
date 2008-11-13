@@ -139,15 +139,31 @@ public class DirStats
     return Info.FullName;
   }
 
+  class DirectoryEntry {
+    public bool Complete;
+    public string Path;
+    public double TotalSize;
+
+    public DirectoryEntry (string path) {
+      Path = path;
+      Complete = false;
+      TotalSize = 0.0;
+    }
+
+    public void SetTotalSize (double sz) { TotalSize = sz; }
+    public void SetComplete (bool c) { Complete = c; }
+  }
+
   public double GetRecursiveSize ()
   {
     if (!recursiveSizeComputed) {
       recursiveSizeComputed = true;
-      TraversalInProgress = true;
       recursiveSize = 0.0;
       recursiveCount = 1.0;
       if (IsDirectory) {
-        ThreadPool.QueueUserWorkItem(new WaitCallback(DirSizeCallback));
+        TraversalInProgress = true;
+        WaitCallback cb = new WaitCallback(DirSizeCallback);
+        ThreadPool.QueueUserWorkItem(cb);
       } else {
         recursiveSize = Info.Length;
         TraversalInProgress = false;
