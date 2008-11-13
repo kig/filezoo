@@ -55,12 +55,14 @@ public class DirStats
     return Height * Scale * Zoom * 1000;
   }
 
-  public string GetSubTitle ()
+  public string GetSubTitle () { return GetSubTitle (true); }
+
+  public string GetSubTitle ( bool complexSubTitle )
   {
     if (IsDirectory) {
       string extras = "";
-      extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
-      extras += String.Format(", {0} total", FormatSize(GetRecursiveSize()));
+      extras += String.Format("{0} files", (complexSubTitle ? GetRecursiveCount() : 0).ToString("N0"));
+      extras += String.Format(", {0} total", FormatSize(complexSubTitle ? GetRecursiveSize() : 0));
       return extras;
     } else {
       return String.Format("{0}", FormatSize(Length));
@@ -87,7 +89,7 @@ public class DirStats
 
   public void Draw (Context cr) { Draw (cr, true); }
 
-  public void Draw (Context cr, bool showSubTitle)
+  public void Draw (Context cr, bool complexSubTitle)
   {
     double h = GetScaledHeight ();
     cr.Save ();
@@ -100,12 +102,10 @@ public class DirStats
       cr.RelMoveTo(0, h*0.5 - fs);
       if (fs > 4) {
         Helpers.DrawText (cr, fs, Name);
-        if (showSubTitle) {
-          cr.RelMoveTo(0, fs*0.35);
-          Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
-        }
+        cr.RelMoveTo(0, fs*0.35);
+        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle (complexSubTitle));
       } else if (fs > 1) {
-        Helpers.DrawText (cr, fs, Name + (showSubTitle ? "  " + GetSubTitle () : ""));
+        Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle (complexSubTitle));
       } else {
         cr.Rectangle (BoxWidth * 1.1, h*0.5 - fs, fs / 2 * (Name.Length+15), fs/3);
         cr.Fill ();
