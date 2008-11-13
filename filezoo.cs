@@ -169,7 +169,12 @@ class Filezoo : DrawingArea
 
   void Draw (Context cr, uint width, uint height)
   {
+    Stopwatch watch = new Stopwatch();
+    watch.Start ();
     if (LayoutUpdateRequested) ReCreateLayout();
+    watch.Stop ();
+    Console.WriteLine("LayoutUpdate: {0} ms", watch.ElapsedMilliseconds);
+    watch.Start ();
     cr.Save ();
       cr.Color = new Color (1,1,1);
       cr.Rectangle (0,0, width, height);
@@ -203,6 +208,8 @@ class Filezoo : DrawingArea
       }
 //       Console.WriteLine("Drew {0} items", count);
     cr.Restore ();
+    watch.Stop();
+    Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
     if (trav) UpdateLayout();
   }
 

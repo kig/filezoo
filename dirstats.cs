@@ -28,7 +28,7 @@ public class DirStats
   public double BoxWidth = 100.0;
 
   public double MinFontSize = 0.5;
-  public double MaxFontSize = 14.0;
+  public double MaxFontSize = 16.0;
 
   private bool recursiveSizeComputed = false;
   private double recursiveSize = 0.0;
@@ -96,7 +96,7 @@ public class DirStats
   }
 
   double GetFontSize(double h) {
-    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, 0.7 * h)));
+    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, 0.5 * h)));
   }
 
   double QuantizeFontSize (double fs) {
