@@ -24,7 +24,7 @@ class Filezoo : DrawingArea
   private static Gtk.Window win = null;
   private string TopDirName = null;
   private double TotalSize = 0.0;
-  private ArrayList Files = null;
+  private DirStats[] Files = null;
 
   double ZoomSpeed = 1.5;
   bool LayoutUpdateRequested = true;
@@ -80,8 +80,8 @@ class Filezoo : DrawingArea
   {
     SortField = SortFields[0];
     SizeField = SizeFields[0];
+    Files = new DirStats[0];
     Zoomer = new FlatZoomer ();
-    Files = new ArrayList();
     win = new Window ("Filezoo");
     BuildDirs (topDirName);
     win.SetDefaultSize (400, 768);
@@ -104,16 +104,17 @@ class Filezoo : DrawingArea
       f.TraversalCancelled = true;
     Files = GetDirStats (dirname);
     ResetZoom ();
+    UpdateSort();
     UpdateLayout();
   }
 
-  ArrayList GetDirStats (string dirname)
+  DirStats[] GetDirStats (string dirname)
   {
-    ArrayList stats = new ArrayList ();
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-    foreach (UnixFileSystemInfo f in files)
-      stats.Add (new DirStats (f));
+    DirStats[] stats = new DirStats[files.Length];
+    for (int i=0; i<files.Length; i++)
+      stats[i] = new DirStats (files[i]);
     return stats;
   }
 
@@ -126,14 +127,30 @@ class Filezoo : DrawingArea
     win.QueueDraw ();
   }
 
+  bool SortUpdateRequested = true;
+
+  void UpdateSort ()
+  {
+    SortUpdateRequested = true;
+  }
+
   void ReCreateLayout ()
   {
     IZoomer zoomer = Zoomer;
     IMeasurer measurer = SizeField.Measurer;
     IComparer comparer = SortField.Comparer;
 
-    Files.Sort(comparer);
-    if (SortDesc) Files.Reverse();
+    Stopwatch watch = new Stopwatch();
+    watch.Start ();
+    if (SortUpdateRequested) {
+      Array.Sort(Files, comparer);
+      if (SortDesc) Array.Reverse(Files);
+      SortUpdateRequested = false;
+    }
+    watch.Stop ();
+//     Console.WriteLine("Files.Sort: {0} ms", watch.ElapsedMilliseconds);
+    watch.Reset ();
+    watch.Start ();
 
     double totalHeight = 0.0;
     foreach (DirStats f in Files) {
@@ -141,6 +158,10 @@ class Filezoo : DrawingArea
       f.Height = height;
       totalHeight += height;
     }
+    watch.Stop ();
+//     Console.WriteLine("Measure: {0} ms", watch.ElapsedMilliseconds);
+    watch.Reset ();
+    watch.Start ();
     double position = 0.0;
     bool trav = false;
     foreach (DirStats f in Files) {
@@ -150,6 +171,9 @@ class Filezoo : DrawingArea
       position += f.Height / totalHeight;
       trav = (trav || f.TraversalInProgress);
     }
+    watch.Stop ();
+//     Console.WriteLine("Zoom: {0} ms", watch.ElapsedMilliseconds);
+    watch.Reset ();
     if (!trav) {
       LayoutUpdateRequested = false;
     }
@@ -173,7 +197,8 @@ class Filezoo : DrawingArea
     watch.Start ();
     if (LayoutUpdateRequested) ReCreateLayout();
     watch.Stop ();
-    Console.WriteLine("LayoutUpdate: {0} ms", watch.ElapsedMilliseconds);
+//     Console.WriteLine("LayoutUpdate: {0} ms", watch.ElapsedMilliseconds);
+    watch.Reset ();
     watch.Start ();
     cr.Save ();
       cr.Color = new Color (1,1,1);
@@ -209,7 +234,7 @@ class Filezoo : DrawingArea
 //       Console.WriteLine("Drew {0} items", count);
     cr.Restore ();
     watch.Stop();
-    Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
+//     Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
     if (trav) UpdateLayout();
   }
 
@@ -252,7 +277,7 @@ class Filezoo : DrawingArea
   {
     cr.Color = ActiveColor;
     cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * 0.4 );
-    Helpers.DrawText (cr, ToolbarTitleFontSize, SortLabel);
+    Helpers.DrawText (cr, ToolbarTitleFontSize, SizeLabel);
     cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * -0.4 );
     FontSize = ToolbarLabelFontSize;
     foreach (SizeHandler sf in SizeFields) {
@@ -371,6 +396,7 @@ class Filezoo : DrawingArea
     if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
       SortDesc = !SortDesc;
       ResetZoom ();
+      UpdateSort ();
       UpdateLayout ();
       return true;
     }

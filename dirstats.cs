@@ -20,7 +20,11 @@ public class DirStats
   public double Scale;
   public double Zoom;
   public double Height;
+  public string Name;
+  public string FullName;
+  public double Length;
   public string Suffix;
+  public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
   public bool TraversalInProgress = false;
   public bool TraversalCancelled = false;
@@ -38,8 +42,12 @@ public class DirStats
   {
     Scale = Zoom = Height = 0.0;
     Info = f;
-    string[] split = f.Name.Split('.');
-    Suffix = (f.Name[0] == '.') ? "" : split[split.Length-1];
+    Name = f.Name;
+    FullName = f.FullName;
+    Length = f.Length;
+    try { IsDirectory = Info.IsDirectory; } catch (System.InvalidOperationException) {}
+    string[] split = Name.Split('.');
+    Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
   public double GetScaledHeight ()
@@ -88,10 +96,16 @@ public class DirStats
       double fs = GetFontSize(h);
       cr.MoveTo (BoxWidth * 1.1, 0.0);
       cr.RelMoveTo(0, h*0.5 - fs);
-      Helpers.DrawText (cr, fs, Info.Name);
-      cr.RelMoveTo(0, fs*0.35);
-      Helpers.DrawText (cr, fs * 0.7, "  ");
-      Helpers.DrawText (cr, fs * 0.7, GetSubTitle ());
+      if (fs > 4) {
+        Helpers.DrawText (cr, fs, Name);
+        cr.RelMoveTo(0, fs*0.35);
+        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
+      } else if (fs > 1) {
+        Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle ());
+      } else {
+        cr.Rectangle (BoxWidth * 1.1, h*0.5 - fs, fs / 2 * (Name.Length+15), fs/3);
+        cr.Fill ();
+      }
     cr.Restore ();
   }
 
@@ -105,15 +119,16 @@ public class DirStats
 
   public bool[] Click (Context cr, double totalSize, double x, double y)
   {
+
     double h = GetScaledHeight ();
+    double fs = GetFontSize(h);
     bool[] retval = {false, false};
+    if (fs < 4) return retval;
     double advance = 0.0;
     cr.Save ();
       cr.NewPath ();
-      double fs = GetFontSize(h);
-      advance += Helpers.GetTextExtents (cr, fs, Info.Name).XAdvance;
-      advance += Helpers.GetTextExtents (cr, fs*0.7, "  ").XAdvance;
-      advance += Helpers.GetTextExtents (cr, fs*0.7, GetSubTitle ()).XAdvance;
+      advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
+      advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
       cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
       cr.IdentityMatrix ();
       retval[0] = cr.InFill(x,y);
@@ -123,17 +138,9 @@ public class DirStats
     return retval;
   }
 
-  public bool IsDirectory {
-    get {
-      bool isDir = false;
-      try { isDir = Info.IsDirectory; } catch (System.InvalidOperationException) {}
-      return isDir;
-    }
-  }
-
   public string GetFullPath ()
   {
-    return Info.FullName;
+    return FullName;
   }
 
   class DirectoryEntry {
@@ -162,7 +169,7 @@ public class DirStats
         WaitCallback cb = new WaitCallback(DirSizeCallback);
         ThreadPool.QueueUserWorkItem(cb);
       } else {
-        recursiveSize = Info.Length;
+        recursiveSize = Length;
         TraversalInProgress = false;
       }
     }
@@ -196,12 +203,11 @@ public class DirStats
       if (TraversalCancelled) return;
       recursiveCount += 1.0;
       bool isDir = false;
-      try { isDir = f.IsDirectory; }
-      catch (System.InvalidOperationException) {}
+      try { isDir = f.IsDirectory; } catch (System.InvalidOperationException) {}
       if (isDir)
         DirSize(f.FullName);
       else
-        recursiveSize += (double)f.Length;
+        try { recursiveSize += (double)f.Length; } catch (System.InvalidOperationException) {}
     }
   }
 
