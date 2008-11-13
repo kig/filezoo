@@ -101,20 +101,29 @@ class Filezoo : DrawingArea
 
   void BuildDirs (string dirname)
   {
+    fwatch.Reset ();
+    fwatch.Start ();
+    Stopwatch watch = new Stopwatch();
+      watch.Start ();
     TopDirName = System.IO.Path.GetFullPath(dirname);
     foreach (DirStats f in Files)
       f.TraversalCancelled = true;
     Files = GetDirStats (dirname);
     FirstFrameOfDir = true;
+      watch.Stop ();
+//       Console.WriteLine("BuildDirs: {0} ms", watch.ElapsedMilliseconds);
     ResetZoom ();
     UpdateSort();
-    UpdateLayout();
   }
 
   DirStats[] GetDirStats (string dirname)
   {
+    Stopwatch watch = new Stopwatch();
+      watch.Start ();
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
     UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
+      watch.Stop ();
+//       Console.WriteLine("List dirs: {0} ms", watch.ElapsedMilliseconds);
     DirStats[] stats = new DirStats[files.Length];
     for (int i=0; i<files.Length; i++)
       stats[i] = new DirStats (files[i]);
@@ -135,6 +144,7 @@ class Filezoo : DrawingArea
   void UpdateSort ()
   {
     SortUpdateRequested = true;
+    UpdateLayout ();
   }
 
   void ReCreateLayout ()
@@ -149,11 +159,11 @@ class Filezoo : DrawingArea
       Array.Sort(Files, comparer);
       if (SortDesc) Array.Reverse(Files);
       SortUpdateRequested = false;
+      watch.Stop ();
+//       Console.WriteLine("Files.Sort: {0} ms", watch.ElapsedMilliseconds);
+      watch.Reset ();
+      watch.Start ();
     }
-    watch.Stop ();
-//     Console.WriteLine("Files.Sort: {0} ms", watch.ElapsedMilliseconds);
-    watch.Reset ();
-    watch.Start ();
 
     double totalHeight = 0.0;
     foreach (DirStats f in Files) {
@@ -194,6 +204,7 @@ class Filezoo : DrawingArea
     cr.Scale (boxSize, boxSize);
   }
 
+  Stopwatch fwatch = new Stopwatch();
   void Draw (Context cr, uint width, uint height)
   {
     Stopwatch watch = new Stopwatch();
@@ -239,7 +250,9 @@ class Filezoo : DrawingArea
     watch.Stop();
 //     Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
     if (trav) UpdateLayout();
+    fwatch.Stop ();
     if (FirstFrameOfDir) {
+//       Console.WriteLine("FirstFrameOfDir: {0} ms", fwatch.ElapsedMilliseconds);
       win.QueueDraw ();
       FirstFrameOfDir = false;
     }
@@ -392,7 +405,7 @@ class Filezoo : DrawingArea
           SortField = sf;
         }
         ResetZoom ();
-        UpdateLayout ();
+        UpdateSort ();
         return true;
       }
       advance += te.XAdvance;
@@ -404,7 +417,6 @@ class Filezoo : DrawingArea
       SortDesc = !SortDesc;
       ResetZoom ();
       UpdateSort ();
-      UpdateLayout ();
       return true;
     }
     advance += te.XAdvance;
