@@ -1,5 +1,5 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Gtk;
@@ -151,12 +151,12 @@ class Filezoo : DrawingArea
   {
     IZoomer zoomer = Zoomer;
     IMeasurer measurer = SizeField.Measurer;
-    IComparer comparer = SortField.Comparer;
+    IComparer<DirStats> comparer = SortField.Comparer;
 
     Stopwatch watch = new Stopwatch();
     watch.Start ();
     if (SortUpdateRequested) {
-      Array.Sort(Files, comparer);
+      Array.Sort<DirStats>(Files, comparer);
       if (SortDesc) Array.Reverse(Files);
       SortUpdateRequested = false;
       watch.Stop ();
@@ -599,8 +599,8 @@ class Filezoo : DrawingArea
 
 class SortHandler {
   public string Name;
-  public IComparer Comparer;
-  public SortHandler (string name, IComparer comparer) {
+  public IComparer<DirStats> Comparer;
+  public SortHandler (string name, IComparer<DirStats> comparer) {
     Name = name;
     Comparer = comparer;
   }

@@ -1,9 +1,7 @@
-using System.Collections;
+using System.Collections.Generic;
 
-public class SizeComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
+public class SizeComparer : IComparer<DirStats> {
+  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
@@ -14,10 +12,8 @@ public class SizeComparer : IComparer {
   }
 }
 
-public class NameComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
+public class NameComparer : IComparer<DirStats> {
+  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
@@ -26,10 +22,8 @@ public class NameComparer : IComparer {
   }
 }
 
-public class DateComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
+public class DateComparer : IComparer<DirStats> {
+  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
@@ -40,10 +34,8 @@ public class DateComparer : IComparer {
   }
 }
 
-public class TypeComparer : IComparer {
-  int IComparer.Compare ( object x, object y ) {
-    DirStats a = (DirStats) x;
-    DirStats b = (DirStats) y;
+public class TypeComparer : IComparer<DirStats> {
+  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
