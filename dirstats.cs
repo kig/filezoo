@@ -110,6 +110,38 @@ public class DirStats
         cr.Fill ();
       }
     cr.Restore ();
+    if (IsDirectory) {
+      cr.Save ();
+        cr.Translate (0, -h*0.01); // to account for the 0.02 bottom margin
+        DrawChildren(cr, GetFullPath(), h, 0.8);
+      cr.Restore ();
+    }
+  }
+
+  public void DrawChildren (Context cr, string path, double scale, double alpha)
+  {
+    if (scale < 1.0) return;
+    cr.Save ();
+      UnixDirectoryInfo info = new UnixDirectoryInfo(path);
+      UnixFileSystemInfo[] files = info.GetFileSystemEntries();
+      if (files.Length > 0) {
+        cr.Translate(0, 0.05*scale);
+        scale *= 0.9;
+        cr.Rectangle (0, 0, BoxWidth*alpha, scale);
+        cr.Color = new Color (1,1,1);
+        cr.Fill ();
+        scale /= files.Length;
+        foreach (UnixFileSystemInfo f in files) {
+          cr.Rectangle (0,0, BoxWidth*alpha, scale*0.98);
+          Color c = GetColor (f.FileType, f.FileAccessPermissions);
+          cr.Color = c;
+          cr.Fill();
+          if (f.IsDirectory)
+            DrawChildren(cr, f.FullName, scale, alpha * 0.8);
+          cr.Translate(0, scale);
+        }
+      }
+    cr.Restore ();
   }
 
   double GetFontSize(double h) {
@@ -150,8 +182,7 @@ public class DirStats
     return retval;
   }
 
-  public string GetFullPath ()
-  {
+  public string GetFullPath () {
     return FullName;
   }
 
