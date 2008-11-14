@@ -28,9 +28,9 @@ public class DirStatsTraversal : DirStats
     if (!recursiveSizeComputed) {
       recursiveSizeComputed = true;
       if (IsDirectory) {
-        TraversalInfo = TraversalServer.RequestInfo(GetFullPath());
+        TraversalInfo = TraversalServer.RequestInfo(FullName);
       } else {
-        TraversalInfo = new Traversal.DirectoryEntry(GetFullPath());
+        TraversalInfo = new Traversal.DirectoryEntry(FullName);
         TraversalInfo.TotalSize = Length;
         TraversalInfo.TotalCount = 1.0;
         TraversalInfo.Complete = true;

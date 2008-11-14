@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.IO;
@@ -16,9 +17,9 @@ public class DirStats
   public static Color executableColor = new Color (0,0.75,0);
   public static Color fileColor = new Color (0,0,0);
 
-  public double Scale;
-  public double Zoom;
-  public double Height;
+  double Scale;
+  double Zoom;
+  double Height;
   public string Name;
   public string FullName;
   public double Length;
@@ -26,6 +27,23 @@ public class DirStats
   public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
   public bool TraversalCancelled = false;
+  public IComparer<DirStats> Comparer;
+  public IMeasurer Measurer;
+  public IZoomer Zoomer;
+  public SortingDirection SortDirection = SortingDirection.Ascending;
+
+  DirStats[] _Entries = null;
+  DirStats[] Entries {
+    get {
+      if (_Entries == null) {
+        UnixFileSystemInfo[] files = new UnixDirectoryInfo(FullName).GetFileSystemEntries ();
+        _Entries = new DirStats[files.Length];
+        for (int i=0; i<files.Length; i++)
+          _Entries[i] = new DirStats (files[i]);
+      }
+      return _Entries;
+    }
+  }
 
   bool travP;
   public virtual bool TraversalInProgress {
@@ -44,6 +62,7 @@ public class DirStats
 
   public DirStats (UnixFileSystemInfo f)
   {
+    Comparer = new NameComparer ();
     Scale = Zoom = Height = 0.0;
     Info = f;
     Name = f.Name;
@@ -54,48 +73,48 @@ public class DirStats
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
-  public double GetScaledHeight ()
-  {
-    return Height * Scale * Zoom * 1000;
-  }
+  public double GetScaledHeight () { return Height * Scale * Zoom * 1000; }
 
   public string GetSubTitle () { return GetSubTitle (true); }
-
   public string GetSubTitle ( bool complexSubTitle )
   {
     if (IsDirectory) {
       string extras = "";
-      extras += String.Format("{0} files", (complexSubTitle ? GetRecursiveCount() : 0).ToString("N0"));
-      extras += String.Format(", {0} total", FormatSize(complexSubTitle ? GetRecursiveSize() : 0));
+      extras += String.Format("{0} files",
+        (complexSubTitle ? GetRecursiveCount() : 0).ToString("N0"));
+      extras += String.Format(", {0} total",
+        Helpers.FormatSI(complexSubTitle ? GetRecursiveSize() : 0, "B"));
       return extras;
     } else {
-      return String.Format("{0}", FormatSize(Length));
+      return String.Format("{0}", Helpers.FormatSI(Length, "B"));
     }
   }
 
-  public static string FormatSize (double sz)
+  public void Sort () { Array.Sort (Entries, Comparer); }
+
+  public void Relayout ()
   {
-    string suffix = "";
-    if (sz >= 1e9) {
-      suffix = "G";
-      sz /= 1e9;
-    } else if (sz >= 1e6) {
-      suffix = "M";
-      sz /= 1e6;
-    } else if (sz >= 1e3) {
-      suffix = "k";
-      sz /= 1e3;
-    } else {
-      return String.Format("{0} B", sz.ToString("N0"));
+    double totalHeight = 0.0;
+    foreach (DirStats f in Entries) {
+      double height = Measurer.Measure(f);
+      f.Height = height;
+      totalHeight += height;
     }
-    return String.Format("{0} {1}B", sz.ToString("N1"), suffix);
+    double position = 0.0;
+    bool trav = false;
+    foreach (DirStats f in Entries) {
+      double zoom = Zoomer.GetZoomAt(position);
+      f.Zoom = zoom;
+      f.Scale = 1.0 / totalHeight;
+      position += f.Height / totalHeight;
+      trav = (trav || f.TraversalInProgress);
+    }
   }
 
-  public void Draw (Context cr, double y) { Draw (cr, y, true); }
-  public void Draw (Context cr, double y, bool complexSubTitle)
-  { Draw (cr, y, complexSubTitle, true); }
+  public void Draw (Context cr, double y, double height, bool complexSubTitle)
+  { Draw (cr, y, height, complexSubTitle, true); }
 
-  public void Draw (Context cr, double y, bool complexSubTitle, bool drawSubdirs)
+  public void Draw (Context cr, double y, double height, bool complexSubTitle, bool drawSubdirs)
   {
     double h = GetScaledHeight ();
     cr.Save ();
@@ -121,7 +140,7 @@ public class DirStats
       cr.Save ();
         cr.Translate (0, -h*0.01); // to account for the 0.02 bottom margin
         y += -h*0.01;
-        DrawChildren(cr, y, GetFullPath(), h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
+        DrawChildren(cr, y, FullName, h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
       cr.Restore ();
     }
   }
@@ -169,13 +188,13 @@ public class DirStats
     return Math.Floor(fs);
   }
 
-  public DirAction Click (Context cr, double totalSize, double x, double y)
+  public DirAction Click (Context cr, double y, double height, double mouseX, double mouseY)
   {
 
     double h = GetScaledHeight ();
     double fs = GetFontSize(h);
     bool hit = false;
-    DirAction retval = DirAction.None;
+    DirAction retval = DirAction.None ();
     double advance = 0.0;
     cr.Save ();
       cr.NewPath ();
@@ -187,20 +206,16 @@ public class DirStats
       }
       cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
       cr.IdentityMatrix ();
-      hit = cr.InFill(x,y);
-      if (hit) retval = DirAction.Open;
+      hit = cr.InFill(mouseX,mouseY);
+      if (hit) retval = DirAction.Open(FullName);
     cr.Restore ();
     if (hit) {
       if (fs < 10)
-        retval = DirAction.ZoomIn;
+        retval = DirAction.ZoomIn(h);
       else if (IsDirectory)
-        retval = DirAction.Navigate;
+        retval = DirAction.Navigate(FullName);
     }
     return retval;
-  }
-
-  public string GetFullPath () {
-    return FullName;
   }
 
   public virtual double GetRecursiveSize ()
@@ -230,7 +245,7 @@ public class DirStats
 
   void DirSizeCallback (Object stateInfo)
   {
-    DirSize(GetFullPath());
+    DirSize(FullName);
     TraversalInProgress = false;
   }
 
@@ -272,10 +287,42 @@ public class DirStats
   }
 }
 
-public enum DirAction
+
+public class DirAction
 {
-  None,
-  Open,
-  Navigate,
-  ZoomIn
+  public Action Type;
+  public string Path;
+  public double Height;
+
+  public static DirAction None ()
+  { return new DirAction (Action.None, "", 0.0); }
+
+  public static DirAction Open (string path)
+  { return new DirAction (Action.Open, path, 0.0); }
+
+  public static DirAction Navigate (string path)
+  { return new DirAction (Action.Navigate, path, 0.0); }
+
+  public static DirAction ZoomIn (double h)
+  { return new DirAction (Action.ZoomIn, "", h); }
+
+  DirAction (Action type, string path, double height)
+  {
+    Type = type;
+    Path = path;
+    Height = height;
+  }
+
+  public enum Action {
+    None,
+    Open,
+    Navigate,
+    ZoomIn
+  }
+}
+
+
+public enum SortingDirection {
+  Ascending,
+  Descending
 }

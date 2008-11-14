@@ -1,6 +1,6 @@
 using System;
 
-interface IZoomer {
+public interface IZoomer {
   void SetZoom (double x, double y, double z);
   double X { get; set; }
   double Y { get; set; }

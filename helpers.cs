@@ -91,4 +91,60 @@ public static class Helpers {
     Process.Start ("gnome-open", path);
   }
 
+  public static string FormatSI (double sz, string unit)
+  {
+    string suffix = "";
+    if (sz >= 1e9) {
+      suffix = "G";
+      sz /= 1e9;
+    } else if (sz >= 1e6) {
+      suffix = "M";
+      sz /= 1e6;
+    } else if (sz >= 1e3) {
+      suffix = "k";
+      sz /= 1e3;
+    } else {
+      return String.Format("{0} "+unit, sz.ToString("N0"));
+    }
+    return String.Format("{0} {1}"+unit, sz.ToString("N1"), suffix);
+  }
+
+}
+
+
+public class Profiler
+{
+  public static bool GlobalPrintProfile = true;
+
+  protected Stopwatch Watch;
+  public Print PrintProfile = Print.Global;
+
+  public Profiler ()
+  {
+    Watch = new Stopwatch ();
+    Watch.Start ();
+  }
+
+  public void Time (string message)
+  {
+    double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
+    if (
+      (PrintProfile == Print.Always) ||
+      ((PrintProfile == Print.Global) && GlobalPrintProfile)
+    ) {
+      Console.WriteLine (message + ": {0} ms", elapsedMilliseconds.ToString("N1"));
+    }
+    Restart ();
+  }
+
+  public void Restart () { Reset (); Start (); }
+  public void Reset () { Watch.Reset (); }
+  public void Start () { Watch.Start (); }
+  public void Stop () { Watch.Stop (); }
+
+  public enum Print {
+    Global,
+    Always,
+    Never
+  }
 }

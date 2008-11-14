@@ -8,9 +8,9 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
-  public double TopDirFontSize = 12;
-  public double TopDirMarginTop = 2;
-  public double TopDirMarginLeft = 12;
+  public double BreadcrumbFontSize = 12;
+  public double BreadcrumbMarginTop = 2;
+  public double BreadcrumbMarginLeft = 12;
 
   public double ToolbarY = 24;
   public double ToolbarTitleFontSize = 6;
@@ -23,8 +23,7 @@ class Filezoo : DrawingArea
 
   private static Gtk.Window win = null;
   private string TopDirName = null;
-  private double TotalSize = 0.0;
-  private DirStats[] Files = null;
+  private DirStats TopDir = null;
 
   double ZoomInSpeed = 1.5;
   double ZoomOutSpeed = 2.0;
@@ -62,11 +61,12 @@ class Filezoo : DrawingArea
   };
   public SortHandler SortField;
   public SizeHandler SizeField;
-  public bool SortDesc = false;
+  public SortingDirection SortDirection = SortingDirection.Ascending;
   public IZoomer Zoomer;
 
+//   Traversal TraversalServer;
 
-  Traversal TraversalServer;
+  Profiler dirLatencyProfiler = new Profiler ();
 
 
   /**
@@ -87,8 +87,7 @@ class Filezoo : DrawingArea
   {
     SortField = SortFields[0];
     SizeField = SizeFields[0];
-    TraversalServer = new Traversal ();
-    Files = new DirStats[0];
+//     TraversalServer = new Traversal ();
     Zoomer = new FlatZoomer ();
     win = new Window ("Filezoo");
     BuildDirs (topDirName);
@@ -107,35 +106,17 @@ class Filezoo : DrawingArea
 
   void BuildDirs (string dirname)
   {
-    fwatch.Reset ();
-    fwatch.Start ();
-    Stopwatch watch = new Stopwatch();
-      watch.Start ();
+    dirLatencyProfiler.Reset ();
+    dirLatencyProfiler.Start ();
+    Profiler p = new Profiler ();
     TopDirName = System.IO.Path.GetFullPath(dirname);
-    foreach (DirStats f in Files)
-      f.TraversalCancelled = true;
-    TraversalServer.ClearQueue ();
-    Files = GetDirStats (dirname);
+    if (TopDir != null)
+      TopDir.TraversalCancelled = true;
+    TopDir = new DirStats(new UnixDirectoryInfo (TopDirName));
     FirstFrameOfDir = true;
-      watch.Stop ();
-//       Console.WriteLine("BuildDirs: {0} ms", watch.ElapsedMilliseconds);
     ResetZoom ();
-    UpdateSort();
-  }
-
-  DirStats[] GetDirStats (string dirname)
-  {
-    Stopwatch watch = new Stopwatch();
-      watch.Start ();
-    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
-    UnixFileSystemInfo[] files = di.GetFileSystemEntries ();
-      watch.Stop ();
-//       Console.WriteLine("List dirs: {0} ms", watch.ElapsedMilliseconds);
-    DirStats[] stats = new DirStats[files.Length];
-    for (int i=0; i<files.Length; i++)
-      stats[i] = new DirStats (files[i]);
-//       stats[i] = new DirStatsTraversal (files[i], TraversalServer);
-    return stats;
+    UpdateSort ();
+    p.Time("BuildDirs");
   }
 
 
@@ -157,49 +138,22 @@ class Filezoo : DrawingArea
 
   void ReCreateLayout ()
   {
-    IZoomer zoomer = Zoomer;
-    IMeasurer measurer = SizeField.Measurer;
-    IComparer<DirStats> comparer = SortField.Comparer;
+    Profiler p = new Profiler ();
 
-    Stopwatch watch = new Stopwatch();
-    watch.Start ();
     if (SortUpdateRequested) {
-      Array.Sort<DirStats>(Files, comparer);
-      if (SortDesc) Array.Reverse(Files);
+      TopDir.Comparer = SortField.Comparer;
+      TopDir.SortDirection = SortDirection;
+      TopDir.Sort ();
       SortUpdateRequested = false;
-      watch.Stop ();
-//       Console.WriteLine("Files.Sort: {0} ms", watch.ElapsedMilliseconds);
-      watch.Reset ();
-      watch.Start ();
+      p.Time ("TopDir.Sort");
     }
 
-    double totalHeight = 0.0;
-    foreach (DirStats f in Files) {
-      double height = measurer.Measure(f);
-      f.Height = height;
-      totalHeight += height;
-    }
-    watch.Stop ();
-//     Console.WriteLine("Measure: {0} ms", watch.ElapsedMilliseconds);
-    watch.Reset ();
-    watch.Start ();
-    double position = 0.0;
-    bool trav = false;
-    foreach (DirStats f in Files) {
-      double zoom = zoomer.GetZoomAt(position);
-      f.Zoom = zoom;
-      f.Scale = 1.0 / totalHeight;
-      position += f.Height / totalHeight;
-      trav = (trav || f.TraversalInProgress);
-    }
-    watch.Stop ();
-//     Console.WriteLine("Zoom: {0} ms", watch.ElapsedMilliseconds);
-    watch.Reset ();
-    if (!trav) {
-      LayoutUpdateRequested = false;
-    }
+    TopDir.Measurer = SizeField.Measurer;
+    TopDir.Zoomer = Zoomer;
+    TopDir.Relayout ();
+    p.Time ("TopDir.Relayout");
+    LayoutUpdateRequested = TopDir.TraversalInProgress;
   }
-
 
   /* Drawing */
 
@@ -212,66 +166,56 @@ class Filezoo : DrawingArea
     cr.Scale (boxSize, boxSize);
   }
 
-  Stopwatch fwatch = new Stopwatch();
   void Draw (Context cr, uint width, uint height)
   {
-    Stopwatch watch = new Stopwatch();
-    watch.Start ();
+    Profiler p = new Profiler ();
+
     if (LayoutUpdateRequested) ReCreateLayout();
-    watch.Stop ();
-//     Console.WriteLine("LayoutUpdate: {0} ms", watch.ElapsedMilliseconds);
-    watch.Reset ();
-    watch.Start ();
+
+    // Clear the drawing area
     cr.Save ();
       cr.Color = new Color (1,1,1);
       cr.Rectangle (0,0, width, height);
       cr.Fill ();
-      cr.Save ();
-        DrawTopDir (cr);
-        DrawSortBar (cr);
-        DrawSizeBar (cr);
-        DrawOpenTerminal (cr);
-      cr.Restore ();
+    cr.Restore ();
+
+    // Draw the toolbars
+    cr.Save ();
+      DrawBreadcrumb (cr);
+      DrawSortBar (cr);
+      DrawSizeBar (cr);
+      DrawOpenTerminal (cr);
+    cr.Restore ();
+
+    p.Time ("Draw toolbars");
+
+    // Draw the filesystem view
+    cr.Save ();
       Transform (cr, width, height);
       cr.Translate (0.0, Zoomer.Y);
-      cr.LineWidth = 0.001;
-      bool trav = LayoutUpdateRequested;
       cr.Scale(0.001, 0.001);
       double y = Zoomer.Y * 1000.0;
-      uint count = 0;
-      foreach (DirStats d in Files) {
-        if (y < 1000.0) {
-          double h = d.GetScaledHeight();
-          if (y+h > 0.0) {
-            d.Draw (cr, y, !FirstFrameOfDir);
-            trav = (trav || d.TraversalInProgress);
-            count++;
-          }
-          cr.Translate (0, h);
-          y += h;
-        } else {
-          break;
-        }
-      }
-//       Console.WriteLine("Drew {0} items", count);
+      TopDir.Draw (cr, y, 1000.0, !FirstFrameOfDir);
     cr.Restore ();
-    watch.Stop();
-//     Console.WriteLine("Draw: {0} ms", watch.ElapsedMilliseconds);
-    if (trav) UpdateLayout();
-    fwatch.Stop ();
+
+    p.Time ("TopDir.Draw");
+
+    dirLatencyProfiler.Stop ();
     if (FirstFrameOfDir) {
-//       Console.WriteLine("FirstFrameOfDir: {0} ms", fwatch.ElapsedMilliseconds);
+      dirLatencyProfiler.Time ("Directory latency");
       win.QueueDraw ();
       FirstFrameOfDir = false;
     }
+    if (LayoutUpdateRequested || TopDir.TraversalInProgress)
+      UpdateLayout();
   }
 
-  void DrawTopDir (Context cr)
+  void DrawBreadcrumb (Context cr)
   {
     cr.Color = new Color (0,0,1);
-    cr.Translate (TopDirMarginLeft, TopDirMarginTop);
+    cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.MoveTo (0.0, 0.0);
-    FontSize = (TopDirFontSize);
+    FontSize = (BreadcrumbFontSize);
     if (TopDirName == "/") {
       Helpers.DrawText (cr, FontSize, "/");
     } else {
@@ -297,6 +241,7 @@ class Filezoo : DrawingArea
     }
     cr.Color = ActiveColor;
     Helpers.DrawText (cr, FontSize, " ");
+    bool SortDesc = (SortDirection == SortingDirection.Descending);
     Helpers.DrawText (cr, FontSize, (SortDesc ? "▾" : "▴") + " ");
     Helpers.DrawText (cr, FontSize, " ");
   }
@@ -331,7 +276,7 @@ class Filezoo : DrawingArea
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
-      if (ClickTopDir (cr, x, y)) {
+      if (ClickBreadcrumb (cr, x, y)) {
         cr.Restore ();
         return;
       }
@@ -350,40 +295,29 @@ class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       cr.Scale(0.001, 0.001);
       double yr = Zoomer.Y * 1000.0;
-      foreach (DirStats d in Files) {
-        if (yr < 1000.0) {
-          double h = d.GetScaledHeight();
-          if (yr+h > 0.0) {
-            DirAction action = d.Click (cr, TotalSize, x, y);
-            switch (action) {
-              case DirAction.Open:
-                Helpers.OpenFile(d.GetFullPath ());
-                break;
-              case DirAction.Navigate:
-                BuildDirs (d.GetFullPath ());
-                break;
-              case DirAction.ZoomIn:
-                cr.Save ();
-                  cr.IdentityMatrix ();
-                  ZoomBy(cr, width, height, x, y, 22.0 / h);
-                cr.Restore ();
-                break;
-            }
-          }
-          yr += h;
-          cr.Translate (0, h);
-        } else {
+      DirAction action = TopDir.Click (cr, yr, 1000.0, x, y);
+      switch (action.Type) {
+        case DirAction.Action.Open:
+          Helpers.OpenFile(action.Path);
           break;
-        }
+        case DirAction.Action.Navigate:
+          BuildDirs (action.Path);
+          break;
+        case DirAction.Action.ZoomIn:
+          cr.Save ();
+            cr.IdentityMatrix ();
+            ZoomBy(cr, width, height, x, y, 22.0 / action.Height);
+          cr.Restore ();
+          break;
       }
     cr.Restore ();
   }
 
-  bool ClickTopDir (Context cr, double x, double y)
+  bool ClickBreadcrumb (Context cr, double x, double y)
   {
-    cr.Translate (TopDirMarginLeft, TopDirMarginTop);
+    cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.MoveTo (0.0, 0.0);
-    FontSize = (TopDirFontSize);
+    FontSize = (BreadcrumbFontSize);
     double advance = 0.0;
     int hitIndex = 0;
     string[] segments = TopDirName.Split('/');
@@ -415,7 +349,9 @@ class Filezoo : DrawingArea
       te = Helpers.GetTextExtents (cr, FontSize, sf.Name);
       if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
         if (sf == SortField) {
-          SortDesc = !SortDesc;
+          SortDirection = (SortDirection == SortingDirection.Ascending) ?
+                          SortingDirection.Descending :
+                          SortingDirection.Ascending;
         } else {
           SortField = sf;
         }
@@ -427,9 +363,12 @@ class Filezoo : DrawingArea
       advance += Helpers.GetTextExtents (cr, FontSize, " ").XAdvance;
     }
     advance += Helpers.GetTextExtents (cr, FontSize, " ").XAdvance;
+    bool SortDesc = (SortDirection == SortingDirection.Descending);
     te = Helpers.GetTextExtents (cr, FontSize, (SortDesc ? "▾" : "▴") + " ");
     if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
-      SortDesc = !SortDesc;
+      SortDirection = (SortDirection == SortingDirection.Ascending) ?
+                      SortingDirection.Descending :
+                      SortingDirection.Ascending;
       ResetZoom ();
       UpdateSort ();
       return true;

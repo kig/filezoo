@@ -1,6 +1,6 @@
 using System;
 
-interface IMeasurer {
+public interface IMeasurer {
   double Measure (DirStats d);
 }
 
