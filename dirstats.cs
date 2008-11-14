@@ -110,7 +110,7 @@ public class DirStats
         cr.Fill ();
       }
     cr.Restore ();
-    if (IsDirectory) {
+    if (false && IsDirectory) {
       cr.Save ();
         cr.Translate (0, -h*0.01); // to account for the 0.02 bottom margin
         DrawChildren(cr, GetFullPath(), h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
