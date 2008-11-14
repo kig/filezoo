@@ -65,6 +65,10 @@ class Filezoo : DrawingArea
   public bool SortDesc = false;
   public IZoomer Zoomer;
 
+
+  Traversal TraversalServer;
+
+
   /**
     The Main method inits the Gtk application and creates a Filezoo instance
     to run.
@@ -83,6 +87,7 @@ class Filezoo : DrawingArea
   {
     SortField = SortFields[0];
     SizeField = SizeFields[0];
+    TraversalServer = new Traversal ();
     Files = new DirStats[0];
     Zoomer = new FlatZoomer ();
     win = new Window ("Filezoo");
@@ -109,6 +114,7 @@ class Filezoo : DrawingArea
     TopDirName = System.IO.Path.GetFullPath(dirname);
     foreach (DirStats f in Files)
       f.TraversalCancelled = true;
+    TraversalServer.ClearQueue ();
     Files = GetDirStats (dirname);
     FirstFrameOfDir = true;
       watch.Stop ();
@@ -128,6 +134,7 @@ class Filezoo : DrawingArea
     DirStats[] stats = new DirStats[files.Length];
     for (int i=0; i<files.Length; i++)
       stats[i] = new DirStats (files[i]);
+//       stats[i] = new DirStatsTraversal (files[i], TraversalServer);
     return stats;
   }
 

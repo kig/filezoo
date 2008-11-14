@@ -25,15 +25,20 @@ public class DirStats
   public string Suffix;
   public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
-  public bool TraversalInProgress = false;
   public bool TraversalCancelled = false;
+
+  bool travP;
+  public virtual bool TraversalInProgress {
+    get { return travP; }
+    set { travP = value; }
+  }
 
   public double BoxWidth = 100.0;
 
   public double MinFontSize = 0.5;
   public double MaxFontSize = 16.0;
 
-  private bool recursiveSizeComputed = false;
+  protected bool recursiveSizeComputed = false;
   private double recursiveSize = 0.0;
   private double recursiveCount = 1.0;
 
@@ -87,8 +92,10 @@ public class DirStats
   }
 
   public void Draw (Context cr) { Draw (cr, true); }
-
   public void Draw (Context cr, bool complexSubTitle)
+  { Draw (cr, complexSubTitle, false); }
+
+  public void Draw (Context cr, bool complexSubTitle, bool drawSubdirs)
   {
     double h = GetScaledHeight ();
     cr.Save ();
@@ -110,7 +117,7 @@ public class DirStats
         cr.Fill ();
       }
     cr.Restore ();
-    if (false && IsDirectory) {
+    if (drawSubdirs && IsDirectory) {
       cr.Save ();
         cr.Translate (0, -h*0.01); // to account for the 0.02 bottom margin
         DrawChildren(cr, GetFullPath(), h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
@@ -186,7 +193,7 @@ public class DirStats
     return FullName;
   }
 
-  public double GetRecursiveSize ()
+  public virtual double GetRecursiveSize ()
   {
     if (!recursiveSizeComputed) {
       recursiveSizeComputed = true;
@@ -204,7 +211,7 @@ public class DirStats
     return recursiveSize;
   }
 
-  public double GetRecursiveCount ()
+  public virtual double GetRecursiveCount ()
   {
     if (!recursiveSizeComputed)
       GetRecursiveSize ();
