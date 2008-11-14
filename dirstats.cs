@@ -91,11 +91,11 @@ public class DirStats
     return String.Format("{0} {1}B", sz.ToString("N1"), suffix);
   }
 
-  public void Draw (Context cr) { Draw (cr, true); }
-  public void Draw (Context cr, bool complexSubTitle)
-  { Draw (cr, complexSubTitle, false); }
+  public void Draw (Context cr, double y) { Draw (cr, y, true); }
+  public void Draw (Context cr, double y, bool complexSubTitle)
+  { Draw (cr, y, complexSubTitle, true); }
 
-  public void Draw (Context cr, bool complexSubTitle, bool drawSubdirs)
+  public void Draw (Context cr, double y, bool complexSubTitle, bool drawSubdirs)
   {
     double h = GetScaledHeight ();
     cr.Save ();
@@ -120,12 +120,13 @@ public class DirStats
     if (drawSubdirs && IsDirectory) {
       cr.Save ();
         cr.Translate (0, -h*0.01); // to account for the 0.02 bottom margin
-        DrawChildren(cr, GetFullPath(), h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
+        y += -h*0.01;
+        DrawChildren(cr, y, GetFullPath(), h, Math.Min(1.0, Math.Max(0.8, h/1000.0)));
       cr.Restore ();
     }
   }
 
-  public void DrawChildren (Context cr, string path, double scale, double alpha)
+  public void DrawChildren (Context cr, double y, string path, double scale, double alpha)
   {
     if (scale < 1.0) return;
     cr.Save ();
@@ -133,19 +134,28 @@ public class DirStats
       UnixFileSystemInfo[] files = info.GetFileSystemEntries();
       if (files.Length > 0) {
         cr.Translate(0, 0.05*scale);
+        y += 0.05*scale;
         scale *= 0.9;
         cr.Rectangle (0, 0, BoxWidth*alpha, scale);
         cr.Color = new Color (1,1,1);
         cr.Fill ();
         scale /= files.Length;
         foreach (UnixFileSystemInfo f in files) {
-          cr.Rectangle (0,0, BoxWidth*alpha, scale*0.98);
-          Color c = GetColor (f.FileType, f.FileAccessPermissions);
-          cr.Color = c;
-          cr.Fill();
-          if (f.IsDirectory)
-            DrawChildren(cr, f.FullName, scale, alpha * 0.8);
+          if (y > 1000.0) break;
+          if (y + scale > 0.0) {
+            cr.Rectangle (0,0, BoxWidth*alpha, scale*0.98);
+            Color c = GetColor (f.FileType, f.FileAccessPermissions);
+            cr.Color = c;
+            cr.Fill();
+            if (f.IsDirectory) {
+              cr.Save ();
+                cr.Translate (0, -scale*0.01); // to account for the 0.02 bottom margin
+                DrawChildren(cr, y - scale*0.01, f.FullName, scale, alpha * 0.8);
+              cr.Restore ();
+            }
+          }
           cr.Translate(0, scale);
+          y += scale;
         }
       }
     cr.Restore ();

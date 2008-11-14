@@ -243,7 +243,7 @@ class Filezoo : DrawingArea
         if (y < 1000.0) {
           double h = d.GetScaledHeight();
           if (y+h > 0.0) {
-            d.Draw (cr, !FirstFrameOfDir);
+            d.Draw (cr, y, !FirstFrameOfDir);
             trav = (trav || d.TraversalInProgress);
             count++;
           }
