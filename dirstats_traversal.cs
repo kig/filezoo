@@ -5,7 +5,7 @@ using System.IO;
 using Mono.Unix;
 using Cairo;
 
-public class DirStats
+public class DirStatsTraversal
 {
   public static Color directoryColor = new Color (0,0,1);
   public static Color blockDeviceColor = new Color (0.75,0.5,0);
@@ -37,7 +37,7 @@ public class DirStats
   Traversal TraversalServer;
   Traversal.DirectoryEntry TraversalInfo;
 
-  public DirStats (Traversal ts, UnixFileSystemInfo f)
+  public DirStatsTraversal (Traversal ts, UnixFileSystemInfo f)
   {
     TraversalServer = ts;
     Scale = Zoom = Height = 0.0;
