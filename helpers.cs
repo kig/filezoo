@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System;
+using Mono.Unix;
 using Cairo;
 
 public static class Helpers {
@@ -74,6 +75,20 @@ public static class Helpers {
       retval = cr.InFill (x, y);
     cr.Restore ();
     return retval;
+  }
+
+
+  public static void OpenTerminal (string path)
+  {
+    string cd = UnixDirectoryInfo.GetCurrentDirectory ();
+    UnixDirectoryInfo.SetCurrentDirectory (path);
+    Process.Start ("urxvt");
+    UnixDirectoryInfo.SetCurrentDirectory (cd);
+  }
+
+  public static void OpenFile (string path)
+  {
+    Process.Start ("gnome-open", path);
   }
 
 }

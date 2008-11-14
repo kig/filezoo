@@ -26,7 +26,8 @@ class Filezoo : DrawingArea
   private double TotalSize = 0.0;
   private DirStats[] Files = null;
 
-  double ZoomSpeed = 1.5;
+  double ZoomInSpeed = 1.5;
+  double ZoomOutSpeed = 2.0;
   bool LayoutUpdateRequested = true;
 
   bool FirstFrameOfDir = true;
@@ -346,18 +347,20 @@ class Filezoo : DrawingArea
         if (yr < 1000.0) {
           double h = d.GetScaledHeight();
           if (yr+h > 0.0) {
-            bool[] action = d.Click (cr, TotalSize, x, y);
-            if (action[0]) {
-              if (action[1]) {
+            DirAction action = d.Click (cr, TotalSize, x, y);
+            switch (action) {
+              case DirAction.Open:
+                Helpers.OpenFile(d.GetFullPath ());
+                break;
+              case DirAction.Navigate:
                 BuildDirs (d.GetFullPath ());
-              } else if (action[2]) {
+                break;
+              case DirAction.ZoomIn:
                 cr.Save ();
                   cr.IdentityMatrix ();
                   ZoomBy(cr, width, height, x, y, 22.0 / h);
                 cr.Restore ();
-              }
-              win.QueueDraw();
-              break;
+                break;
             }
           }
           yr += h;
@@ -457,10 +460,7 @@ class Filezoo : DrawingArea
     advance += Helpers.GetTextExtents (cr, FontSize, " |  ").XAdvance;
     te = Helpers.GetTextExtents (cr, FontSize, OpenTerminalLabel);
     if (Helpers.CheckTextExtents (cr, advance, te, x, y)) {
-      string cd = UnixDirectoryInfo.GetCurrentDirectory ();
-      UnixDirectoryInfo.SetCurrentDirectory (TopDirName);
-      Process.Start ("urxvt");
-      UnixDirectoryInfo.SetCurrentDirectory (cd);
+      Helpers.OpenTerminal(TopDirName);
       return true;
     }
     advance += te.XAdvance;
@@ -489,12 +489,12 @@ class Filezoo : DrawingArea
 
   void ZoomToward (Context cr, uint width, uint height, double x, double y)
   {
-    ZoomBy (cr, width, height, x, y, ZoomSpeed);
+    ZoomBy (cr, width, height, x, y, ZoomInSpeed);
   }
 
   void ZoomAway (Context cr, uint width, uint height, double x, double y)
   {
-    ZoomBy (cr, width, height, x, y, 1 / ZoomSpeed);
+    ZoomBy (cr, width, height, x, y, 1.0 / ZoomOutSpeed);
   }
 
   void PanBy (Context cr, uint width, uint height, double dx, double dy)

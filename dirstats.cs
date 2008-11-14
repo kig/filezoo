@@ -120,16 +120,17 @@ public class DirStats
     return Math.Floor(fs);
   }
 
-  public bool[] Click (Context cr, double totalSize, double x, double y)
+  public DirAction Click (Context cr, double totalSize, double x, double y)
   {
 
     double h = GetScaledHeight ();
     double fs = GetFontSize(h);
-    bool[] retval = {false, false, false};
+    bool hit = false;
+    DirAction retval = DirAction.None;
     double advance = 0.0;
     cr.Save ();
       cr.NewPath ();
-      if (fs < 8) {
+      if (fs < 10) {
         advance += BoxWidth;
       } else {
         advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
@@ -137,13 +138,14 @@ public class DirStats
       }
       cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
       cr.IdentityMatrix ();
-      retval[0] = cr.InFill(x,y);
+      hit = cr.InFill(x,y);
+      if (hit) retval = DirAction.Open;
     cr.Restore ();
-    if (retval[0]) {
-      if (fs < 8)
-        retval[2] = true;
-      else
-        retval[1] = OpenFile ();
+    if (hit) {
+      if (fs < 10)
+        retval = DirAction.ZoomIn;
+      else if (IsDirectory)
+        retval = DirAction.Navigate;
     }
     return retval;
   }
@@ -206,17 +208,6 @@ public class DirStats
     }
   }
 
-  bool OpenFile ()
-  {
-    if (IsDirectory) {
-      return true;
-    } else {
-      Process proc = Process.Start ("gnome-open", GetFullPath ());
-      proc.WaitForExit ();
-      return false;
-    }
-  }
-
   static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
@@ -231,4 +222,12 @@ public class DirStats
       return executableColor;
     return fileColor;
   }
+}
+
+public enum DirAction
+{
+  None,
+  Open,
+  Navigate,
+  ZoomIn
 }
