@@ -45,6 +45,7 @@ public class Traversal {
         PropagateTotalSize(d);
         if (allComplete) SetComplete(d);
       }
+      Thread.Sleep (500);
     }
   }
 
