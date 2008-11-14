@@ -125,19 +125,26 @@ public class DirStats
 
     double h = GetScaledHeight ();
     double fs = GetFontSize(h);
-    bool[] retval = {false, false};
-    if (fs < 4) return retval;
+    bool[] retval = {false, false, false};
     double advance = 0.0;
     cr.Save ();
       cr.NewPath ();
-      advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
-      advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
+      if (fs < 8) {
+        advance += BoxWidth;
+      } else {
+        advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
+        advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
+      }
       cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
       cr.IdentityMatrix ();
       retval[0] = cr.InFill(x,y);
     cr.Restore ();
-    if (retval[0])
-      retval[1] = OpenFile ();
+    if (retval[0]) {
+      if (fs < 8)
+        retval[2] = true;
+      else
+        retval[1] = OpenFile ();
+    }
     return retval;
   }
 

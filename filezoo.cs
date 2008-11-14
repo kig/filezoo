@@ -350,6 +350,11 @@ class Filezoo : DrawingArea
             if (action[0]) {
               if (action[1]) {
                 BuildDirs (d.GetFullPath ());
+              } else if (action[2]) {
+                cr.Save ();
+                  cr.IdentityMatrix ();
+                  ZoomBy(cr, width, height, x, y, 22.0 / h);
+                cr.Restore ();
               }
               win.QueueDraw();
               break;
