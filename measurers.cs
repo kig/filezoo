@@ -1,5 +1,14 @@
 using System;
 
+class SizeHandler {
+  public string Name;
+  public IMeasurer Measurer;
+  public SizeHandler (string name, IMeasurer measurer) {
+    Name = name;
+    Measurer = measurer;
+  }
+}
+
 public interface IMeasurer {
   double Measure (DirStats d);
 }

@@ -8,97 +8,101 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
+  // current directory style
   public double BreadcrumbFontSize = 12;
   public double BreadcrumbMarginTop = 2;
   public double BreadcrumbMarginLeft = 12;
 
+  // sort/size toolbar style
   public double ToolbarY = 24;
   public double ToolbarTitleFontSize = 6;
   public double ToolbarLabelFontSize = 9;
-
-  public double FilesMarginLeft = 10;
-  public double FilesMarginRight = 10;
-  public double FilesMarginTop = 52;
-  public double FilesMarginBottom = 10;
-
-  private static Gtk.Window win = null;
-  private string TopDirName = null;
-  private DirStats TopDir = null;
-
-  double ZoomInSpeed = 1.5;
-  double ZoomOutSpeed = 2.0;
-  bool LayoutUpdateRequested = true;
-
-  bool FirstFrameOfDir = true;
-
-  bool dragging = false;
-  double dragStartX = 0.0;
-  double dragStartY = 0.0;
-  double dragX = 0.0;
-  double dragY = 0.0;
-
-  double FontSize = 15;
-
-  public Color ActiveColor = new Color (0,0,0,1);
-  public Color InActiveColor = new Color (0,0,0,0.5);
-  public Color TermColor = new Color (0,0,1,1);
 
   public string SortLabel = "Sort ";
   public string SizeLabel = "Size ";
   public string OpenTerminalLabel = "Term";
 
+  public Color ActiveColor = new Color (0,0,0,1);
+  public Color InActiveColor = new Color (0,0,0,0.5);
+  public Color TermColor = new Color (0,0,1,1);
+
+  // filesystem view style
+  public double FilesMarginLeft = 10;
+  public double FilesMarginRight = 10;
+  public double FilesMarginTop = 52;
+  public double FilesMarginBottom = 10;
+
+  // zoom speed settings, must be > 1 to zoom in the right direction
+  public double ZoomInSpeed = 1.5;
+  public double ZoomOutSpeed = 2.0;
+
+  // Available sorts
   public SortHandler[] SortFields = {
     new SortHandler("Name", new NameComparer()),
     new SortHandler("Size", new SizeComparer()),
     new SortHandler("Date", new DateComparer()),
     new SortHandler("Type", new TypeComparer())
   };
+  // current sort settings
+  public SortHandler SortField;
+  public SortingDirection SortDirection = SortingDirection.Ascending;
+
+  // Available file sizers
   public SizeHandler[] SizeFields = {
     new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
     new SizeHandler("Count", new CountMeasurer()),
     new SizeHandler("Total", new TotalMeasurer())
   };
-  public SortHandler SortField;
+  // current file sizer
   public SizeHandler SizeField;
-  public SortingDirection SortDirection = SortingDirection.Ascending;
+
+  // current zoomer
   public IZoomer Zoomer;
 
-//   Traversal TraversalServer;
+  // current directory
+  private string CurrentDirPath = null;
+  private DirStats CurrentDir = null;
 
+  // Do we need to relayout before drawing
+  public bool LayoutUpdateRequested = true;
+
+  // Do we need to sort before drawing
+  public bool SortUpdateRequested = true;
+
+  // are we drawing the first frame of a new directory
+  bool FirstFrameOfDir = true;
+
+  // GUI state variables
+  bool dragging = false;
+  double dragStartX = 0.0;
+  double dragStartY = 0.0;
+  double dragX = 0.0;
+  double dragY = 0.0;
+
+  // font size state variable
+  double FontSize;
+
+  // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ();
-
-
-  /**
-    The Main method inits the Gtk application and creates a Filezoo instance
-    to run.
-  */
-  static void Main (string[] args)
-  {
-    Application.Init ();
-    new Filezoo (args.Length > 0 ? args[0] : ".");
-    Application.Run ();
-  }
 
 
   /* Constructor */
 
-  Filezoo (string topDirName)
+  public Filezoo (string dirname)
   {
     SortField = SortFields[0];
     SizeField = SizeFields[0];
-//     TraversalServer = new Traversal ();
     Zoomer = new FlatZoomer ();
-    win = new Window ("Filezoo");
-    BuildDirs (topDirName);
-    win.SetDefaultSize (400, 768);
-    win.DeleteEvent += new DeleteEventHandler (OnQuit);
-    AddEvents((int)Gdk.EventMask.ButtonPressMask);
-    AddEvents((int)Gdk.EventMask.ButtonReleaseMask);
-    AddEvents((int)Gdk.EventMask.ScrollMask);
-    AddEvents((int)Gdk.EventMask.PointerMotionMask);
-    win.Add (this);
-    win.ShowAll ();
+
+    BuildDirs (dirname);
+
+    AddEvents((int)(
+        Gdk.EventMask.ButtonPressMask
+      | Gdk.EventMask.ButtonReleaseMask
+      | Gdk.EventMask.ScrollMask
+      | Gdk.EventMask.PointerMotionMask
+    ));
   }
 
 
@@ -106,13 +110,11 @@ class Filezoo : DrawingArea
 
   void BuildDirs (string dirname)
   {
-    dirLatencyProfiler.Reset ();
-    dirLatencyProfiler.Start ();
     Profiler p = new Profiler ();
-    TopDirName = System.IO.Path.GetFullPath(dirname);
-    if (TopDir != null)
-      TopDir.TraversalCancelled = true;
-    TopDir = new DirStats(new UnixDirectoryInfo (TopDirName));
+    dirLatencyProfiler.Restart ();
+    CurrentDirPath = System.IO.Path.GetFullPath(dirname);
+    if (CurrentDir != null) CurrentDir.TraversalCancelled = true;
+    CurrentDir = new DirStats(new UnixDirectoryInfo (CurrentDirPath));
     FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort ();
@@ -125,10 +127,8 @@ class Filezoo : DrawingArea
   void UpdateLayout ()
   {
     LayoutUpdateRequested = true;
-    win.QueueDraw ();
+    QueueDraw ();
   }
-
-  bool SortUpdateRequested = true;
 
   void UpdateSort ()
   {
@@ -141,18 +141,18 @@ class Filezoo : DrawingArea
     Profiler p = new Profiler ();
 
     if (SortUpdateRequested) {
-      TopDir.Comparer = SortField.Comparer;
-      TopDir.SortDirection = SortDirection;
-      TopDir.Sort ();
+      CurrentDir.Comparer = SortField.Comparer;
+      CurrentDir.SortDirection = SortDirection;
+      CurrentDir.Sort ();
       SortUpdateRequested = false;
-      p.Time ("TopDir.Sort");
+      p.Time ("CurrentDir.Sort");
     }
 
-    TopDir.Measurer = SizeField.Measurer;
-    TopDir.Zoomer = Zoomer;
-    TopDir.Relayout ();
-    p.Time ("TopDir.Relayout");
-    LayoutUpdateRequested = TopDir.TraversalInProgress;
+    CurrentDir.Measurer = SizeField.Measurer;
+    CurrentDir.Zoomer = Zoomer;
+    CurrentDir.Relayout ();
+    p.Time ("CurrentDir.Relayout");
+    LayoutUpdateRequested = CurrentDir.TraversalInProgress;
   }
 
   /* Drawing */
@@ -195,18 +195,18 @@ class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       cr.Scale(0.001, 0.001);
       double y = Zoomer.Y * 1000.0;
-      TopDir.Draw (cr, y, 1000.0, !FirstFrameOfDir);
+      CurrentDir.Draw (cr, y, 1000.0, !FirstFrameOfDir);
     cr.Restore ();
 
-    p.Time ("TopDir.Draw");
+    p.Time ("CurrentDir.Draw");
 
     dirLatencyProfiler.Stop ();
     if (FirstFrameOfDir) {
       dirLatencyProfiler.Time ("Directory latency");
-      win.QueueDraw ();
+      QueueDraw ();
       FirstFrameOfDir = false;
     }
-    if (LayoutUpdateRequested || TopDir.TraversalInProgress)
+    if (LayoutUpdateRequested || CurrentDir.TraversalInProgress)
       UpdateLayout();
   }
 
@@ -216,10 +216,10 @@ class Filezoo : DrawingArea
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.MoveTo (0.0, 0.0);
     FontSize = (BreadcrumbFontSize);
-    if (TopDirName == "/") {
+    if (CurrentDirPath == "/") {
       Helpers.DrawText (cr, FontSize, "/");
     } else {
-      foreach (string s in TopDirName.Split('/')) {
+      foreach (string s in CurrentDirPath.Split('/')) {
         Helpers.DrawText (cr, FontSize, s);
         Helpers.DrawText (cr, FontSize, "/");
       }
@@ -295,7 +295,7 @@ class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       cr.Scale(0.001, 0.001);
       double yr = Zoomer.Y * 1000.0;
-      DirAction action = TopDir.Click (cr, yr, 1000.0, x, y);
+      DirAction action = CurrentDir.Click (cr, yr, 1000.0, x, y);
       switch (action.Type) {
         case DirAction.Action.Open:
           Helpers.OpenFile(action.Path);
@@ -320,14 +320,14 @@ class Filezoo : DrawingArea
     FontSize = (BreadcrumbFontSize);
     double advance = 0.0;
     int hitIndex = 0;
-    string[] segments = TopDirName.Split('/');
-    if (TopDirName != "/") {
+    string[] segments = CurrentDirPath.Split('/');
+    if (CurrentDirPath != "/") {
       foreach (string s in segments) {
         TextExtents te = Helpers.GetTextExtents (cr, FontSize, s + "/");
         if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
           string newDir = String.Join("/", segments, 0, hitIndex+1);
           if (newDir == "") newDir = "/";
-          if (newDir != TopDirName)
+          if (newDir != CurrentDirPath)
             BuildDirs (newDir);
           return true;
         }
@@ -406,7 +406,7 @@ class Filezoo : DrawingArea
     advance += Helpers.GetTextExtents (cr, FontSize, " |  ").XAdvance;
     te = Helpers.GetTextExtents (cr, FontSize, OpenTerminalLabel);
     if (Helpers.CheckTextExtents (cr, advance, te, x, y)) {
-      Helpers.OpenTerminal(TopDirName);
+      Helpers.OpenTerminal(CurrentDirPath);
       return true;
     }
     advance += te.XAdvance;
@@ -538,32 +538,8 @@ class Filezoo : DrawingArea
     return true;
   }
 
-  /**
-    The quit event handler. Calls Application.Quit.
-  */
-  void OnQuit (object sender, DeleteEventArgs e)
-  {
-    Application.Quit ();
-  }
 }
 
 
-class SortHandler {
-  public string Name;
-  public IComparer<DirStats> Comparer;
-  public SortHandler (string name, IComparer<DirStats> comparer) {
-    Name = name;
-    Comparer = comparer;
-  }
-}
-
-class SizeHandler {
-  public string Name;
-  public IMeasurer Measurer;
-  public SizeHandler (string name, IMeasurer measurer) {
-    Name = name;
-    Measurer = measurer;
-  }
-}
 
 

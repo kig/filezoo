@@ -1,5 +1,14 @@
 using System.Collections.Generic;
 
+class SortHandler {
+  public string Name;
+  public IComparer<DirStats> Comparer;
+  public SortHandler (string name, IComparer<DirStats> comparer) {
+    Name = name;
+    Comparer = comparer;
+  }
+}
+
 public class SizeComparer : IComparer<DirStats> {
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
