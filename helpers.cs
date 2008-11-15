@@ -132,7 +132,8 @@ public class Profiler
       (PrintProfile == Print.Always) ||
       ((PrintProfile == Print.Global) && GlobalPrintProfile)
     ) {
-      Console.WriteLine (message + ": {0} ms", elapsedMilliseconds.ToString("N1"));
+      string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N3"));
+      Console.WriteLine (time.PadLeft(12) + message);
     }
     Restart ();
   }
