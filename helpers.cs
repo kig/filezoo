@@ -127,12 +127,12 @@ public class Profiler
 
   public void Time (string message)
   {
-    double elapsedMicroseconds = Watch.ElapsedTicks / 10.0;
+    double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
     if (
       (PrintProfile == Print.Always) ||
       ((PrintProfile == Print.Global) && GlobalPrintProfile)
     ) {
-      string time = String.Format ("{0} us ", elapsedMicroseconds.ToString("N0"));
+      string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
       Console.WriteLine (time.PadLeft(12) + message);
     }
     Restart ();
