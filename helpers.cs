@@ -88,7 +88,7 @@ public static class Helpers {
 
   public static void OpenFile (string path)
   {
-    Process.Start ("gnome-open", path);
+    Process.Start (path);
   }
 
   public static string FormatSI (double sz, string unit)
@@ -114,7 +114,7 @@ public static class Helpers {
 
 public class Profiler
 {
-  public static bool GlobalPrintProfile = true;
+  public static bool GlobalPrintProfile = false;
 
   protected Stopwatch Watch;
   public Print PrintProfile = Print.Global;

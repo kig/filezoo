@@ -34,7 +34,7 @@ class Filezoo : DrawingArea
 
   // zoom speed settings, must be > 1 to zoom in the right direction
   public double ZoomInSpeed = 1.5;
-  public double ZoomOutSpeed = 2.0;
+  public double ZoomOutSpeed = 1.5;
 
   // Available sorts
   public SortHandler[] SortFields = {
@@ -122,6 +122,8 @@ class Filezoo : DrawingArea
   }
 
 
+
+
   /* Layout */
 
   void UpdateLayout ()
@@ -136,7 +138,7 @@ class Filezoo : DrawingArea
     UpdateLayout ();
   }
 
-  void ReCreateLayout ()
+  void RecreateLayout ()
   {
     Profiler p = new Profiler ();
 
@@ -155,6 +157,8 @@ class Filezoo : DrawingArea
     LayoutUpdateRequested = CurrentDir.TraversalInProgress;
   }
 
+
+
   /* Drawing */
 
   void Transform (Context cr, uint width, uint height)
@@ -168,46 +172,55 @@ class Filezoo : DrawingArea
 
   void Draw (Context cr, uint width, uint height)
   {
-    Profiler p = new Profiler ();
+    if (LayoutUpdateRequested) RecreateLayout();
 
-    if (LayoutUpdateRequested) ReCreateLayout();
-
-    // Clear the drawing area
     cr.Save ();
-      cr.Color = new Color (1,1,1);
-      cr.Rectangle (0,0, width, height);
-      cr.Fill ();
+      DrawClear (cr, width, height);
+      DrawToolbars (cr);
+      Transform (cr, width, height);
+      DrawCurrentDir(cr);
     cr.Restore ();
 
-    // Draw the toolbars
+    dirLatencyProfiler.Stop ();
+    if (FirstFrameOfDir) {
+      dirLatencyProfiler.Time ("Directory latency");
+      FirstFrameOfDir = false;
+      QueueDraw ();
+    }
+    if (LayoutUpdateRequested || CurrentDir.TraversalInProgress)
+      UpdateLayout();
+  }
+
+  void DrawClear (Context cr, uint width, uint height)
+  {
+    cr.Color = new Color (1,1,1);
+    cr.Rectangle (0,0, width, height);
+    cr.Fill ();
+  }
+
+  void DrawToolbars (Context cr)
+  {
+    Profiler p = new Profiler ();
     cr.Save ();
       DrawBreadcrumb (cr);
       DrawSortBar (cr);
       DrawSizeBar (cr);
       DrawOpenTerminal (cr);
     cr.Restore ();
+    p.Time ("DrawToolbars");
+  }
 
-    p.Time ("Draw toolbars");
-
-    // Draw the filesystem view
+  void DrawCurrentDir (Context cr)
+  {
+    Profiler p = new Profiler ();
     cr.Save ();
-      Transform (cr, width, height);
+      double boxHeight = cr.Matrix.Yy;
+      double boxTop = cr.Matrix.Y0;
+      cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      cr.Scale(0.001, 0.001);
-      double y = Zoomer.Y * 1000.0;
-      CurrentDir.Draw (cr, y, 1000.0, !FirstFrameOfDir);
+      CurrentDir.Draw (cr, boxTop, boxHeight, !FirstFrameOfDir, 0);
     cr.Restore ();
-
-    p.Time ("CurrentDir.Draw");
-
-    dirLatencyProfiler.Stop ();
-    if (FirstFrameOfDir) {
-      dirLatencyProfiler.Time ("Directory latency");
-      QueueDraw ();
-      FirstFrameOfDir = false;
-    }
-    if (LayoutUpdateRequested || CurrentDir.TraversalInProgress)
-      UpdateLayout();
+    p.Time ("DrawCurrentDir");
   }
 
   void DrawBreadcrumb (Context cr)
@@ -265,7 +278,7 @@ class Filezoo : DrawingArea
   {
     FontSize = ToolbarLabelFontSize;
     cr.Color = InActiveColor;
-    Helpers.DrawText (cr, FontSize, " |  ");
+    Helpers.DrawText (cr, FontSize, "  ");
     cr.Color = TermColor;
     Helpers.DrawText (cr, FontSize, OpenTerminalLabel);
   }
@@ -403,7 +416,7 @@ class Filezoo : DrawingArea
   {
     TextExtents te;
     FontSize = ToolbarLabelFontSize;
-    advance += Helpers.GetTextExtents (cr, FontSize, " |  ").XAdvance;
+    advance += Helpers.GetTextExtents (cr, FontSize, "  ").XAdvance;
     te = Helpers.GetTextExtents (cr, FontSize, OpenTerminalLabel);
     if (Helpers.CheckTextExtents (cr, advance, te, x, y)) {
       Helpers.OpenTerminal(CurrentDirPath);
@@ -423,12 +436,12 @@ class Filezoo : DrawingArea
 
   void ZoomBy (Context cr, uint width, uint height, double x, double y, double factor)
   {
-    double xr = x, yr = y, nz = Math.Max(1.0, Zoomer.Z * factor);
+    double xr = x, yr = y, nz = Math.Max (1.0, Zoomer.Z * factor);
     cr.Save ();
       Transform (cr, width, height);
       cr.InverseTransformPoint(ref xr, ref yr);
-      double npy = (yr / nz) - (yr / Zoomer.Z) + (Zoomer.Y / Zoomer.Z);
-      Zoomer.SetZoom (0.0, npy*nz, nz);
+      double npy = (yr / nz) - (yr / Zoomer.Z) + Zoomer.Y;
+      Zoomer.SetZoom (0.0, npy, nz);
     cr.Restore ();
     UpdateLayout();
   }
@@ -449,7 +462,7 @@ class Filezoo : DrawingArea
     cr.Save ();
       Transform (cr, width, height);
       cr.InverseTransformDistance(ref xr, ref yr);
-      Zoomer.Y += yr;
+      Zoomer.Y += yr / Zoomer.Z;
     cr.Restore ();
     UpdateLayout();
   }

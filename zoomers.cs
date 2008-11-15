@@ -15,7 +15,8 @@ public class FlatZoomer : IZoomer {
   public double Y {
     get { return yval; }
     set {
-      yval = Math.Max(-zval+1, Math.Min(0.0, value));
+      double max = (1.0 / zval) - 1.0;
+      yval = Math.Max(max, Math.Min(0.0, value));
     }
   }
   public double Z { get { return zval; } set { zval = value; } }
