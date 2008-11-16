@@ -114,7 +114,7 @@ class Filezoo : DrawingArea
     dirLatencyProfiler.Restart ();
     CurrentDirPath = System.IO.Path.GetFullPath(dirname);
     if (CurrentDir != null) CurrentDir.TraversalCancelled = true;
-    CurrentDir = new DirStats(new UnixDirectoryInfo (CurrentDirPath));
+    CurrentDir = DirStats.Get (new UnixDirectoryInfo (CurrentDirPath));
     FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort ();
@@ -154,7 +154,7 @@ class Filezoo : DrawingArea
     CurrentDir.Zoomer = Zoomer;
     CurrentDir.Relayout ();
     p.Time ("CurrentDir.Relayout");
-    LayoutUpdateRequested = CurrentDir.TraversalInProgress;
+    LayoutUpdateRequested = !CurrentDir.Complete;
   }
 
 
@@ -187,7 +187,7 @@ class Filezoo : DrawingArea
       FirstFrameOfDir = false;
       QueueDraw ();
     }
-    if (LayoutUpdateRequested || CurrentDir.TraversalInProgress)
+    if (LayoutUpdateRequested || !CurrentDir.Complete)
       UpdateLayout();
   }
 

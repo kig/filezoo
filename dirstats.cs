@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Diagnostics;
 using System.Threading;
 using System.IO;
@@ -22,7 +23,7 @@ public class DirStats
   public double BoxWidth = 0.1;
 
   public double MinFontSize = 0.5;
-  public double MaxFontSize = 16.0;
+  public double MaxFontSize = 12.0;
 
   // Public state of the DirStats
   public string Name;
@@ -41,18 +42,96 @@ public class DirStats
   public IZoomer Zoomer;
 
   // Traversal progress flag, true if the
-  // recursive traversal of the DirStats has not yet completed.
-  public virtual bool TraversalInProgress
-  { get { return travP; } set { travP = value; } }
-  bool travP;
+  // recursive traversal of the DirStats is completed.
+  public virtual bool Complete
+  { get { return recursiveInfo.Complete; } }
 
   // Should the recursive traversal be stopped?
   public bool TraversalCancelled = false;
 
   // State variables for computing the recursive traversal of the DirStats
-  protected bool recursiveSizeComputed = false;
-  private double recursiveSize = 0.0;
-  private double recursiveCount = 1.0;
+  public bool recursiveSizeComputed = false;
+  public Dir recursiveInfo;
+
+  static Dictionary<string,Dir> DirCache = new Dictionary<string,Dir> (200000);
+
+  public class Dir {
+    public string Path;
+    public double TotalCount;
+    public double TotalSize;
+    public bool Complete;
+    public bool InProgress;
+    public int Missing;
+    public Dir (string path) {
+      Path = path;
+      TotalCount = 1.0;
+      TotalSize = 0.0;
+      Complete = false;
+      InProgress = false;
+    }
+
+    public Dir Finish () {
+      lock (this) {
+        Complete = true;
+        InProgress = false;
+      }
+      return this;
+    }
+    public Dir Fail () { return Finish (); }
+    public Dir Cancel () {
+      lock (this) {
+        Complete = false;
+        InProgress = false;
+      }
+      return this;
+    }
+    public string ParentDir () {
+      return System.IO.Path.GetDirectoryName(Path);
+    }
+    public void AddCount (double c) {
+      TotalCount += c;
+      string pdir = ParentDir();
+      if (pdir == "") return;
+      lock (DirCache)
+        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddCount(c);
+    }
+    public void AddSize (double c) {
+      TotalSize += c;
+      string pdir = ParentDir();
+      if (pdir == "") return;
+      lock (DirCache)
+        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddSize(c);
+    }
+    public void AddChildData (Dir c) {
+      TotalSize += c.TotalSize;
+      TotalCount += c.TotalCount;
+      string pdir = ParentDir();
+      if (pdir == "") return;
+      lock (DirCache)
+        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddChildData(c);
+    }
+    public void PropagateComplete () {
+      string pdir = ParentDir();
+      if (pdir == "") return;
+      lock (DirCache)
+        if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished ();
+    }
+    public void ChildFinished () {
+      lock (this) {
+        Missing--;
+        if (Missing <= 0) {
+          Complete = true;
+          InProgress = false;
+        }
+        if (Missing == 0) {
+          string pdir = ParentDir();
+          if (pdir == "") return;
+          lock (DirCache)
+            if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished ();
+        }
+      }
+    }
+  }
 
   // Drawing state variables
   double Scale;
@@ -67,7 +146,7 @@ public class DirStats
           UnixFileSystemInfo[] files = new UnixDirectoryInfo(FullName).GetFileSystemEntries ();
           _Entries = new DirStats[files.Length];
           for (int i=0; i<files.Length; i++)
-            _Entries[i] = new DirStats (files[i]);
+            _Entries[i] = Get (files[i]);
         } catch (System.UnauthorizedAccessException) {
           _Entries = new DirStats[0];
         }
@@ -79,7 +158,29 @@ public class DirStats
 
   /* Constructor */
 
-  public DirStats (UnixFileSystemInfo f)
+  static Dir GetCacheEntry (string name) {
+    Dir dc;
+    lock (DirCache) {
+      if (DirCache.ContainsKey(name)) {
+        dc = DirCache[name];
+      } else {
+        dc = new Dir (name);
+        DirCache[name] = dc;
+      }
+    }
+    return dc;
+  }
+
+  public static DirStats Get (UnixFileSystemInfo f) {
+    DirStats d = new DirStats (f);
+    if (d.IsDirectory)
+      d.SetRecursiveInfo(GetCacheEntry(d.FullName));
+    else
+      d.SetRecursiveInfo(new Dir(d.FullName));
+    return d;
+  }
+
+  protected DirStats (UnixFileSystemInfo f)
   {
     Comparer = new NameComparer ();
     Scale = Height = 1.0;
@@ -90,6 +191,11 @@ public class DirStats
     try { IsDirectory = Info.IsDirectory; } catch (System.InvalidOperationException) {}
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
+  }
+
+  public void SetRecursiveInfo (Dir dc)
+  {
+    recursiveInfo = dc;
   }
 
 
@@ -120,7 +226,9 @@ public class DirStats
 
   double GetFontSize (double h)
   {
-    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, 0.5 * h)));
+    double fs;
+    fs = h*0.6;
+    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
   }
 
   double QuantizeFontSize (double fs) { return Math.Floor(fs); }
@@ -167,7 +275,7 @@ public class DirStats
   public DirStats ParentDir {
     get {
       if (_ParentDir == null)
-        _ParentDir = new DirStats (new UnixDirectoryInfo(System.IO.Path.GetDirectoryName(FullName)));
+        _ParentDir = Get (new UnixDirectoryInfo(System.IO.Path.GetDirectoryName(FullName)));
       return _ParentDir;
     }
   }
@@ -197,7 +305,6 @@ public class DirStats
   public bool IsVisible (Context cr, double targetTop, double targetHeight)
   {
     double h = cr.Matrix.Yy * GetScaledHeight ();
-    if (h < 1) return false;
     double y = cr.Matrix.Y0 - targetTop;
     return ((y < targetHeight) && ((y+h) > 0.0));
   }
@@ -210,15 +317,18 @@ public class DirStats
     double h = GetScaledHeight ();
     cr.Save ();
       cr.Scale (1, h);
-      cr.Rectangle (0.0, -0.01, BoxWidth*1.02, 1.01);
+      cr.Rectangle (-0.01*BoxWidth, -0.01, BoxWidth*1.02, 1.02);
       cr.Color = new Color (1,1,1);
       cr.Fill ();
-      cr.Rectangle (0.0, 0.0, BoxWidth, 0.98);
       Color c = GetColor (Info.FileType, Info.FileAccessPermissions);
       cr.Color = c;
-      cr.Fill ();
-      DrawTitle (cr, complexSubTitle);
-      if (IsDirectory) DrawChildren(cr, targetTop, targetHeight, complexSubTitle, depth);
+      if (depth != 0) {
+        cr.Rectangle (0.0, 0.0, BoxWidth, 0.98);
+        cr.Fill ();
+      }
+      if (depth <= 1 || (cr.Matrix.Yy > 1)) DrawTitle (cr, complexSubTitle);
+      if (IsDirectory && (depth == 0 || (cr.Matrix.Yy > 1)))
+        DrawChildren(cr, targetTop, targetHeight, complexSubTitle, depth);
     cr.Restore ();
   }
 
@@ -245,9 +355,9 @@ public class DirStats
       double x = cr.Matrix.X0;
       double y = cr.Matrix.Y0;
       cr.IdentityMatrix ();
-      cr.Translate (x,y);
+      cr.Translate (x, y);
       cr.NewPath ();
-      cr.MoveTo (0, 0);
+      cr.MoveTo (0, -fs*0.2);
       if (fs > 4) {
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
@@ -309,55 +419,76 @@ public class DirStats
 
   public virtual double GetRecursiveSize ()
   {
-    if (!recursiveSizeComputed) {
-      recursiveSizeComputed = true;
-      recursiveSize = 0.0;
-      recursiveCount = 1.0;
+    if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
       if (IsDirectory) {
-        TraversalInProgress = true;
         WaitCallback cb = new WaitCallback(DirSizeCallback);
         ThreadPool.QueueUserWorkItem(cb);
       } else {
-        recursiveSize = Length;
-        TraversalInProgress = false;
+        recursiveInfo.InProgress = false;
+        recursiveInfo.Complete = true;
+        recursiveInfo.TotalSize = Length;
+        recursiveInfo.TotalCount = 1.0;
       }
     }
-    return recursiveSize;
+    return recursiveInfo.TotalSize;
   }
 
   public virtual double GetRecursiveCount ()
   {
     if (!recursiveSizeComputed)
       GetRecursiveSize ();
-    return recursiveCount;
+    return recursiveInfo.TotalCount;
   }
 
   void DirSizeCallback (Object stateInfo)
   {
+    TraversalCancelled = false;
     DirSize(FullName);
-    TraversalInProgress = false;
   }
 
-  void DirSize (string dirname)
+  Dir DirSize (string dirname)
   {
-    if (TraversalCancelled) return;
-    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    Dir dc = GetCacheEntry(dirname);
+    if (TraversalCancelled) return dc;
     UnixFileSystemInfo[] files;
-    try {
-      files = di.GetFileSystemEntries ();
-    } catch (System.UnauthorizedAccessException) {
-      return;
+    lock (dc) {
+      if (dc.Complete || dc.InProgress) return dc;
+      UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+      try { files = di.GetFileSystemEntries (); }
+      catch (System.UnauthorizedAccessException) { return dc; }
+      dc.InProgress = true;
+      dc.Complete = false;
+      dc.Missing = files.Length;
     }
+    double count = 0.0;
+    double size = 0.0;
     foreach (UnixFileSystemInfo f in files) {
-      if (TraversalCancelled) return;
-      recursiveCount += 1.0;
+      if (TraversalCancelled) { return dc.Cancel (); }
+      count += 1.0;
       bool isDir = false;
       try { isDir = f.IsDirectory; } catch (System.InvalidOperationException) {}
-      if (isDir)
-        DirSize(f.FullName);
-      else
-        try { recursiveSize += (double)f.Length; } catch (System.InvalidOperationException) {}
+      if (!isDir) {
+        try { size += f.Length; }
+        catch (System.InvalidOperationException) {}
+        dc.Missing--;
+      }
     }
+    dc.AddCount (count);
+    dc.AddSize (size);
+    foreach (UnixFileSystemInfo f in files) {
+      if (TraversalCancelled) { return dc.Cancel (); }
+      bool isDir = false;
+      try { isDir = f.IsDirectory; } catch (System.InvalidOperationException) {}
+      if (isDir) DirSize(f.FullName);
+    }
+    lock (dc) {
+      if (!dc.Complete) {
+        dc.Complete = (dc.Missing <= 0);
+        dc.InProgress = !dc.Complete;
+        if (dc.Complete) dc.PropagateComplete ();
+      }
+    }
+    return dc;
   }
 
 }
