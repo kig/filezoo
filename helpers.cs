@@ -114,7 +114,7 @@ public static class Helpers {
 
 public class Profiler
 {
-  public static bool GlobalPrintProfile = true;
+  public static bool GlobalPrintProfile = false;
 
   protected Stopwatch Watch;
   public Print PrintProfile = Print.Global;

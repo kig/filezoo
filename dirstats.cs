@@ -114,11 +114,14 @@ public class DirStats
       string pdir = ParentDir();
       if (pdir == "") return;
       lock (DirCache)
-        if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished ();
+        if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished (this);
     }
-    public void ChildFinished () {
+    public void ChildFinished (Dir d) {
       lock (this) {
         Missing--;
+if (Path == "/home/kig/downloads") {
+    Console.WriteLine("{1}", Missing, d.Path);
+}
         if (Missing <= 0) {
           Complete = true;
           InProgress = false;
@@ -127,7 +130,7 @@ public class DirStats
           string pdir = ParentDir();
           if (pdir == "") return;
           lock (DirCache)
-            if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished ();
+            if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished (this);
         }
       }
     }
@@ -227,7 +230,7 @@ public class DirStats
   double GetFontSize (double h)
   {
     double fs;
-    fs = h*0.6;
+    fs = h*0.4;
     return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
   }
 
@@ -309,41 +312,45 @@ public class DirStats
     return ((y < targetHeight) && ((y+h) > 0.0));
   }
 
-  public void Draw (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
+  public uint Draw (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
   {
     if (!IsVisible(cr, targetTop, targetHeight)) {
-      return;
+      return 0;
     }
     double h = GetScaledHeight ();
+    uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      cr.Rectangle (-0.01*BoxWidth, -0.01, BoxWidth*1.02, 1.02);
+      cr.Rectangle (-0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01);
       cr.Color = new Color (1,1,1);
       cr.Fill ();
-      Color c = GetColor (Info.FileType, Info.FileAccessPermissions);
-      cr.Color = c;
-      if (depth != 0) {
-        cr.Rectangle (0.0, 0.0, BoxWidth, 0.98);
-        cr.Fill ();
-      }
-      if (depth <= 1 || (cr.Matrix.Yy > 1)) DrawTitle (cr, complexSubTitle);
-      if (IsDirectory && (depth == 0 || (cr.Matrix.Yy > 1)))
-        DrawChildren(cr, targetTop, targetHeight, complexSubTitle, depth);
+      Color co = GetColor (Info.FileType, Info.FileAccessPermissions);
+      cr.Color = co;
+      cr.Rectangle (0.0, 0.02, BoxWidth, 0.98);
+      cr.Fill ();
+      if (depth > 0 && cr.Matrix.Yy > 1) DrawTitle (cr, complexSubTitle);
+      if (IsDirectory && (depth == 0 || (cr.Matrix.Yy > 4)))
+        c += DrawChildren(cr, targetTop, targetHeight, complexSubTitle, depth);
     cr.Restore ();
+    return c;
   }
 
-  void DrawChildren (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
+  uint DrawChildren (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
   {
     cr.Save ();
-      cr.Translate (0.1*BoxWidth, 0.04);
-      cr.Scale (0.9, 0.93);
+      if (depth > 0) {
+        cr.Translate (0.1*BoxWidth, 0.48);
+        cr.Scale (0.9, 0.48);
+      }
+      uint c = 0;
       foreach (DirStats d in Entries) {
         UpdateChild (d);
-        d.Draw (cr, targetTop, targetHeight, complexSubTitle, depth+1);
+        c += d.Draw (cr, targetTop, targetHeight, complexSubTitle, depth+1);
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
       }
     cr.Restore ();
+    return c;
   }
 
   void DrawTitle (Context cr, bool complexSubTitle)
@@ -351,7 +358,7 @@ public class DirStats
     double h = cr.Matrix.Yy;
     double fs = GetFontSize(h);
     cr.Save ();
-      cr.Translate(BoxWidth * 1.1, 0);
+      cr.Translate(BoxWidth * 1.1, 0.02);
       double x = cr.Matrix.X0;
       double y = cr.Matrix.Y0;
       cr.IdentityMatrix ();
@@ -385,34 +392,61 @@ public class DirStats
 
   /* Click handler */
 
-  public DirAction Click (Context cr, double y, double height, double mouseX, double mouseY)
+  public DirAction Click (Context cr, double targetTop, double targetHeight, double mouseX, double mouseY, uint depth)
   {
-    DirAction retval = DirAction.None ();
-/*    double h = GetScaledHeight ();
-    double fs = GetFontSize(h);
-    bool hit = false;
+    if (!IsVisible(cr, targetTop, targetHeight)) {
+      return DirAction.None;
+    }
+    double h = GetScaledHeight ();
+    DirAction retval = DirAction.None;
     double advance = 0.0;
     cr.Save ();
-      cr.NewPath ();
-      if (fs < 10) {
-        advance += BoxWidth;
-      } else {
-        advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
-        advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
+      cr.Scale (1, h);
+      if (IsDirectory && (cr.Matrix.Yy > 2))
+        retval = ClickChildren (cr, targetTop, targetHeight, mouseX, mouseY, depth);
+      if (retval == DirAction.None) {
+        cr.NewPath ();
+        double fs = GetFontSize(cr.Matrix.Yy);
+        if (fs < 10) {
+          advance += BoxWidth;
+        } else {
+          advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
+          advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
+        }
+        cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, 1.0);
+        cr.IdentityMatrix ();
+        if (cr.InFill(mouseX,mouseY)) {
+          if (fs < 10)
+            retval = DirAction.ZoomIn(cr.Matrix.Yy / 20);
+          else if (IsDirectory)
+            retval = DirAction.Navigate(FullName);
+          else
+            retval = DirAction.Open(FullName);
+        }
       }
-      cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, h);
-      cr.IdentityMatrix ();
-      hit = cr.InFill(mouseX,mouseY);
-      if (hit) retval = DirAction.Open(FullName);
     cr.Restore ();
-    if (hit) {
-      if (fs < 10)
-        retval = DirAction.ZoomIn(h);
-      else if (IsDirectory)
-        retval = DirAction.Navigate(FullName);
-    }*/
     return retval;
   }
+
+  DirAction ClickChildren (Context cr, double targetTop, double targetHeight, double mouseX, double mouseY, uint depth)
+  {
+    DirAction retval = DirAction.None;
+    cr.Save ();
+      if (depth > 0) {
+        cr.Translate (0.1*BoxWidth, 0.48);
+        cr.Scale (0.9, 0.48);
+      }
+      foreach (DirStats d in Entries) {
+        retval = d.Click (cr, targetTop, targetHeight, mouseX, mouseY, depth+1);
+        if (retval != DirAction.None) break;
+        double h = d.GetScaledHeight();
+        cr.Translate (0.0, h);
+      }
+    cr.Restore ();
+    return retval;
+  }
+
+
 
 
   /* Directory traversal */
@@ -445,6 +479,10 @@ public class DirStats
     TraversalCancelled = false;
     DirSize(FullName);
   }
+
+
+
+
 
   Dir DirSize (string dirname)
   {
@@ -494,13 +532,19 @@ public class DirStats
 }
 
 
+
+
+
+
 public class DirAction
 {
   public Action Type;
   public string Path;
   public double Height;
 
-  public static DirAction None ()
+  public static DirAction None = GetNone ();
+
+  public static DirAction GetNone ()
   { return new DirAction (Action.None, "", 0.0); }
 
   public static DirAction Open (string path)

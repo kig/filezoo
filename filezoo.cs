@@ -112,7 +112,7 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
-    CurrentDirPath = System.IO.Path.GetFullPath(dirname);
+    CurrentDirPath = System.IO.Path.GetFullPath(dirname).TrimEnd('/');
     if (CurrentDir != null) CurrentDir.TraversalCancelled = true;
     CurrentDir = DirStats.Get (new UnixDirectoryInfo (CurrentDirPath));
     FirstFrameOfDir = true;
@@ -218,8 +218,9 @@ class Filezoo : DrawingArea
       double boxTop = cr.Matrix.Y0;
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      CurrentDir.Draw (cr, boxTop, boxHeight, !FirstFrameOfDir, 0);
+      uint c = CurrentDir.Draw (cr, boxTop, boxHeight, !FirstFrameOfDir, 0);
     cr.Restore ();
+//     Console.WriteLine("Drew {0} entries", c);
     p.Time ("DrawCurrentDir");
   }
 
@@ -305,21 +306,25 @@ class Filezoo : DrawingArea
     cr.Restore ();
     cr.Save();
       Transform (cr, width, height);
+      double boxHeight = cr.Matrix.Yy;
+      double boxTop = cr.Matrix.Y0;
+      cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      cr.Scale(0.001, 0.001);
-      double yr = Zoomer.Y * 1000.0;
-      DirAction action = CurrentDir.Click (cr, yr, 1000.0, x, y);
+      DirAction action = CurrentDir.Click (cr, boxTop, boxHeight, x, y, 0);
       switch (action.Type) {
         case DirAction.Action.Open:
+          Console.WriteLine("Open {0}", action.Path);
           Helpers.OpenFile(action.Path);
           break;
         case DirAction.Action.Navigate:
+          Console.WriteLine("Navigate {0}", action.Path);
           BuildDirs (action.Path);
           break;
         case DirAction.Action.ZoomIn:
+          Console.WriteLine("ZoomIn {0}x", 1 / action.Height);
           cr.Save ();
             cr.IdentityMatrix ();
-            ZoomBy(cr, width, height, x, y, 22.0 / action.Height);
+            ZoomBy(cr, width, height, x, y, 1 / action.Height);
           cr.Restore ();
           break;
       }
