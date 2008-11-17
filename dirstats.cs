@@ -234,11 +234,11 @@ public class DirStats
       cr.Fill ();
       Color co = GetColor (Info.FileType, Info.FileAccessPermissions);
       cr.Color = co;
-      if (!recursiveInfo.Complete) cr.Color = new Color (0, 0, 1, 0.2);
-//       if (depth > 0) {
+      if (!recursiveInfo.Complete) cr.Color = new Color (0.5, 0, 1);
+      if (depth > 0) {
         cr.Rectangle (0.0, 0.02, BoxWidth, 0.98);
         cr.Fill ();
-//       }
+      }
       if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
       if (IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
