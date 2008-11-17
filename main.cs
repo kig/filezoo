@@ -7,6 +7,7 @@ public static class FilezooApp {
   */
   static void Main (string[] args)
   {
+    Profiler.GlobalPrintProfile = false;
     Application.Init ();
     Window win = new Window ("Filezoo");
     win.SetDefaultSize (400, 768);
