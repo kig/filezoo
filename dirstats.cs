@@ -53,89 +53,6 @@ public class DirStats
   public bool recursiveSizeComputed = false;
   public Dir recursiveInfo;
 
-  static Dictionary<string,Dir> DirCache = new Dictionary<string,Dir> (200000);
-
-  public class Dir {
-    public string Path;
-    public double TotalCount;
-    public double TotalSize;
-    public bool Complete;
-    public bool InProgress;
-    public int Missing;
-    public Dir (string path) {
-      Path = path;
-      TotalCount = 1.0;
-      TotalSize = 0.0;
-      Complete = false;
-      InProgress = false;
-    }
-
-    public Dir Finish () {
-      lock (this) {
-        Complete = true;
-        InProgress = false;
-      }
-      return this;
-    }
-    public Dir Fail () { return Finish (); }
-    public Dir Cancel () {
-      lock (this) {
-        Complete = false;
-        InProgress = false;
-      }
-      return this;
-    }
-    public string ParentDir () {
-      return System.IO.Path.GetDirectoryName(Path);
-    }
-    public void AddCount (double c) {
-      TotalCount += c;
-      string pdir = ParentDir();
-      if (pdir == "") return;
-      lock (DirCache)
-        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddCount(c);
-    }
-    public void AddSize (double c) {
-      TotalSize += c;
-      string pdir = ParentDir();
-      if (pdir == "") return;
-      lock (DirCache)
-        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddSize(c);
-    }
-    public void AddChildData (Dir c) {
-      TotalSize += c.TotalSize;
-      TotalCount += c.TotalCount;
-      string pdir = ParentDir();
-      if (pdir == "") return;
-      lock (DirCache)
-        if (DirCache.ContainsKey(pdir)) DirCache[pdir].AddChildData(c);
-    }
-    public void PropagateComplete () {
-      string pdir = ParentDir();
-      if (pdir == "") return;
-      lock (DirCache)
-        if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished (this);
-    }
-    public void ChildFinished (Dir d) {
-      lock (this) {
-        Missing--;
-if (Path == "/home/kig/downloads") {
-    Console.WriteLine("{1}", Missing, d.Path);
-}
-        if (Missing <= 0) {
-          Complete = true;
-          InProgress = false;
-        }
-        if (Missing == 0) {
-          string pdir = ParentDir();
-          if (pdir == "") return;
-          lock (DirCache)
-            if (DirCache.ContainsKey(pdir)) DirCache[pdir].ChildFinished (this);
-        }
-      }
-    }
-  }
-
   // Drawing state variables
   double Scale;
   double Height;
@@ -159,60 +76,50 @@ if (Path == "/home/kig/downloads") {
   }
 
 
+
   /* Constructor */
 
-  static Dir GetCacheEntry (string name) {
-    Dir dc;
-    lock (DirCache) {
-      if (DirCache.ContainsKey(name)) {
-        dc = DirCache[name];
-      } else {
-        dc = new Dir (name);
-        DirCache[name] = dc;
-      }
-    }
-    return dc;
-  }
-
   public static DirStats Get (UnixFileSystemInfo f) {
-    DirStats d = new DirStats (f);
-    if (d.IsDirectory)
-      d.SetRecursiveInfo(GetCacheEntry(d.FullName));
+    DirStats d;
+    if (f.IsDirectory)
+      d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
     else
-      d.SetRecursiveInfo(new Dir(d.FullName));
+      d = new DirStats(f, new Dir(f.FullName));
     return d;
   }
 
-  protected DirStats (UnixFileSystemInfo f)
+  protected DirStats (UnixFileSystemInfo f, Dir r)
   {
     Comparer = new NameComparer ();
+    recursiveInfo = r;
     Scale = Height = 1.0;
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
     Length = f.Length;
     try { IsDirectory = Info.IsDirectory; } catch (System.InvalidOperationException) {}
+    if (!IsDirectory) {
+      recursiveInfo.InProgress = false;
+      recursiveInfo.Complete = true;
+      recursiveInfo.TotalSize = Length;
+      recursiveInfo.TotalCount = 1.0;
+    }
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
-  }
-
-  public void SetRecursiveInfo (Dir dc)
-  {
-    recursiveInfo = dc;
   }
 
 
   /* Subtitles */
 
-  public string GetSubTitle () { return GetSubTitle (true); }
-  public string GetSubTitle ( bool complexSubTitle )
+  public string GetSubTitle ()
   {
     if (IsDirectory) {
       string extras = "";
-      extras += String.Format("{0} files",
-        (complexSubTitle ? GetRecursiveCount() : 0).ToString("N0"));
-      extras += String.Format(", {0} total",
-        Helpers.FormatSI(complexSubTitle ? GetRecursiveSize() : 0, "B"));
+      extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
+      extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
+      if (recursiveInfo.Missing != recursiveInfo.Completed && recursiveInfo.InProgress) {
+        extras += String.Format(", {0} missing", recursiveInfo.Missing-recursiveInfo.Completed);
+      }
       return extras;
     } else {
       return String.Format("{0}", Helpers.FormatSI(Length, "B"));
@@ -230,7 +137,7 @@ if (Path == "/home/kig/downloads") {
   double GetFontSize (double h)
   {
     double fs;
-    fs = h*0.4;
+    fs = h * (IsDirectory ? 0.4 : 0.6);
     return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
   }
 
@@ -312,7 +219,8 @@ if (Path == "/home/kig/downloads") {
     return ((y < targetHeight) && ((y+h) > 0.0));
   }
 
-  public uint Draw (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
+  static Color BG = new Color (1,1,1);
+  public uint Draw (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
   {
     if (!IsVisible(cr, targetTop, targetHeight)) {
       return 0;
@@ -322,30 +230,48 @@ if (Path == "/home/kig/downloads") {
     cr.Save ();
       cr.Scale (1, h);
       cr.Rectangle (-0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01);
-      cr.Color = new Color (1,1,1);
+      cr.Color = BG;
       cr.Fill ();
       Color co = GetColor (Info.FileType, Info.FileAccessPermissions);
       cr.Color = co;
-      cr.Rectangle (0.0, 0.02, BoxWidth, 0.98);
-      cr.Fill ();
-      if (depth > 0 && cr.Matrix.Yy > 1) DrawTitle (cr, complexSubTitle);
-      if (IsDirectory && (depth == 0 || (cr.Matrix.Yy > 4)))
-        c += DrawChildren(cr, targetTop, targetHeight, complexSubTitle, depth);
+      if (!recursiveInfo.Complete) cr.Color = new Color (0, 0, 1, 0.2);
+//       if (depth > 0) {
+        cr.Rectangle (0.0, 0.02, BoxWidth, 0.98);
+        cr.Fill ();
+//       }
+      if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
+      if (IsDirectory) {
+        bool childrenVisible = cr.Matrix.Yy > 2;
+        bool shouldDrawChildren = !firstFrame && childrenVisible;
+        if (depth == 0) shouldDrawChildren = true;
+        if (shouldDrawChildren) {
+          RequestInfo();
+          c += DrawChildren(cr, targetTop, targetHeight, firstFrame, depth);
+        }
+      }
     cr.Restore ();
     return c;
   }
 
-  uint DrawChildren (Context cr, double targetTop, double targetHeight, bool complexSubTitle, uint depth)
+  void ChildTransform (Context cr, uint depth)
+  {
+    if (depth > 0) {
+      cr.Translate (0.1*BoxWidth, 0.48);
+      cr.Scale (0.9, 0.48);
+    } else {
+      cr.Translate (0.0, 0.05);
+      cr.Scale (1.0, 0.93);
+    }
+  }
+
+  uint DrawChildren (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
   {
     cr.Save ();
-      if (depth > 0) {
-        cr.Translate (0.1*BoxWidth, 0.48);
-        cr.Scale (0.9, 0.48);
-      }
+      ChildTransform (cr, depth);
       uint c = 0;
       foreach (DirStats d in Entries) {
         UpdateChild (d);
-        c += d.Draw (cr, targetTop, targetHeight, complexSubTitle, depth+1);
+        c += d.Draw (cr, targetTop, targetHeight, firstFrame, depth+1);
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
       }
@@ -353,7 +279,7 @@ if (Path == "/home/kig/downloads") {
     return c;
   }
 
-  void DrawTitle (Context cr, bool complexSubTitle)
+  void DrawTitle (Context cr, uint depth)
   {
     double h = cr.Matrix.Yy;
     double fs = GetFontSize(h);
@@ -364,13 +290,13 @@ if (Path == "/home/kig/downloads") {
       cr.IdentityMatrix ();
       cr.Translate (x, y);
       cr.NewPath ();
-      cr.MoveTo (0, -fs*0.2);
+      cr.MoveTo (0, -fs*0.3);
       if (fs > 4) {
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
-        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle (complexSubTitle));
+        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
       } else if (fs > 1) {
-        Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle (complexSubTitle));
+        Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle ());
       } else {
         cr.Rectangle (0.0, 0.0, fs / 2 * (Name.Length+15), fs/3);
         cr.Fill ();
@@ -380,13 +306,21 @@ if (Path == "/home/kig/downloads") {
 
   void UpdateChild (DirStats d)
   {
+    bool needRelayout = false;
     if (d.Comparer != Comparer || d.SortDirection != SortDirection) {
       d.Comparer = Comparer;
       d.SortDirection = SortDirection;
       d.Sort ();
+      needRelayout = true;
     }
-    d.Measurer = Measurer;
-    d.Relayout ();
+    if (d.Measurer != Measurer) {
+      d.Measurer = Measurer;
+      needRelayout = true;
+    }
+    if (Measurer.DependsOnTotals && !d.Complete)
+      needRelayout = true;
+    if (needRelayout)
+      d.Relayout ();
   }
 
 
@@ -404,20 +338,21 @@ if (Path == "/home/kig/downloads") {
       cr.Scale (1, h);
       if (IsDirectory && (cr.Matrix.Yy > 2))
         retval = ClickChildren (cr, targetTop, targetHeight, mouseX, mouseY, depth);
-      if (retval == DirAction.None) {
+      if (retval == DirAction.None || (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 10)) {
         cr.NewPath ();
         double fs = GetFontSize(cr.Matrix.Yy);
         if (fs < 10) {
-          advance += BoxWidth;
+          advance += fs / 2 * (Name.Length+15);
         } else {
           advance += Helpers.GetTextExtents (cr, fs, Name).XAdvance;
           advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle ()).XAdvance;
         }
         cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, 1.0);
+        double ys = cr.Matrix.Yy;
         cr.IdentityMatrix ();
         if (cr.InFill(mouseX,mouseY)) {
-          if (fs < 10)
-            retval = DirAction.ZoomIn(cr.Matrix.Yy / 20);
+          if (ys < 20)
+            retval = DirAction.ZoomIn(ys / 20);
           else if (IsDirectory)
             retval = DirAction.Navigate(FullName);
           else
@@ -432,10 +367,7 @@ if (Path == "/home/kig/downloads") {
   {
     DirAction retval = DirAction.None;
     cr.Save ();
-      if (depth > 0) {
-        cr.Translate (0.1*BoxWidth, 0.48);
-        cr.Scale (0.9, 0.48);
-      }
+      ChildTransform (cr, depth);
       foreach (DirStats d in Entries) {
         retval = d.Click (cr, targetTop, targetHeight, mouseX, mouseY, depth+1);
         if (retval != DirAction.None) break;
@@ -453,80 +385,25 @@ if (Path == "/home/kig/downloads") {
 
   public virtual double GetRecursiveSize ()
   {
-    if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
-      if (IsDirectory) {
-        WaitCallback cb = new WaitCallback(DirSizeCallback);
-        ThreadPool.QueueUserWorkItem(cb);
-      } else {
-        recursiveInfo.InProgress = false;
-        recursiveInfo.Complete = true;
-        recursiveInfo.TotalSize = Length;
-        recursiveInfo.TotalCount = 1.0;
-      }
-    }
     return recursiveInfo.TotalSize;
   }
 
   public virtual double GetRecursiveCount ()
   {
-    if (!recursiveSizeComputed)
-      GetRecursiveSize ();
     return recursiveInfo.TotalCount;
+  }
+
+  void RequestInfo () {
+    if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
+      WaitCallback cb = new WaitCallback(DirSizeCallback);
+      ThreadPool.QueueUserWorkItem(cb);
+    }
   }
 
   void DirSizeCallback (Object stateInfo)
   {
     TraversalCancelled = false;
-    DirSize(FullName);
-  }
-
-
-
-
-
-  Dir DirSize (string dirname)
-  {
-    Dir dc = GetCacheEntry(dirname);
-    if (TraversalCancelled) return dc;
-    UnixFileSystemInfo[] files;
-    lock (dc) {
-      if (dc.Complete || dc.InProgress) return dc;
-      UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
-      try { files = di.GetFileSystemEntries (); }
-      catch (System.UnauthorizedAccessException) { return dc; }
-      dc.InProgress = true;
-      dc.Complete = false;
-      dc.Missing = files.Length;
-    }
-    double count = 0.0;
-    double size = 0.0;
-    foreach (UnixFileSystemInfo f in files) {
-      if (TraversalCancelled) { return dc.Cancel (); }
-      count += 1.0;
-      bool isDir = false;
-      try { isDir = f.IsDirectory; } catch (System.InvalidOperationException) {}
-      if (!isDir) {
-        try { size += f.Length; }
-        catch (System.InvalidOperationException) {}
-        dc.Missing--;
-      }
-    }
-    dc.AddCount (count);
-    dc.AddSize (size);
-    foreach (UnixFileSystemInfo f in files) {
-      if (TraversalCancelled) { return dc.Cancel (); }
-      bool isDir = false;
-      try { isDir = f.IsDirectory; } catch (System.InvalidOperationException) {}
-      if (isDir) DirSize(f.FullName);
-    }
-    lock (dc) {
-      if (!dc.Complete) {
-        dc.Complete = (dc.Missing <= 0);
-        dc.InProgress = !dc.Complete;
-        if (dc.Complete) dc.PropagateComplete ();
-      }
-    }
-    return dc;
+    DirCache.Traverse(FullName, ref TraversalCancelled);
   }
 
 }

@@ -112,9 +112,10 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
-    CurrentDirPath = System.IO.Path.GetFullPath(dirname).TrimEnd('/');
+    UnixDirectoryInfo d = new UnixDirectoryInfo (dirname.TrimEnd('/'));
+    CurrentDirPath = d.FullName;
     if (CurrentDir != null) CurrentDir.TraversalCancelled = true;
-    CurrentDir = DirStats.Get (new UnixDirectoryInfo (CurrentDirPath));
+    CurrentDir = DirStats.Get (d);
     FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort ();
@@ -218,10 +219,9 @@ class Filezoo : DrawingArea
       double boxTop = cr.Matrix.Y0;
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = CurrentDir.Draw (cr, boxTop, boxHeight, !FirstFrameOfDir, 0);
+      uint c = CurrentDir.Draw (cr, boxTop, boxHeight, FirstFrameOfDir, 0);
     cr.Restore ();
-//     Console.WriteLine("Drew {0} entries", c);
-    p.Time ("DrawCurrentDir");
+    p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
 
   void DrawBreadcrumb (Context cr)
@@ -305,30 +305,35 @@ class Filezoo : DrawingArea
       }
     cr.Restore ();
     cr.Save();
-      Transform (cr, width, height);
-      double boxHeight = cr.Matrix.Yy;
-      double boxTop = cr.Matrix.Y0;
-      cr.Scale (1, Zoomer.Z);
-      cr.Translate (0.0, Zoomer.Y);
-      DirAction action = CurrentDir.Click (cr, boxTop, boxHeight, x, y, 0);
-      switch (action.Type) {
-        case DirAction.Action.Open:
-          Console.WriteLine("Open {0}", action.Path);
-          Helpers.OpenFile(action.Path);
-          break;
-        case DirAction.Action.Navigate:
-          Console.WriteLine("Navigate {0}", action.Path);
-          BuildDirs (action.Path);
-          break;
-        case DirAction.Action.ZoomIn:
-          Console.WriteLine("ZoomIn {0}x", 1 / action.Height);
-          cr.Save ();
-            cr.IdentityMatrix ();
-            ZoomBy(cr, width, height, x, y, 1 / action.Height);
-          cr.Restore ();
-          break;
-      }
+      ClickCurrentDir(cr, width, height, x, y);
     cr.Restore ();
+  }
+
+  void ClickCurrentDir (Context cr, uint width, uint height, double x, double y)
+  {
+    Transform (cr, width, height);
+    double boxHeight = cr.Matrix.Yy;
+    double boxTop = cr.Matrix.Y0;
+    cr.Scale (1, Zoomer.Z);
+    cr.Translate (0.0, Zoomer.Y);
+    DirAction action = CurrentDir.Click (cr, boxTop, boxHeight, x, y, 0);
+    switch (action.Type) {
+      case DirAction.Action.Open:
+        Console.WriteLine("Open {0}", action.Path);
+        Helpers.OpenFile(action.Path);
+        break;
+      case DirAction.Action.Navigate:
+        Console.WriteLine("Navigate {0}", action.Path);
+        BuildDirs (action.Path);
+        break;
+      case DirAction.Action.ZoomIn:
+        Console.WriteLine("ZoomIn {0}x", 1 / action.Height);
+        cr.Save ();
+          cr.IdentityMatrix ();
+          ZoomBy(cr, width, height, x, y, 1 / action.Height);
+        cr.Restore ();
+        break;
+    }
   }
 
   bool ClickBreadcrumb (Context cr, double x, double y)
