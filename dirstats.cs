@@ -47,7 +47,7 @@ public class DirStats
   { get { return recursiveInfo.Complete; } }
 
   // Should the recursive traversal be stopped?
-  public bool TraversalCancelled = false;
+  bool TraversalCancelled = false;
 
   // State variables for computing the recursive traversal of the DirStats
   public bool recursiveSizeComputed = false;
@@ -391,6 +391,12 @@ public class DirStats
   public virtual double GetRecursiveCount ()
   {
     return recursiveInfo.TotalCount;
+  }
+
+  public void CancelTraversal () {
+    TraversalCancelled = true;
+    if (_Entries != null)
+      foreach (DirStats e in _Entries) e.CancelTraversal ();
   }
 
   void RequestInfo () {

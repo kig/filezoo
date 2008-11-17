@@ -112,9 +112,10 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
-    UnixDirectoryInfo d = new UnixDirectoryInfo (dirname.TrimEnd('/'));
+    if (dirname != "/") dirname = dirname.TrimEnd('/');
+    UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     CurrentDirPath = d.FullName;
-    if (CurrentDir != null) CurrentDir.TraversalCancelled = true;
+    if (CurrentDir != null) CurrentDir.CancelTraversal ();
     CurrentDir = DirStats.Get (d);
     FirstFrameOfDir = true;
     ResetZoom ();
