@@ -5,7 +5,7 @@ public class Profiler
 {
   public static bool GlobalPrintProfile = true;
 
-  protected Stopwatch Watch;
+  public Stopwatch Watch;
   public Print PrintProfile = Print.Global;
 
   public Profiler ()
