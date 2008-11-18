@@ -172,6 +172,9 @@ public class DirStats
     }
   }
 
+  static Profiler FrameProfiler = new Profiler ();
+  double MaxTimePerFrame = 50.0;
+
   public void Relayout ()
   {
     if (!IsDirectory) return;
@@ -227,6 +230,7 @@ public class DirStats
   static Color BG = new Color (1,1,1);
   public uint Draw (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
   {
+    if (depth == 0) FrameProfiler.Restart ();
     if (!IsVisible(cr, targetTop, targetHeight)) {
       return 0;
     }
@@ -255,6 +259,7 @@ public class DirStats
         }
       }
     cr.Restore ();
+    if (depth == 0) FrameProfiler.Stop ();
     return c;
   }
 
@@ -271,6 +276,7 @@ public class DirStats
 
   uint DrawChildren (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
   {
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame && _Entries == null) return 0;
     cr.Save ();
       ChildTransform (cr, depth);
       uint c = 0;
@@ -311,6 +317,7 @@ public class DirStats
 
   void UpdateChild (DirStats d)
   {
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame) return;
     bool needRelayout = false;
     if (d.Comparer != Comparer || d.SortDirection != SortDirection) {
       d.Comparer = Comparer;
