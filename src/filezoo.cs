@@ -149,11 +149,18 @@ class Filezoo : DrawingArea
       CurrentDir.SortDirection = SortDirection;
       CurrentDir.Sort ();
       SortUpdateRequested = false;
+      FirstFrameOfDir = true;
       p.Time ("CurrentDir.Sort");
     }
 
-    CurrentDir.Measurer = SizeField.Measurer;
-    CurrentDir.Zoomer = Zoomer;
+    if (CurrentDir.Measurer != SizeField.Measurer) {
+      FirstFrameOfDir = true;
+      CurrentDir.Measurer = SizeField.Measurer;
+    }
+    if (CurrentDir.Zoomer != Zoomer) {
+      FirstFrameOfDir = true;
+      CurrentDir.Zoomer = Zoomer;
+    }
     CurrentDir.Relayout ();
     p.Time ("CurrentDir.Relayout");
     LayoutUpdateRequested = !CurrentDir.Complete;
