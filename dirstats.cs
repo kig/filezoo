@@ -28,7 +28,7 @@ public class DirStats
   // Public state of the DirStats
   public string Name;
   public string FullName;
-  public double Length;
+  public ulong Length;
   public string Suffix;
   public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
@@ -45,9 +45,6 @@ public class DirStats
   // recursive traversal of the DirStats is completed.
   public virtual bool Complete
   { get { return recursiveInfo.Complete; } }
-
-  // Should the recursive traversal be stopped?
-  bool TraversalCancelled = false;
 
   // State variables for computing the recursive traversal of the DirStats
   public bool recursiveSizeComputed = false;
@@ -96,13 +93,13 @@ public class DirStats
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
-    Length = f.Length;
+    Length = (ulong)f.Length;
     try { IsDirectory = Info.IsDirectory; } catch (System.InvalidOperationException) {}
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
       recursiveInfo.Complete = true;
       recursiveInfo.TotalSize = Length;
-      recursiveInfo.TotalCount = 1.0;
+      recursiveInfo.TotalCount = 1;
     }
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
@@ -117,7 +114,7 @@ public class DirStats
       string extras = "";
       extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
       extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
-      if (recursiveInfo.Missing != recursiveInfo.Completed && recursiveInfo.InProgress) {
+      if (recursiveInfo.InProgress) {
         extras += String.Format(", {0} missing", recursiveInfo.Missing-recursiveInfo.Completed);
       }
       return extras;
@@ -394,9 +391,7 @@ public class DirStats
   }
 
   public void CancelTraversal () {
-    TraversalCancelled = true;
-    if (_Entries != null)
-      foreach (DirStats e in _Entries) e.CancelTraversal ();
+    DirCache.CancelTraversal ();
   }
 
   void RequestInfo () {
@@ -408,8 +403,7 @@ public class DirStats
 
   void DirSizeCallback (Object stateInfo)
   {
-    TraversalCancelled = false;
-    DirCache.Traverse(FullName, ref TraversalCancelled);
+    DirCache.RequestTraversal (FullName);
   }
 
 }
