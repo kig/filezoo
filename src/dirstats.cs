@@ -53,6 +53,11 @@ public class DirStats
   public bool recursiveSizeComputed = false;
   public Dir recursiveInfo;
 
+  // Frame rate profiler to help with maintaining the frame rate when doing
+  // lots of in-frame work.
+  static Profiler FrameProfiler = new Profiler ();
+  double MaxTimePerFrame = 50.0;
+
   // Drawing state variables
   double Scale;
   double Height;
@@ -171,9 +176,6 @@ public class DirStats
         Array.Reverse (Entries);
     }
   }
-
-  static Profiler FrameProfiler = new Profiler ();
-  double MaxTimePerFrame = 50.0;
 
   public void Relayout ()
   {
