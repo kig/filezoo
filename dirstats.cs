@@ -33,6 +33,9 @@ public class DirStats
   public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
 
+  FileAccessPermissions Permissions;
+  FileTypes FileType;
+
   // How to sort directories
   public IComparer<DirStats> Comparer;
   public SortingDirection SortDirection = SortingDirection.Ascending;
@@ -60,7 +63,7 @@ public class DirStats
     get {
       if (_Entries == null) {
         try {
-          UnixFileSystemInfo[] files = new UnixDirectoryInfo(FullName).GetFileSystemEntries ();
+          UnixFileSystemInfo[] files = DirCache.EntriesMaybe (FullName);
           _Entries = new DirStats[files.Length];
           for (int i=0; i<files.Length; i++)
             _Entries[i] = Get (files[i]);
@@ -78,7 +81,7 @@ public class DirStats
 
   public static DirStats Get (UnixFileSystemInfo f) {
     DirStats d;
-    if (f.IsDirectory)
+    if (DirCache.IsDir(f))
       d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
     else
       d = new DirStats(f, new Dir(f.FullName));
@@ -93,8 +96,10 @@ public class DirStats
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
-    Length = (ulong)f.Length;
-    try { IsDirectory = Info.IsDirectory; } catch (System.InvalidOperationException) {}
+    FileType = DirCache.FileType(f);
+    Permissions = DirCache.FilePermissions(f);
+    Length = DirCache.FileSize(f);
+    IsDirectory = DirCache.IsDir(f);
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
       recursiveInfo.Complete = true;
@@ -160,8 +165,11 @@ public class DirStats
 
   public void Sort ()
   {
-    if (IsDirectory)
+    if (IsDirectory) {
       Array.Sort (Entries, Comparer);
+      if (SortDirection == SortingDirection.Descending)
+        Array.Reverse (Entries);
+    }
   }
 
   public void Relayout ()
@@ -229,7 +237,7 @@ public class DirStats
       cr.Rectangle (-0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01);
       cr.Color = BG;
       cr.Fill ();
-      Color co = GetColor (Info.FileType, Info.FileAccessPermissions);
+      Color co = GetColor (FileType, Permissions);
       cr.Color = co;
       if (!recursiveInfo.Complete) cr.Color = new Color (0.5, 0, 1);
       if (depth > 0) {

@@ -19,7 +19,7 @@ public static class DirCache
         Cache[name] = dc;
         Dir c = dc;
         string s = c.ParentDir ();
-        while (s != "") {
+        while (s.Length > 0) {
           if (Cache.ContainsKey(s)) break;
           Cache[s] = c = new Dir (s);
           s = c.ParentDir ();
@@ -105,12 +105,27 @@ public static class DirCache
     return di.GetFileSystemEntries ();
   }
 
-  static ulong FileSize (UnixFileSystemInfo f) {
+  public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
+    try { return Entries(dirname); }
+    catch (System.IO.FileNotFoundException) { return new UnixFileSystemInfo[0]; }
+  }
+
+  public static FileTypes FileType (UnixFileSystemInfo f) {
+    try { return f.FileType; }
+    catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
+  }
+
+  public static FileAccessPermissions FilePermissions (UnixFileSystemInfo f) {
+    try { return f.FileAccessPermissions; }
+    catch (System.InvalidOperationException) { return (FileAccessPermissions)0; }
+  }
+
+  public static ulong FileSize (UnixFileSystemInfo f) {
     try { return (ulong)f.Length; }
     catch (System.InvalidOperationException) { return 0; }
   }
 
-  static bool IsDir (UnixFileSystemInfo f) {
+  public static bool IsDir (UnixFileSystemInfo f) {
     try { return f.IsDirectory; }
     catch (System.InvalidOperationException) { return false; }
   }
@@ -141,7 +156,7 @@ public class Dir {
       InProgress = false;
       Complete = true;
       string pdir = ParentDir();
-      if (pdir == "") return this;
+      if (pdir.Length == 0) return this;
       DirCache.GetCacheEntry(pdir).ChildFinished (this);
     }
     return this;
@@ -169,7 +184,7 @@ public class Dir {
     lock (this) {
       TotalCount += c;
       string pdir = ParentDir();
-      if (pdir == "") return;
+      if (pdir.Length == 0) return;
       DirCache.GetCacheEntry(pdir).AddCount(c);
     }
   }
@@ -178,7 +193,7 @@ public class Dir {
     lock (this) {
       TotalSize += c;
       string pdir = ParentDir();
-      if (pdir == "") return;
+      if (pdir.Length == 0) return;
       DirCache.GetCacheEntry(pdir).AddSize(c);
     }
   }
@@ -186,7 +201,8 @@ public class Dir {
   public string ParentDir () {
     if (Path == "/") return "";
     char[] sa = {'/'};
-    return srev(srev(Path).Split(sa, 2)[1]);
+    string p = srev(srev(Path).Split(sa, 2)[1]);
+    return (p.Length == 0 ? "/" : p);
   }
 
 
