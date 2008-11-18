@@ -1,7 +1,11 @@
 Filezoo requirements document
 -----------------------------
 
-This document outlines the requirements for the Filezoo file manager project.
+This document outlines the requirements for the Filezoo project.
+This is a live document so things are liable to change as I learn more about
+what I want to do and how (perhaps this is a "But mom, I don't really want to
+write unit tests, boo hoo!"-disclaimer.)
+
 
 1 Performance
 
