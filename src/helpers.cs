@@ -109,43 +109,36 @@ public static class Helpers {
     return String.Format("{0} {1}"+unit, sz.ToString("N1"), suffix);
   }
 
+  public static UnixFileSystemInfo[] Entries (string dirname) {
+    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    return di.GetFileSystemEntries ();
+  }
+
+  public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
+    try { return Entries(dirname); }
+    catch (System.IO.FileNotFoundException) { return new UnixFileSystemInfo[0]; }
+  }
+
+  public static FileTypes FileType (UnixFileSystemInfo f) {
+    try { return f.FileType; }
+    catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
+  }
+
+  public static FileAccessPermissions FilePermissions (UnixFileSystemInfo f) {
+    try { return f.FileAccessPermissions; }
+    catch (System.InvalidOperationException) { return (FileAccessPermissions)0; }
+  }
+
+  public static ulong FileSize (UnixFileSystemInfo f) {
+    try { return (ulong)f.Length; }
+    catch (System.InvalidOperationException) { return 0; }
+  }
+
+  public static bool IsDir (UnixFileSystemInfo f) {
+    try { return f.IsDirectory; }
+    catch (System.InvalidOperationException) { return false; }
+  }
+
 }
 
 
-public class Profiler
-{
-  public static bool GlobalPrintProfile = true;
-
-  protected Stopwatch Watch;
-  public Print PrintProfile = Print.Global;
-
-  public Profiler ()
-  {
-    Watch = new Stopwatch ();
-    Watch.Start ();
-  }
-
-  public void Time (string message)
-  {
-    double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
-    if (
-      (PrintProfile == Print.Always) ||
-      ((PrintProfile == Print.Global) && GlobalPrintProfile)
-    ) {
-      string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      Console.WriteLine (time.PadLeft(12) + message);
-    }
-    Restart ();
-  }
-
-  public void Restart () { Reset (); Start (); }
-  public void Reset () { Watch.Reset (); }
-  public void Start () { Watch.Start (); }
-  public void Stop () { Watch.Stop (); }
-
-  public enum Print {
-    Global,
-    Always,
-    Never
-  }
-}

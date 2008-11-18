@@ -63,7 +63,7 @@ public class DirStats
     get {
       if (_Entries == null) {
         try {
-          UnixFileSystemInfo[] files = DirCache.EntriesMaybe (FullName);
+          UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
           _Entries = new DirStats[files.Length];
           for (int i=0; i<files.Length; i++)
             _Entries[i] = Get (files[i]);
@@ -81,7 +81,7 @@ public class DirStats
 
   public static DirStats Get (UnixFileSystemInfo f) {
     DirStats d;
-    if (DirCache.IsDir(f))
+    if (Helpers.IsDir(f))
       d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
     else
       d = new DirStats(f, new Dir(f.FullName));
@@ -96,10 +96,10 @@ public class DirStats
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
-    FileType = DirCache.FileType(f);
-    Permissions = DirCache.FilePermissions(f);
-    Length = DirCache.FileSize(f);
-    IsDirectory = DirCache.IsDir(f);
+    FileType = Helpers.FileType(f);
+    Permissions = Helpers.FilePermissions(f);
+    Length = Helpers.FileSize(f);
+    IsDirectory = Helpers.IsDir(f);
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
       recursiveInfo.Complete = true;

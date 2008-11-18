@@ -74,7 +74,7 @@ public static class DirCache
       if (TraversalCancelled) return dc.Cancel ();
       if (dc.Complete) return dc;
       dc.InProgress = true;
-      try { files = Entries (dirname); }
+      try { files = Helpers.Entries (dirname); }
       catch (System.UnauthorizedAccessException) { return dc.Fail (); }
       if (!dc.FilePassDone) {
         ulong count = 0;
@@ -82,8 +82,8 @@ public static class DirCache
         long missing = 0;
         foreach (UnixFileSystemInfo f in files) {
           count++;
-          if (IsDir(f)) missing++;
-          else size += FileSize(f);
+          if (Helpers.IsDir(f)) missing++;
+          else size += Helpers.FileSize(f);
         }
         dc.AddCount (count);
         dc.AddSize (size);
@@ -94,43 +94,13 @@ public static class DirCache
       if (TraversalCancelled) return dc.Cancel ();
     }
     foreach (UnixFileSystemInfo f in files) {
-      if (IsDir(f)) Traverse(f.FullName);
+      if (Helpers.IsDir(f)) Traverse(f.FullName);
       if (TraversalCancelled) return dc.Cancel ();
     }
     return dc;
   }
 
-  static UnixFileSystemInfo[] Entries (string dirname) {
-    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
-    return di.GetFileSystemEntries ();
-  }
-
-  public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
-    try { return Entries(dirname); }
-    catch (System.IO.FileNotFoundException) { return new UnixFileSystemInfo[0]; }
-  }
-
-  public static FileTypes FileType (UnixFileSystemInfo f) {
-    try { return f.FileType; }
-    catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
-  }
-
-  public static FileAccessPermissions FilePermissions (UnixFileSystemInfo f) {
-    try { return f.FileAccessPermissions; }
-    catch (System.InvalidOperationException) { return (FileAccessPermissions)0; }
-  }
-
-  public static ulong FileSize (UnixFileSystemInfo f) {
-    try { return (ulong)f.Length; }
-    catch (System.InvalidOperationException) { return 0; }
-  }
-
-  public static bool IsDir (UnixFileSystemInfo f) {
-    try { return f.IsDirectory; }
-    catch (System.InvalidOperationException) { return false; }
-  }
 }
-
 
 
 public class Dir {
