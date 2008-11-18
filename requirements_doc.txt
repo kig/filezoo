@@ -1,0 +1,83 @@
+Filezoo requirements document
+-----------------------------
+
+This document outlines the requirements for the Filezoo file manager project.
+
+1 Performance
+
+  1.1 Interactivity losses must be less than 100ms.
+    1.1.1 Displaying the first level of the new directory after navigation must
+          take less than 100ms.
+    1.1.2 Minimum framerate when zooming and scrolling must be above 20 fps.
+    1.1.3 The time it takes for a UI action to register must be less than 100ms.
+
+  1.2 Memory usage of the application should be less than 500 MB.
+    1.2.1 For a filesystem tree of 200 thousand directories, that would mean
+          max. 2.5 kB per directory.
+
+  1.3 Redundant redraws should be avoided.
+    1.3.1 When the application is hidden, the application must not redraw.
+    1.3.2 When a redraw is not needed, the application must not redraw.
+
+
+2 Features
+
+  2.1 Visualize the filesystem in a clear readable manner.
+
+  2.2 Interact with files and directories in a natural way.
+    2.2.1 Integrate browsing with the shell.
+      2.2.1.1 Open a new terminal in the current directory.
+      2.2.1.2 Access selection from the shell.
+      2.2.1.3 Navigate the filesystem view from the shell.
+    2.2.2 Show thumbnails of files.
+    2.2.3 Select files and directories by clicking on them.
+      2.2.3.1 Operate on selections with copy, mv, rm, rename.
+      2.2.3.2 Save selections to clipboard.
+    2.2.4 Open files with the corresponding mimetype handler when clicked.
+    2.2.5 Zoom into a file to view it in full size.
+
+  2.3 Navigate the filesystem efficiently.
+    2.3.1 Click to zoom in to the clicked target.
+      2.3.1.1 Small items should be zoomed to readable size when clicked.
+      2.3.1.2 Readable items should be zoomed to detailed view when clicked.
+      2.3.1.3 Large items should be zoomed out to show their overview and context.
+      2.3.1.4 Clicking outside of items should zoom out to parent overview.
+    2.3.2 Scroll by dragging a scroll velocity vector.
+      2.3.2.1 Using the wheel causes RSI.
+      2.3.2.2 Panning by dragging the background is slow and a lot of work.
+    2.3.3 Enter directories by zooming into them.
+    2.3.4 Write to enter current path / search string.
+      2.3.4.1 Autocomplete entries.
+      2.3.4.2 Show results as typing.
+      2.3.4.3 Interact with results.
+    2.3.5 Keyboard shortcuts for navigation.
+
+
+3 Code quality
+
+  3.1 Relative importance of application components
+    3.1.1 There are the following importance levels for components, in order
+          from most important to least important.
+          CRITICAL, IMPORTANT, NORMAL and UNIMPORTANT.
+    3.1.2 Components that can cause changes in the filesystem are CRITICAL.
+    3.1.3 Components used by the user interface in blocking mode are IMPORTANT.
+    3.1.4 Components used asynchronously by the user interface are NORMAL.
+    3.1.5 Non-CRITICAL components not used by the user interface are UNIMPORTANT.
+
+  3.2 Documentation
+    3.2.1 There must be a manual with instructions for using the program.
+    3.2.2 Public interfaces in the code must be documented.
+    3.2.3 There must be an overview document describing the layout of the
+          source code and how the different parts work together.
+    3.2.4 Each class must contain an overview description of its purpose.
+    3.2.5 Non-trivial parts of the implementation must be explained.
+    3.2.6 Methods and classes must to be annotated with their importance levels.
+
+  3.3 Testing
+    3.3.1 CRITICAL components must be thoroughly tested, maybe even proofed.
+    3.3.2 IMPORTANT components must be thoroughly tested for deadlocks.
+    3.3.3 NORMAL components must be tested for correctness.
+
+  3.4 Performance monitoring
+    3.4.1 IMPORTANT components must have profilers in them.
+    3.4.2 NORMAL components should collect profiling information.
