@@ -29,6 +29,12 @@ public static class DirCache
     return dc;
   }
 
+  public static void Invalidate (string path) {
+    lock (Cache) {
+      Cache.Clear ();
+    }
+  }
+
   static bool TraversalCancelled = false;
   static long TraversalCounter = 0;
   static Dir CancelLock = new Dir ("");
@@ -112,6 +118,7 @@ public class Dir {
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
+  public bool Invalid = false;
 
   public Dir (string path) {
     Path = path;
@@ -119,6 +126,7 @@ public class Dir {
 
   public Dir SetComplete () {
     lock (this) {
+      if (Invalid) return this;
       if (Missing != Completed) {
         Console.WriteLine("Dir.Missing != Dir.Completed in {0}: {1} != {2}", Path, Missing, Completed);
         throw new System.ArgumentException ("Missing != Completed");
@@ -152,6 +160,7 @@ public class Dir {
 
   public void AddCount (ulong c) {
     lock (this) {
+      if (Invalid) return;
       TotalCount += c;
       string pdir = ParentDir();
       if (pdir.Length == 0) return;
@@ -161,6 +170,7 @@ public class Dir {
 
   public void AddSize (ulong c) {
     lock (this) {
+      if (Invalid) return;
       TotalSize += c;
       string pdir = ParentDir();
       if (pdir.Length == 0) return;

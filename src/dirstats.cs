@@ -50,7 +50,6 @@ public class DirStats
   { get { return recursiveInfo.Complete; } }
 
   // State variables for computing the recursive traversal of the DirStats
-  public bool recursiveSizeComputed = false;
   public Dir recursiveInfo;
 
   // Frame rate profiler to help with maintaining the frame rate when doing
@@ -66,6 +65,14 @@ public class DirStats
   DirStats[] _Entries = null;
   DirStats[] Entries {
     get {
+      if (recursiveInfo.Invalid) {
+        _Entries = null;
+        if (IsDirectory) {
+          UpdateInfo (DirCache.GetCacheEntry(FullName));
+        } else {
+          UpdateInfo (new Dir(FullName));
+        }
+      }
       if (_Entries == null) {
         try {
           UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
@@ -87,17 +94,27 @@ public class DirStats
   public static DirStats Get (UnixFileSystemInfo f) {
     DirStats d;
     if (Helpers.IsDir(f))
-      d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
+      d = new DirStats(DirCache.GetCacheEntry(f.FullName));
     else
-      d = new DirStats(f, new Dir(f.FullName));
+      d = new DirStats(new Dir(f.FullName));
     return d;
   }
 
-  protected DirStats (UnixFileSystemInfo f, Dir r)
+  protected DirStats (Dir r)
   {
+    UpdateInfo (r);
     Comparer = new NameComparer ();
-    recursiveInfo = r;
     Scale = Height = 1.0;
+    string[] split = Name.Split('.');
+    Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
+  }
+
+  void UpdateInfo (Dir r) {
+    recursiveInfo = r;
+    UnixFileSystemInfo f;
+    try {
+      f = new UnixDirectoryInfo (r.Path);
+    } catch (System.IO.FileNotFoundException) { IsDirectory=false; return; }
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
@@ -111,8 +128,6 @@ public class DirStats
       recursiveInfo.TotalSize = Length;
       recursiveInfo.TotalCount = 1;
     }
-    string[] split = Name.Split('.');
-    Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
 

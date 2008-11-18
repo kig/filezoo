@@ -83,9 +83,14 @@ class Filezoo : DrawingArea
   // font size state variable
   double FontSize;
 
+  // Current dir invalidated?
+  bool Invalidated = false;
+
   // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ();
 
+  // FileSystemWatcher for watching the CurrentDirPath
+  FileSystemWatcher Watcher;
 
   /* Constructor */
 
@@ -94,6 +99,8 @@ class Filezoo : DrawingArea
     SortField = SortFields[0];
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
+
+    Watcher = MakeWatcher (dirname);
 
     BuildDirs (dirname);
 
@@ -117,12 +124,54 @@ class Filezoo : DrawingArea
     CurrentDirPath = d.FullName;
     if (CurrentDir != null) CurrentDir.CancelTraversal ();
     CurrentDir = DirStats.Get (d);
+    if (Watcher.Path != CurrentDirPath) {
+      Watcher.Dispose ();
+      Watcher = MakeWatcher (CurrentDirPath);
+    }
     FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort ();
     p.Time("BuildDirs");
   }
 
+  void WatcherChanged (object source, FileSystemEventArgs e)
+  {
+    lock (this) {
+//       Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+      Invalidated = true;
+    }
+    UpdateLayout ();
+  }
+
+  void WatcherRenamed (object source, RenamedEventArgs e)
+  {
+    lock (this) {
+//       Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
+      Invalidated = true;
+    }
+    UpdateLayout ();
+  }
+
+  FileSystemWatcher MakeWatcher (string dirname)
+  {
+    FileSystemWatcher watcher = new FileSystemWatcher ();
+    watcher.IncludeSubdirectories = false;
+    watcher.NotifyFilter = (
+        NotifyFilters.LastWrite
+      | NotifyFilters.Size
+      | NotifyFilters.FileName
+      | NotifyFilters.DirectoryName
+      | NotifyFilters.CreationTime
+    );
+    watcher.Path = dirname;
+    watcher.Filter = "";
+    watcher.Changed += new FileSystemEventHandler (WatcherChanged);
+    watcher.Created += new FileSystemEventHandler (WatcherChanged);
+    watcher.Deleted += new FileSystemEventHandler (WatcherChanged);
+    watcher.Renamed += new RenamedEventHandler (WatcherRenamed);
+    watcher.EnableRaisingEvents = true;
+    return watcher;
+  }
 
 
 
@@ -181,6 +230,13 @@ class Filezoo : DrawingArea
 
   void Draw (Context cr, uint width, uint height)
   {
+    lock (this) {
+      if (Invalidated) {
+        DirCache.Invalidate (CurrentDirPath);
+        BuildDirs (CurrentDirPath);
+        Invalidated = false;
+      }
+    }
     if (LayoutUpdateRequested) RecreateLayout();
 
     cr.Save ();
