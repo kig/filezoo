@@ -13,7 +13,7 @@ Requirements:
   libmono-cairo2.0-cil
 
 Compile by:
-  gmcs -pkg:gtk-sharp-2.0 -r:Mono.Cairo -r:Mono.Posix -out:filezoo.exe *.cs
+  ./build.sh
 
 Usage:
-  filezoo.exe [directory]
+  bin/filezoo.exe [directory]
