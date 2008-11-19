@@ -7,6 +7,17 @@ using System.IO;
 using Mono.Unix;
 using Cairo;
 
+
+/**
+  DirStats is the drawing model class for FileZoo.
+
+  Every directory and file is presented by a DirStats instance.
+
+  A DirStats draws itself and its children on a Cairo Context.
+
+  If the DirStats instance's on-screen presence is small, it won't draw its children.
+  If the DirStats is hidden, it won't draw itself or its children.
+*/
 public class DirStats
 {
   // Colors for the different file types, quite like ls
@@ -218,6 +229,9 @@ public class DirStats
   {
     double h = cr.Matrix.Yy * GetScaledHeight ();
     double y = cr.Matrix.Y0 - targetTop;
+    // rectangle doesn't intersect any quarter-pixel midpoints
+    if (h < 0.5 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
+      return false;
     return ((y < targetHeight) && ((y+h) > 0.0));
   }
 
@@ -232,7 +246,7 @@ public class DirStats
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01, targetBox);
+      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.02, targetBox);
       cr.Color = BG;
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
@@ -241,6 +255,12 @@ public class DirStats
       if (depth > 0) {
         Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
+        if (IsDirectory) {
+          Helpers.DrawRectangle (cr, BoxWidth*0.1, 0.48, BoxWidth*0.9, 0.48, targetBox);
+          cr.Color = BG;
+          cr.Fill ();
+          cr.Color = co;
+        }
       }
       if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
       if (IsDirectory) {
