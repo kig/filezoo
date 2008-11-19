@@ -10,18 +10,20 @@ class SortHandler {
 }
 
 public class SizeComparer : IComparer<DirStats> {
+  /** BLOCKING */
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    int rv = a.Length.CompareTo(b.Length);
+    long rv = a.Length - b.Length;
     if (rv == 0) rv = a.Name.CompareTo(b.Name);
-    return rv;
+    return rv > 0 ? 1 : (rv < 0 ? -1 : 0);
   }
 }
 
 public class NameComparer : IComparer<DirStats> {
+  /** BLOCKING */
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
@@ -32,18 +34,20 @@ public class NameComparer : IComparer<DirStats> {
 }
 
 public class DateComparer : IComparer<DirStats> {
+  /** BLOCKING */
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    int rv = a.Info.LastWriteTime.CompareTo(b.Info.LastWriteTime);
+    int rv = a.LastModified.CompareTo(b.LastModified);
     if (rv == 0) rv = a.Name.CompareTo(b.Name);
     return rv;
   }
 }
 
 public class TypeComparer : IComparer<DirStats> {
+  /** BLOCKING */
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;

@@ -20,6 +20,7 @@ public static class Helpers {
   static Hashtable LayoutCache = new Hashtable(20);
   static bool fontCacheInit = false;
 
+  /** BLOCKING */
   static Pango.Layout GetFont(Context cr, double fontSize)
   {
     if (!fontCacheInit) {
@@ -39,6 +40,7 @@ public static class Helpers {
     return (Pango.Layout)LayoutCache[fontSize];
   }
 
+  /** BLOCKING */
   public static void DrawText (Context cr, double fontSize, string text)
   {
   Stopwatch wa = new Stopwatch ();
@@ -58,6 +60,7 @@ public static class Helpers {
     cr.RelMoveTo (w, 0);
   }
 
+  /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, double fontSize, string text)
   {
     TextExtents te = new TextExtents ();
@@ -75,7 +78,9 @@ public static class Helpers {
   }
 
 
-  public static bool CheckTextExtents (Context cr, double advance, TextExtents te, double x, double y)
+  /** FAST */
+  public static bool CheckTextExtents
+  (Context cr, double advance, TextExtents te, double x, double y)
   {
     bool retval = false;
     cr.Save ();
@@ -89,6 +94,7 @@ public static class Helpers {
 
   /* Rectangle drawing helpers */
 
+  /** FAST */
   public static void DrawRectangle
   (Context cr, double x, double y, double w, double h, Rectangle target)
   {
@@ -113,6 +119,7 @@ public static class Helpers {
 
   /* File opening helpers */
 
+  /** ASYNC */
   public static void OpenTerminal (string path)
   {
     string cd = UnixDirectoryInfo.GetCurrentDirectory ();
@@ -121,6 +128,7 @@ public static class Helpers {
     UnixDirectoryInfo.SetCurrentDirectory (cd);
   }
 
+  /** ASYNC */
   public static void OpenFile (string path)
   {
     Process.Start ("gnome-open", EscapePath(path));
@@ -129,6 +137,7 @@ public static class Helpers {
 
   /* String formatting helpers */
 
+  /** FAST */
   public static string FormatSI (double sz, string unit)
   {
     string suffix = "";
@@ -150,52 +159,67 @@ public static class Helpers {
 
   /* File info helpers */
 
+  /** BLOCKING */
   public static UnixFileSystemInfo[] Entries (string dirname) {
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
     return di.GetFileSystemEntries ();
   }
 
+  /** BLOCKING */
   public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
     try { return Entries(dirname); }
     catch (System.IO.FileNotFoundException) { return new UnixFileSystemInfo[0]; }
   }
 
+  /** BLOCKING */
   public static FileTypes FileType (UnixFileSystemInfo f) {
     try { return f.FileType; }
     catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
   }
 
+  /** BLOCKING */
   public static FileAccessPermissions FilePermissions (UnixFileSystemInfo f) {
     try { return f.FileAccessPermissions; }
     catch (System.InvalidOperationException) { return (FileAccessPermissions)0; }
   }
 
+  /** BLOCKING */
   public static long FileSize (UnixFileSystemInfo f) {
     try { return f.Length; }
     catch (System.InvalidOperationException) { return 0; }
   }
 
+  /** BLOCKING */
   public static bool IsDir (UnixFileSystemInfo f) {
     try { return f.IsDirectory; }
     catch (System.InvalidOperationException) { return false; }
   }
 
+  /** BLOCKING */
   public static bool IsDir (string s) {
     return IsDir (new UnixDirectoryInfo(s));
   }
 
+  /** BLOCKING */
   public static bool FileExists (string path) {
     return (new UnixFileInfo (path)).Exists;
   }
 
-  public static DateTime LastModified (string path) {
-    UnixFileSystemInfo f = new UnixFileInfo (path);
+  /** BLOCKING */
+  public static DateTime LastModified (UnixFileSystemInfo f) {
     if (f.LastWriteTime > f.LastStatusChangeTime)
       return f.LastWriteTime;
     else
       return f.LastStatusChangeTime;
   }
 
+  /** BLOCKING */
+  public static DateTime LastModified (string path) {
+    UnixFileSystemInfo f = new UnixFileInfo (path);
+    return LastModified(f);
+  }
+
+  /** BLOCKING */
   public static ArrayList SubDirs (string path) {
     ArrayList a = new ArrayList ();
     try {
@@ -207,6 +231,7 @@ public static class Helpers {
     return a;
   }
 
+  /** BLOCKING */
   public static ArrayList SubDirnames (string path) {
     ArrayList a = new ArrayList ();
     foreach (UnixFileSystemInfo d in SubDirs (path))
@@ -217,6 +242,7 @@ public static class Helpers {
 
   /* Path helpers */
 
+  /** FAST */
   public static string Dirname (string path) {
     if (path == RootDir) return "";
     char[] sa = {DirSepC};
@@ -225,10 +251,12 @@ public static class Helpers {
   }
 
   static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");
+  /** FAST */
   public static string EscapePath (string path) {
     return specialChars.Replace(path, @"\");
   }
 
+  /** FAST */
   static string srev (string s) {
     char [] c = s.ToCharArray ();
     Array.Reverse (c);

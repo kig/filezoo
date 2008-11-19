@@ -18,6 +18,7 @@ public static class DirCache
   static Dir CancelLock = new Dir ();
   static Dir TCLock = new Dir ();
 
+  /** BLOCKING */
   public static Dir GetCacheEntry (string path)
   { lock (Cache) {
       Dir dc;
@@ -33,6 +34,7 @@ public static class DirCache
       return dc;
   } }
 
+  /** BLOCKING */
   public static void CancelTraversal ()
   {
     lock (CancelLock) {
@@ -48,42 +50,7 @@ public static class DirCache
     }
   }
 
-  public static void RequestTraversal (string dirname)
-  {
-    lock (CancelLock) {}
-    ThreadTraverse(dirname);
-  }
-
-
-
-
-
-  static void AddChild (string path, Dir d)
-  { lock (Cache) {
-    GetChildren(path).Add (d);
-  } }
-
-  static ArrayList GetAncestors (string path)
-  { lock (Cache) {
-    string s = Helpers.Dirname (path);
-    ArrayList a = new ArrayList ();
-    while (s.Length > 0) {
-      a.Add (GetCacheEntry (s));
-      s = Helpers.Dirname (s);
-    }
-    return a;
-  } }
-
-  static ArrayList GetChildren (string path)
-  { lock (Cache) {
-    if (Children.ContainsKey(path)) {
-      return Children[path];
-    } else {
-      return (Children[path] = new ArrayList ());
-    }
-  } }
-
-  /* Here there be bugs, file count abnormally rises after some events */
+  /** BLOCKING */
   public static void Invalidate (string path)
   { lock (Cache) {
     if (Cache.ContainsKey(path)) {
@@ -99,7 +66,47 @@ public static class DirCache
     }
   } }
 
-  public static void Deleted (string path)
+  /** BLOCKING */
+  public static void RequestTraversal (string dirname)
+  {
+    lock (CancelLock) {}
+    ThreadTraverse(dirname);
+  }
+
+
+
+
+
+  /** ASYNC */
+  static void AddChild (string path, Dir d)
+  { lock (Cache) {
+    GetChildren(path).Add (d);
+  } }
+
+  /** ASYNC */
+  static ArrayList GetAncestors (string path)
+  { lock (Cache) {
+    string s = Helpers.Dirname (path);
+    ArrayList a = new ArrayList ();
+    while (s.Length > 0) {
+      a.Add (GetCacheEntry (s));
+      s = Helpers.Dirname (s);
+    }
+    return a;
+  } }
+
+  /** ASYNC */
+  static ArrayList GetChildren (string path)
+  { lock (Cache) {
+    if (Children.ContainsKey(path)) {
+      return Children[path];
+    } else {
+      return (Children[path] = new ArrayList ());
+    }
+  } }
+
+  /** ASYNC */
+  static void Deleted (string path)
   { lock (Cache) {
     // ditch path's children, ditch path, excise path from parent,
     // set parent complete if path was the only incomplete child in it
@@ -113,7 +120,8 @@ public static class DirCache
       SetComplete (parent);
   } }
 
-  public static void DeleteChildren (string path)
+  /** ASYNC */
+  static void DeleteChildren (string path)
   { lock (Cache) {
     if (Children.ContainsKey(path)) {
       foreach (Dir c in Children[path])
@@ -124,7 +132,8 @@ public static class DirCache
       Cache.Remove (path);
   } }
 
-  public static void Modified (string path)
+  /** ASYNC */
+  static void Modified (string path)
   { lock (Cache) {
     // excise path data from parent
     // redo path's file pass
@@ -150,13 +159,15 @@ public static class DirCache
     }
   } }
 
+  /** ASYNC */
   public static void Clear ()
   { lock (Cache) {
     Cache.Clear ();
     Children.Clear ();
   } }
 
-  public static void AddCountAndSize (string path, long count, long size)
+  /** ASYNC */
+  static void AddCountAndSize (string path, long count, long size)
   { lock (Cache) {
     Dir d = GetCacheEntry (path);
     d.TotalCount += count;
@@ -167,6 +178,7 @@ public static class DirCache
     }
   } }
 
+  /** ASYNC */
   static void SetComplete (string path)
   { lock (Cache) {
     Dir d = GetCacheEntry (path);
@@ -178,6 +190,7 @@ public static class DirCache
     }
   } }
 
+  /** ASYNC */
   static void SetIncomplete (string path)
   { lock (Cache) {
     Dir d = GetCacheEntry (path);
@@ -189,6 +202,7 @@ public static class DirCache
     }
   } }
 
+  /** ASYNC */
   static bool AllChildrenComplete (string path)
   { lock (Cache) {
     if (NeedFilePass(path)) return false;
@@ -197,6 +211,7 @@ public static class DirCache
     return true;
   } }
 
+  /** ASYNC */
   static bool StartTraversal (string path)
   { lock (Cache) {
     Dir d = GetCacheEntry (path);
@@ -205,11 +220,13 @@ public static class DirCache
     return true;
   } }
 
+  /** ASYNC */
   static void Fail (string path)
   { lock (Cache) {
     SetComplete (path);
   } }
 
+  /** ASYNC */
   static void SetFilePassStats (string path, long count, long size)
   { lock (Cache) {
     Dir d = GetCacheEntry (path);
@@ -224,6 +241,7 @@ public static class DirCache
     }
   } }
 
+  /** ASYNC */
   static bool NeedFilePass (string path)
   { lock (Cache) {
     return !(GetCacheEntry(path).FilePassDone);
@@ -231,17 +249,20 @@ public static class DirCache
 
 
 
+  /** BLOCKING */
   static void ThreadTraverse (string dirname) {
     WaitCallback cb = new WaitCallback(TraverseCallback);
     ThreadPool.QueueUserWorkItem(cb, dirname);
   }
 
+  /** ASYNC */
   static void TraverseCallback (object state) {
     lock (TCLock) TraverseThreadCount++;
     Traverse ((string)state);
     lock (TCLock) TraverseThreadCount--;
   }
 
+  /** ASYNC */
   static void TraverseSub (string dirname)
   {
     bool useThread;
@@ -250,6 +271,7 @@ public static class DirCache
     else Traverse (dirname);
   }
 
+  /** ASYNC */
   static void Traverse (string dirname)
   {
     lock (TCLock) TraversalCounter++;
@@ -257,6 +279,7 @@ public static class DirCache
     lock (TCLock) TraversalCounter--;
   }
 
+  /** ASYNC */
   static void TraverseDir (string dirname)
   {
     if (TraversalCancelled) return;

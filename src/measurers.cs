@@ -16,6 +16,7 @@ public interface IMeasurer {
 
 public class SizeMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  /** FAST */
   public double Measure (DirStats d) {
     return Math.Max(1.0, d.Length);
   }
@@ -23,6 +24,7 @@ public class SizeMeasurer : IMeasurer {
 
 public class TotalMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
+  /** FAST */
   public double Measure (DirStats d) {
     return Math.Max(1.0, d.GetRecursiveSize ());
   }
@@ -30,16 +32,18 @@ public class TotalMeasurer : IMeasurer {
 
 public class CountMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
+  /** FAST */
   public double Measure (DirStats d) {
-    double mul = (d.Info.Name[0] == '.') ? 1.0 : 20.0;
+    double mul = (d.Name[0] == '.') ? 1.0 : 20.0;
     return (d.IsDirectory ? Math.Max(1, d.GetRecursiveCount()) : 5.0) * mul;
   }
 }
 
 public class FlatMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  /** FAST */
   public double Measure (DirStats d) {
-    bool isDotFile = d.Info.Name[0] == '.';
+    bool isDotFile = d.Name[0] == '.';
     if (isDotFile) return 0.05;
     return (d.IsDirectory ? 1.5 : 1.0);
   }

@@ -95,6 +95,7 @@ class Filezoo : DrawingArea
 
   /* Constructor */
 
+  /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
   {
     SortField = SortFields[0];
@@ -116,6 +117,7 @@ class Filezoo : DrawingArea
 
   /* Files model */
 
+  /** BLOCKING */
   void BuildDirs (string dirname)
   {
     Profiler p = new Profiler ();
@@ -135,6 +137,7 @@ class Filezoo : DrawingArea
     p.Time("BuildDirs");
   }
 
+  /** FAST */
   void WatcherChanged (object source, FileSystemEventArgs e)
   {
     lock (this) {
@@ -145,6 +148,7 @@ class Filezoo : DrawingArea
     UpdateLayout ();
   }
 
+  /** FAST */
   void WatcherRenamed (object source, RenamedEventArgs e)
   {
     lock (this) {
@@ -156,6 +160,7 @@ class Filezoo : DrawingArea
     UpdateLayout ();
   }
 
+  /** BLOCKING */
   FileSystemWatcher MakeWatcher (string dirname)
   {
     FileSystemWatcher watcher = new FileSystemWatcher ();
@@ -181,18 +186,21 @@ class Filezoo : DrawingArea
 
   /* Layout */
 
+  /** FAST */
   void UpdateLayout ()
   {
     LayoutUpdateRequested = true;
     QueueDraw ();
   }
 
+  /** FAST */
   void UpdateSort ()
   {
     SortUpdateRequested = true;
     UpdateLayout ();
   }
 
+  /** BLOCKING */
   void RecreateLayout ()
   {
     Profiler p = new Profiler ();
@@ -223,6 +231,7 @@ class Filezoo : DrawingArea
 
   /* Drawing */
 
+  /** FAST */
   Rectangle Transform (Context cr, uint width, uint height)
   {
     double boxHeight = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
@@ -238,6 +247,7 @@ class Filezoo : DrawingArea
     return new Rectangle (x,y,w,h);
   }
 
+  /** BLOCKING */
   void Draw (Context cr, uint width, uint height)
   {
     lock (this) {
@@ -268,6 +278,7 @@ class Filezoo : DrawingArea
       UpdateLayout();
   }
 
+  /** FAST */
   void DrawClear (Context cr, uint width, uint height)
   {
     cr.Color = new Color (1,1,1);
@@ -275,6 +286,7 @@ class Filezoo : DrawingArea
     cr.Fill ();
   }
 
+  /** FAST */
   void DrawToolbars (Context cr)
   {
     Profiler p = new Profiler ();
@@ -287,6 +299,7 @@ class Filezoo : DrawingArea
     p.Time ("DrawToolbars");
   }
 
+  /** BLOCKING */
   void DrawCurrentDir (Context cr, Rectangle targetBox)
   {
     Profiler p = new Profiler ();
@@ -298,6 +311,7 @@ class Filezoo : DrawingArea
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
 
+  /** FAST */
   void DrawBreadcrumb (Context cr)
   {
     cr.Color = new Color (0,0,1);
@@ -314,6 +328,7 @@ class Filezoo : DrawingArea
     }
   }
 
+  /** FAST */
   void DrawSortBar (Context cr)
   {
     cr.MoveTo (0.0, ToolbarY);
@@ -334,6 +349,7 @@ class Filezoo : DrawingArea
     Helpers.DrawText (cr, FontSize, " ");
   }
 
+  /** FAST */
   void DrawSizeBar (Context cr)
   {
     cr.Color = ActiveColor;
@@ -349,6 +365,7 @@ class Filezoo : DrawingArea
     Helpers.DrawText (cr, FontSize, " ");
   }
 
+  /** FAST */
   void DrawOpenTerminal (Context cr)
   {
     FontSize = ToolbarLabelFontSize;
@@ -361,6 +378,7 @@ class Filezoo : DrawingArea
 
   /* Click handling */
 
+  /** BLOCKING */
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
@@ -383,14 +401,13 @@ class Filezoo : DrawingArea
     cr.Restore ();
   }
 
+  /** BLOCKING */
   void ClickCurrentDir (Context cr, uint width, uint height, double x, double y)
   {
-    Transform (cr, width, height);
-    double boxHeight = cr.Matrix.Yy;
-    double boxTop = cr.Matrix.Y0;
+    Rectangle box = Transform (cr, width, height);
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
-    DirAction action = CurrentDir.Click (cr, boxTop, boxHeight, x, y, 0);
+    DirAction action = CurrentDir.Click (cr, box, x, y, 0);
     switch (action.Type) {
       case DirAction.Action.Open:
         Console.WriteLine("Open {0}", action.Path);
@@ -410,6 +427,7 @@ class Filezoo : DrawingArea
     }
   }
 
+  /** FAST */
   bool ClickBreadcrumb (Context cr, double x, double y)
   {
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
@@ -435,6 +453,7 @@ class Filezoo : DrawingArea
     return false;
   }
 
+  /** FAST */
   bool ClickSortBar (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
@@ -475,6 +494,7 @@ class Filezoo : DrawingArea
     return false;
   }
 
+  /** FAST */
   bool ClickSizeBar (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
@@ -496,6 +516,7 @@ class Filezoo : DrawingArea
     return false;
   }
 
+  /** FAST */
   bool ClickOpenTerminal (ref double advance, Context cr, double x, double y)
   {
     TextExtents te;
@@ -513,12 +534,14 @@ class Filezoo : DrawingArea
 
   /* Zooming and panning */
 
-  void ResetZoom ()
-  {
+  /** FAST */
+  void ResetZoom () {
     Zoomer.ResetZoom ();
   }
 
-  void ZoomBy (Context cr, uint width, uint height, double x, double y, double factor)
+  /** FAST */
+  void ZoomBy
+  (Context cr, uint width, uint height, double x, double y, double factor)
   {
     double xr = x, yr = y, nz = Math.Max (1.0, Zoomer.Z * factor);
     cr.Save ();
@@ -530,16 +553,17 @@ class Filezoo : DrawingArea
     UpdateLayout();
   }
 
-  void ZoomToward (Context cr, uint width, uint height, double x, double y)
-  {
+  /** FAST */
+  void ZoomToward (Context cr, uint width, uint height, double x, double y) {
     ZoomBy (cr, width, height, x, y, ZoomInSpeed);
   }
 
-  void ZoomAway (Context cr, uint width, uint height, double x, double y)
-  {
+  /** FAST */
+  void ZoomAway (Context cr, uint width, uint height, double x, double y) {
     ZoomBy (cr, width, height, x, y, 1.0 / ZoomOutSpeed);
   }
 
+  /** FAST */
   void PanBy (Context cr, uint width, uint height, double dx, double dy)
   {
     double xr = dx, yr = dy;
@@ -554,6 +578,7 @@ class Filezoo : DrawingArea
 
   /* Event handlers */
 
+  /** FAST */
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
     dragStartX = dragX = e.X;
@@ -562,6 +587,7 @@ class Filezoo : DrawingArea
     return true;
   }
 
+  /** BLOCKING */
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
     if (e.Button == 1 && !dragging) {
@@ -576,6 +602,7 @@ class Filezoo : DrawingArea
     return true;
   }
 
+  /** FAST */
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
     if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
@@ -596,6 +623,7 @@ class Filezoo : DrawingArea
     return true;
   }
 
+  /** FAST */
   protected override bool OnScrollEvent (Gdk.EventScroll e)
   {
     if (e.Direction == Gdk.ScrollDirection.Up) {
@@ -617,6 +645,7 @@ class Filezoo : DrawingArea
     return true;
   }
 
+  /** BLOCKING */
   /**
     The expose event handler. Gets the Cairo.Context for the
     window and calls Draw with it and the window dimensions.

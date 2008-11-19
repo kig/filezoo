@@ -19,6 +19,10 @@ public class DirStats
   public static Color executableColor = new Color (0,0.75,0);
   public static Color fileColor = new Color (0,0,0);
 
+  public static Color unfinishedColor = new Color (0.5, 0, 1);
+  public static Color BG = new Color (1,1,1);
+
+
   // Style for the DirStats
   public double BoxWidth = 0.1;
 
@@ -31,7 +35,9 @@ public class DirStats
   public long Length;
   public string Suffix;
   public bool IsDirectory = false;
-  public UnixFileSystemInfo Info;
+  public DateTime LastModified;
+
+  UnixFileSystemInfo Info;
 
   FileAccessPermissions Permissions;
   FileTypes FileType;
@@ -46,6 +52,7 @@ public class DirStats
 
   // Traversal progress flag, true if the
   // recursive traversal of the DirStats is completed.
+  /** FAST */
   public virtual bool Complete
   { get { return recursiveInfo.Complete; } }
 
@@ -63,6 +70,7 @@ public class DirStats
 
   // DirStats objects for the children of a directory DirStats
   DirStats[] _Entries = null;
+  /** BLOCKING */
   DirStats[] Entries {
     get {
       if (_Entries == null) {
@@ -83,6 +91,7 @@ public class DirStats
 
   /* Constructor */
 
+  /** BLOCKING */
   public static DirStats Get (UnixFileSystemInfo f) {
     DirStats d;
     if (Helpers.IsDir(f))
@@ -92,6 +101,7 @@ public class DirStats
     return d;
   }
 
+  /** BLOCKING */
   protected DirStats (UnixFileSystemInfo f, Dir r)
   {
     UpdateInfo (f, r);
@@ -101,6 +111,7 @@ public class DirStats
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
+  /** BLOCKING */
   void UpdateInfo (UnixFileSystemInfo f, Dir r) {
     recursiveInfo = r;
     Info = f;
@@ -109,6 +120,7 @@ public class DirStats
     FileType = Helpers.FileType(f);
     Permissions = Helpers.FilePermissions(f);
     Length = Helpers.FileSize(f);
+    LastModified = Helpers.LastModified(f);
     IsDirectory = Helpers.IsDir(f);
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
@@ -121,15 +133,13 @@ public class DirStats
 
   /* Subtitles */
 
+  /** FAST */
   public string GetSubTitle ()
   {
     if (IsDirectory) {
       string extras = "";
       extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
       extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
-      if (recursiveInfo.InProgress) {
-//         extras += String.Format(", {0} missing", recursiveInfo.Missing-recursiveInfo.Completed);
-      }
       return extras;
     } else {
       return String.Format("{0}", Helpers.FormatSI(Length, "B"));
@@ -139,11 +149,13 @@ public class DirStats
 
   /* Drawing helpers */
 
+  /** FAST */
   public double GetScaledHeight ()
   {
     return Height * Scale;
   }
 
+  /** FAST */
   double GetFontSize (double h)
   {
     double fs;
@@ -151,8 +163,10 @@ public class DirStats
     return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
   }
 
+  /** FAST */
   double QuantizeFontSize (double fs) { return Math.Floor(fs); }
 
+  /** FAST */
   static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
@@ -171,6 +185,7 @@ public class DirStats
 
   /* Relayout */
 
+  /** BLOCKING */
   public void Sort ()
   {
     if (IsDirectory) {
@@ -180,6 +195,7 @@ public class DirStats
     }
   }
 
+  /** BLOCKING */
   public void Relayout ()
   {
     if (!IsDirectory) return;
@@ -194,37 +210,10 @@ public class DirStats
     }
   }
 
-  DirStats _ParentDir;
-  public DirStats ParentDir {
-    get {
-      if (_ParentDir == null)
-        _ParentDir = Get (new UnixDirectoryInfo(System.IO.Path.GetDirectoryName(FullName)));
-      return _ParentDir;
-    }
-  }
-  public string GetParentDirPath () {
-    return ParentDir.FullName;
-  }
-  public double GetYInParentDir () {
-    UpdateChild (ParentDir);
-    double position = 0.0;
-    foreach (DirStats d in ParentDir.Entries) {
-      if (d.Name == Name) return position;
-      position += d.GetScaledHeight ();
-    }
-    return 0.0;
-  }
-  public double GetHeightInParentDir () {
-    UpdateChild (ParentDir);
-    foreach (DirStats d in ParentDir.Entries) {
-      if (d.Name == Name) return d.GetScaledHeight ();
-    }
-    return 1.0;
-  }
-
 
   /* Drawing */
 
+  /** FAST */
   public bool IsVisible (Context cr, double targetTop, double targetHeight)
   {
     double h = cr.Matrix.Yy * GetScaledHeight ();
@@ -232,7 +221,7 @@ public class DirStats
     return ((y < targetHeight) && ((y+h) > 0.0));
   }
 
-  static Color BG = new Color (1,1,1);
+  /** BLOCKING */
   public uint Draw (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
     if (depth == 0) FrameProfiler.Restart ();
@@ -248,7 +237,7 @@ public class DirStats
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
       cr.Color = co;
-      if (!recursiveInfo.Complete) cr.Color = new Color (0.5, 0, 1);
+      if (!recursiveInfo.Complete) cr.Color = unfinishedColor;
       if (depth > 0) {
         Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
@@ -268,6 +257,7 @@ public class DirStats
     return c;
   }
 
+  /** FAST */
   void ChildTransform (Context cr, uint depth)
   {
     if (depth > 0) {
@@ -279,22 +269,7 @@ public class DirStats
     }
   }
 
-  uint DrawChildren (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
-  {
-    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame && _Entries == null) return 0;
-    cr.Save ();
-      ChildTransform (cr, depth);
-      uint c = 0;
-      foreach (DirStats d in Entries) {
-        UpdateChild (d);
-        c += d.Draw (cr, targetBox, firstFrame, depth+1);
-        double h = d.GetScaledHeight();
-        cr.Translate (0.0, h);
-      }
-    cr.Restore ();
-    return c;
-  }
-
+  /** BLOCKING */
   void DrawTitle (Context cr, uint depth)
   {
     double h = cr.Matrix.Yy;
@@ -320,6 +295,24 @@ public class DirStats
     cr.Restore ();
   }
 
+  /** BLOCKING */
+  uint DrawChildren (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
+  {
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame && _Entries == null) return 0;
+    cr.Save ();
+      ChildTransform (cr, depth);
+      uint c = 0;
+      foreach (DirStats d in Entries) {
+        UpdateChild (d);
+        c += d.Draw (cr, targetBox, firstFrame, depth+1);
+        double h = d.GetScaledHeight();
+        cr.Translate (0.0, h);
+      }
+    cr.Restore ();
+    return c;
+  }
+
+  /** BLOCKING */
   void UpdateChild (DirStats d)
   {
     if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame) return;
@@ -343,9 +336,11 @@ public class DirStats
 
   /* Click handler */
 
-  public DirAction Click (Context cr, double targetTop, double targetHeight, double mouseX, double mouseY, uint depth)
+  /** BLOCKING */
+  public DirAction Click
+  (Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
-    if (!IsVisible(cr, targetTop, targetHeight)) {
+    if (!IsVisible(cr, target.Y, target.Height)) {
       return DirAction.None;
     }
     double h = GetScaledHeight ();
@@ -354,8 +349,11 @@ public class DirStats
     cr.Save ();
       cr.Scale (1, h);
       if (IsDirectory && (cr.Matrix.Yy > 2))
-        retval = ClickChildren (cr, targetTop, targetHeight, mouseX, mouseY, depth);
-      if (retval == DirAction.None || (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 10)) {
+        retval = ClickChildren (cr, target, mouseX, mouseY, depth);
+      if (
+        retval == DirAction.None ||
+        (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 10)
+      ) {
         cr.NewPath ();
         double fs = GetFontSize(cr.Matrix.Yy);
         if (fs < 10) {
@@ -380,13 +378,15 @@ public class DirStats
     return retval;
   }
 
-  DirAction ClickChildren (Context cr, double targetTop, double targetHeight, double mouseX, double mouseY, uint depth)
+  /** BLOCKING */
+  DirAction ClickChildren
+  (Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     DirAction retval = DirAction.None;
     cr.Save ();
       ChildTransform (cr, depth);
       foreach (DirStats d in Entries) {
-        retval = d.Click (cr, targetTop, targetHeight, mouseX, mouseY, depth+1);
+        retval = d.Click (cr, target, mouseX, mouseY, depth+1);
         if (retval != DirAction.None) break;
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
@@ -400,20 +400,22 @@ public class DirStats
 
   /* Directory traversal */
 
-  public virtual double GetRecursiveSize ()
-  {
+  /** FAST */
+  public virtual double GetRecursiveSize () {
     return recursiveInfo.TotalSize;
   }
 
-  public virtual double GetRecursiveCount ()
-  {
+  /** FAST */
+  public virtual double GetRecursiveCount () {
     return recursiveInfo.TotalCount;
   }
 
+  /** FAST */
   public void CancelTraversal () {
     DirCache.CancelTraversal ();
   }
 
+  /** ASYNC */
   void RequestInfo () {
     if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
       DirCache.RequestTraversal (FullName);
@@ -423,30 +425,32 @@ public class DirStats
 }
 
 
-
-
-
-
 public class DirAction
 {
   public Action Type;
   public string Path;
   public double Height;
 
+  /** FAST */
   public static DirAction None = GetNone ();
 
+  /** FAST */
   public static DirAction GetNone ()
   { return new DirAction (Action.None, "", 0.0); }
 
+  /** FAST */
   public static DirAction Open (string path)
   { return new DirAction (Action.Open, path, 0.0); }
 
+  /** FAST */
   public static DirAction Navigate (string path)
   { return new DirAction (Action.Navigate, path, 0.0); }
 
+  /** FAST */
   public static DirAction ZoomIn (double h)
   { return new DirAction (Action.ZoomIn, "", h); }
 
+  /** FAST */
   DirAction (Action type, string path, double height)
   {
     Type = type;

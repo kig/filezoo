@@ -62,11 +62,16 @@ write unit tests, boo hoo!"-disclaimer.)
   3.1 Relative importance of application components
     3.1.1 There are the following importance levels for components, in order
           from most important to least important.
-          DESTRUCTIVE, BLOCKING, ASYNC and UNIMPORTANT.
+          DESTRUCTIVE, BLOCKING, ASYNC, UNIMPORTANT and FAST.
     3.1.2 Components that can cause changes in the filesystem are DESTRUCTIVE.
     3.1.3 Components used by the user interface in blocking mode are BLOCKING.
     3.1.4 Components used asynchronously by the user interface are ASYNC.
+          If a method acts FAST to the caller but may take a non-trivial amount
+          of time to yield its results to the data model, it's ASYNC.
     3.1.5 Non-DESTRUCTIVE components not used by the user interface are UNIMPORTANT.
+    3.1.6 Methods trivially proven fast are FAST.
+          If a method uses only FAST methods in a trivially fast manner, the
+          method can also be marked FAST.
 
   3.2 Documentation
     3.2.1 There must be a manual with instructions for using the program.
@@ -81,6 +86,7 @@ write unit tests, boo hoo!"-disclaimer.)
     3.3.1 DESTRUCTIVE components must be thoroughly tested, maybe even proofed.
     3.3.2 BLOCKING components must be thoroughly tested for deadlocks.
     3.3.3 ASYNC components must be tested for correctness.
+    3.3.4 FAST components must be tested for correctness.
 
   3.4 Performance monitoring
     3.4.1 BLOCKING components must have profilers in them.
