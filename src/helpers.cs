@@ -179,6 +179,14 @@ public static class Helpers {
     catch (System.InvalidOperationException) { return false; }
   }
 
+  public static bool IsDir (string s) {
+    return IsDir (new UnixDirectoryInfo(s));
+  }
+
+  public static bool FileExists (string path) {
+    return (new UnixFileInfo (path)).Exists;
+  }
+
   public static DateTime LastModified (string path) {
     UnixFileSystemInfo f = new UnixFileInfo (path);
     if (f.LastWriteTime > f.LastStatusChangeTime)

@@ -18,16 +18,16 @@ public static class DirCache
   static Dir CancelLock = new Dir ();
   static Dir TCLock = new Dir ();
 
-  public static Dir GetCacheEntry (string name)
+  public static Dir GetCacheEntry (string path)
   { lock (Cache) {
       Dir dc;
-      if (Cache.ContainsKey(name)) {
-        dc = Cache[name];
+      if (Cache.ContainsKey(path)) {
+        dc = Cache[path];
       } else {
-        dc = new Dir ();
-        dc.LastModified = Helpers.LastModified(name);
-        Cache[name] = dc;
-        string s = Helpers.Dirname (name);
+        dc = new Dir (path);
+        dc.LastModified = Helpers.LastModified(path);
+        Cache[path] = dc;
+        string s = Helpers.Dirname (path);
         if (s.Length > 0) GetCacheEntry (s);
       }
       return dc;
@@ -85,7 +85,63 @@ public static class DirCache
 
   public static void Invalidate (string path)
   { lock (Cache) {
-    Clear ();
+    if (Cache.ContainsKey(path)) {
+      if (Helpers.FileExists(path) && Helpers.IsDir(path)) {
+        Modified (path);
+      } else {
+        Deleted (path);
+      }
+    } else if (Cache.ContainsKey(Helpers.Dirname(path))) {
+      Modified (Helpers.Dirname(path));
+    } else {
+      return;
+    }
+  } }
+
+  public static void Deleted (string path)
+  { lock (Cache) {
+    // ditch path's children, ditch path, excise path from parent,
+    // set parent complete if path was the only incomplete child in it
+    Dir d = GetCacheEntry (path);
+    DeleteChildren (path);
+    string parent = Helpers.Dirname (path);
+    if (Children.ContainsKey(parent))
+      Children[parent].Remove(d);
+    AddCountAndSize (parent, -d.TotalCount, -d.TotalSize);
+    if (!d.Complete && AllChildrenComplete(parent))
+      SetComplete (parent);
+  } }
+
+  public static void DeleteChildren (string path)
+  { lock (Cache) {
+    if (Children.ContainsKey(path)) {
+      foreach (Dir c in Children[path])
+        DeleteChildren (c.Path);
+      Children.Remove(path);
+    }
+    if (Cache.ContainsKey(path))
+      Cache.Remove (path);
+  } }
+
+  public static void Modified (string path)
+  { lock (Cache) {
+    // excise path data from parent
+    // redo path's file pass
+    // enter new data to parent
+    Dir d = GetCacheEntry (path);
+    long count = 0;
+    long size = 0;
+    GetChildren(path).Clear();
+    foreach (UnixFileSystemInfo f in Helpers.EntriesMaybe(path)) {
+      count++;
+      if (Helpers.IsDir(f)) AddChild (path, GetCacheEntry(f.FullName));
+      else size += Helpers.FileSize(f);
+    }
+    foreach (Dir c in GetChildren(path)) {
+      count += c.TotalCount;
+      size += c.TotalSize;
+    }
+    AddCountAndSize (path, count-d.TotalCount, size-d.TotalSize);
   } }
 
   public static void Clear ()
@@ -215,10 +271,13 @@ public static class DirCache
 
 
 public class Dir {
+  public string Path;
   public long TotalCount = 1;
   public long TotalSize = 0;
   public DateTime LastModified;
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
+  public Dir () { Path = ""; }
+  public Dir (string path) { Path = path; }
 }
