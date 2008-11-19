@@ -32,7 +32,7 @@ public class CountMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
   public double Measure (DirStats d) {
     double mul = (d.Info.Name[0] == '.') ? 1.0 : 20.0;
-    return (d.IsDirectory ? d.GetRecursiveCount() : 5.0) * mul;
+    return (d.IsDirectory ? Math.Max(1, d.GetRecursiveCount()) : 5.0) * mul;
   }
 }
 
