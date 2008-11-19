@@ -7,9 +7,12 @@ public class Profiler
 
   public Stopwatch Watch;
   public Print PrintProfile = Print.Global;
+  public string Prefix;
 
-  public Profiler ()
+  public Profiler () : this("") {}
+  public Profiler (string prefix)
   {
+    Prefix = prefix;
     Watch = new Stopwatch ();
     Watch.Start ();
   }
@@ -22,7 +25,7 @@ public class Profiler
       ((PrintProfile == Print.Global) && GlobalPrintProfile)
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      Console.WriteLine (time.PadLeft(12) + message);
+      Console.WriteLine (Prefix + time.PadLeft(12) + message);
     }
     Restart ();
   }
