@@ -89,7 +89,8 @@ public static class Helpers {
 
   /* Rectangle drawing helpers */
 
-  public static void DrawRectangle (Context cr, double x, double y, double w, double h, Rectangle target)
+  public static void DrawRectangle
+  (Context cr, double x, double y, double w, double h, Rectangle target)
   {
     double x_a = cr.Matrix.X0+x*cr.Matrix.Xx;
     double y_a = cr.Matrix.Y0+y*cr.Matrix.Yy;

@@ -83,6 +83,7 @@ public static class DirCache
     }
   } }
 
+  /* Here there be bugs, file count abnormally rises after some events */
   public static void Invalidate (string path)
   { lock (Cache) {
     if (Cache.ContainsKey(path)) {
@@ -141,6 +142,7 @@ public static class DirCache
       count += c.TotalCount;
       size += c.TotalSize;
     }
+
     AddCountAndSize (path, count-d.TotalCount, size-d.TotalSize);
     bool acc = AllChildrenComplete(path);
     if (d.Complete != acc) {
@@ -288,7 +290,7 @@ public static class DirCache
 
 public class Dir {
   public string Path;
-  public long TotalCount = 1;
+  public long TotalCount = 0;
   public long TotalSize = 0;
   public DateTime LastModified;
   public bool Complete = false;
