@@ -88,7 +88,7 @@ class Filezoo : DrawingArea
   Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
 
   // first frame latency profiler
-  Profiler dirLatencyProfiler = new Profiler ();
+  Profiler dirLatencyProfiler = new Profiler (" --- ");
 
   // FileSystemWatcher for watching the CurrentDirPath
   FileSystemWatcher Watcher;
@@ -138,7 +138,7 @@ class Filezoo : DrawingArea
   void WatcherChanged (object source, FileSystemEventArgs e)
   {
     lock (this) {
-//       Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+      Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
       Invalidated = true;
       Invalids[e.FullPath] = true;
     }
@@ -148,7 +148,7 @@ class Filezoo : DrawingArea
   void WatcherRenamed (object source, RenamedEventArgs e)
   {
     lock (this) {
-//       Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
+      Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
       Invalidated = true;
       Invalids[e.FullPath] = true;
       Invalids[e.OldFullPath] = true;

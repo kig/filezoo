@@ -142,7 +142,6 @@ public static class DirCache
       count += c.TotalCount;
       size += c.TotalSize;
     }
-
     AddCountAndSize (path, count-d.TotalCount, size-d.TotalSize);
     bool acc = AllChildrenComplete(path);
     if (d.Complete != acc) {
