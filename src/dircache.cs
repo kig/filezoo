@@ -6,195 +6,189 @@ using System.Collections.Generic;
 using System.IO;
 
 
-/*
-  Refactor this into:
-    * A Cache that is the only object that edits the cache and its entries.
-    * Traversers that walk the tree and send information to Cache.
-*/
 public static class DirCache
 {
-  public static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (200000);
-
-  public static Dir GetCacheEntry (string name) {
-    Dir dc;
-    lock (Cache) {
-      if (Cache.ContainsKey(name)) {
-        dc = Cache[name];
-      } else {
-        dc = new Dir (name);
-        Cache[name] = dc;
-        Dir c = dc;
-        string s = c.ParentDir ();
-        while (s.Length > 0) {
-          if (Cache.ContainsKey(s)) break;
-          Cache[s] = c = new Dir (s);
-          s = c.ParentDir ();
-        }
-      }
-    }
-    return dc;
-  }
-
-  public static void Invalidate (string path) {
-    lock (Cache) {
-      Cache.Clear ();
-    }
-  }
+  static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (200000);
 
   static bool TraversalCancelled = false;
   static long TraversalCounter = 0;
-  static Dir CancelLock = new Dir ("");
-  static Dir TCLock = new Dir ("");
+  static Dir CancelLock = new Dir ();
+  static Dir TCLock = new Dir ();
+
+  public static Dir GetCacheEntry (string name)
+  { lock (Cache) {
+      Dir dc;
+      if (Cache.ContainsKey(name)) {
+        dc = Cache[name];
+      } else {
+        dc = new Dir ();
+        Cache[name] = dc;
+        string s = Helpers.Dirname (name);
+        while (s.Length > 0) {
+          if (Cache.ContainsKey(s)) break;
+          Cache[s] = new Dir ();
+          s = Helpers.Dirname (s);
+        }
+      }
+      return dc;
+  } }
 
   public static void CancelTraversal ()
   {
     lock (CancelLock) {
       TraversalCancelled = true;
       while (TraversalCounter != 0) {
-//         Console.WriteLine(TraversalCounter);
         Thread.Sleep (50);
       }
       lock (Cache) {
         foreach (Dir d in Cache.Values)
-          lock (d) { d.InProgress = false; }
+          d.InProgress = false;
       }
       TraversalCancelled = false;
     }
   }
 
-  public static Dir RequestTraversal (string dirname)
+  public static void RequestTraversal (string dirname)
   {
-    lock (CancelLock) {
-//       lock (TCLock) Console.WriteLine("Req {0}", TraversalCounter);
-    }
-    return Traverse (dirname);
+    lock (CancelLock) {}
+    WaitCallback cb = new WaitCallback(TraverseCallback);
+    ThreadPool.QueueUserWorkItem(cb, dirname);
   }
 
-  static Dir Traverse (string dirname)
+
+
+
+
+  static ArrayList GetAncestors (string path)
+  { lock (Cache) {
+    string s = Helpers.Dirname (path);
+    ArrayList a = new ArrayList ();
+    while (s.Length > 0) {
+      a.Add (GetCacheEntry (s));
+      s = Helpers.Dirname (s);
+    }
+    return a;
+  } }
+
+  static ArrayList GetChildren (string path)
+  { lock (Cache) {
+    ArrayList childNames = Helpers.SubDirnames (path);
+    ArrayList a = new ArrayList ();
+    foreach (string s in childNames)
+      a.Add (GetCacheEntry (s));
+    return a;
+  } }
+
+  public static void Invalidate (string path)
+  { lock (Cache) {
+      Cache.Clear ();
+  } }
+
+  public static void AddCountAndSize (string path, long count, long size)
+  { lock (Cache) {
+      Dir d = GetCacheEntry (path);
+      d.TotalCount += count;
+      d.TotalSize += size;
+      foreach (Dir a in GetAncestors (path)) {
+        a.TotalCount += count;
+        a.TotalSize += size;
+      }
+  } }
+
+  static void SetComplete (string path)
+  { lock (Cache) {
+      Dir d = GetCacheEntry (path);
+      d.Complete = true;
+      if (path != Helpers.RootDir) {
+        string p = Helpers.Dirname (path);
+        if (p.Length > 0 && AllChildrenComplete (p))
+          SetComplete (p);
+      }
+  } }
+
+  static bool AllChildrenComplete (string path)
+  { lock (Cache) {
+      ArrayList children = GetChildren (path);
+      foreach (Dir c in children)
+        if (!c.Complete) return false;
+      return true;
+  } }
+
+  static bool StartTraversal (string path)
+  { lock (Cache) {
+    Dir d = GetCacheEntry (path);
+    if (d.Complete || d.InProgress) return false;
+    d.InProgress = true;
+    return true;
+  } }
+
+  static void Fail (string path)
+  { lock (Cache) {
+    SetComplete (path);
+  } }
+
+  static void SetFilePassStats (string path, long count, long size)
+  { lock (Cache) {
+    Dir d = GetCacheEntry (path);
+    if (!d.FilePassDone) {
+      AddCountAndSize (path, count, size);
+      if (AllChildrenComplete(path))
+        SetComplete (path);
+      d.FilePassDone = true;
+    } else {
+      Console.WriteLine("SetFilePassStats {0} when FilePassDone", path);
+      throw new System.ArgumentException ("Can't SetFilePassStats when FilePassDone");
+    }
+  } }
+
+  static bool NeedFilePass (string path)
+  { lock (Cache) {
+    Dir d = GetCacheEntry (path);
+    return !d.FilePassDone;
+  } }
+
+  static void TraverseCallback (object state) { Traverse ((string)state); }
+
+  static void Traverse (string dirname)
   {
     lock (TCLock) TraversalCounter++;
-    Dir d = TraverseDir (dirname);
+    TraverseDir (dirname);
     lock (TCLock) TraversalCounter--;
-    return d;
   }
 
-  static Dir TraverseDir (string dirname)
+  static void TraverseDir (string dirname)
   {
-    Dir dc = GetCacheEntry(dirname);
+    if (TraversalCancelled) return;
     UnixFileSystemInfo[] files;
-    lock (dc) {
-      if (TraversalCancelled) return dc.Cancel ();
-      if (dc.Complete) return dc;
-      dc.InProgress = true;
-      try { files = Helpers.Entries (dirname); }
-      catch (System.UnauthorizedAccessException) { return dc.Fail (); }
-      if (!dc.FilePassDone) {
-        ulong count = 0;
-        ulong size = 0;
-        long missing = 0;
-        foreach (UnixFileSystemInfo f in files) {
-          count++;
-          if (Helpers.IsDir(f)) missing++;
-          else size += Helpers.FileSize(f);
-        }
-        dc.AddCount (count);
-        dc.AddSize (size);
-        dc.Missing = missing;
-        dc.FilePassDone = true;
-        if (dc.Missing == dc.Completed) return dc.SetComplete ();
-      }
-      if (TraversalCancelled) return dc.Cancel ();
+    if (!StartTraversal (dirname)) return;
+    try { files = Helpers.Entries (dirname); }
+    catch (System.UnauthorizedAccessException) {
+      Fail (dirname);
+      return;
     }
+    if (NeedFilePass (dirname)) {
+      long count = 0;
+      long size = 0;
+      foreach (UnixFileSystemInfo f in files) {
+        count++;
+        if (!Helpers.IsDir(f)) size += Helpers.FileSize(f);
+      }
+      SetFilePassStats (dirname, count, size);
+    }
+    if (TraversalCancelled) return;
     foreach (UnixFileSystemInfo f in files) {
       if (Helpers.IsDir(f)) Traverse(f.FullName);
-      if (TraversalCancelled) return dc.Cancel ();
+      if (TraversalCancelled) return;
     }
-    return dc;
   }
 
 }
 
 
 public class Dir {
-  public string Path;
-  public ulong TotalCount = 1;
-  public ulong TotalSize = 0;
-  public long Missing = 0;
-  public long Completed = 0;
+  public long TotalCount = 1;
+  public long TotalSize = 0;
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
-  public bool Invalid = false;
-
-  public Dir (string path) {
-    Path = path;
-  }
-
-  public Dir SetComplete () {
-    lock (this) {
-      if (Invalid) return this;
-      if (Missing != Completed) {
-        Console.WriteLine("Dir.Missing != Dir.Completed in {0}: {1} != {2}", Path, Missing, Completed);
-        throw new System.ArgumentException ("Missing != Completed");
-      }
-      InProgress = false;
-      Complete = true;
-      string pdir = ParentDir();
-      if (pdir.Length == 0) return this;
-      DirCache.GetCacheEntry(pdir).ChildFinished (this);
-    }
-    return this;
-  }
-
-  public void ChildFinished (Dir d) {
-    lock (this) {
-      Completed++;
-      if (Missing == Completed) SetComplete ();
-    }
-  }
-
-  public Dir Fail () {
-    return SetComplete ();
-  }
-
-  public Dir Cancel () {
-    lock (this) {
-      InProgress = false;
-      return this;
-    }
-  }
-
-  public void AddCount (ulong c) {
-    lock (this) {
-      if (Invalid) return;
-      TotalCount += c;
-      string pdir = ParentDir();
-      if (pdir.Length == 0) return;
-      DirCache.GetCacheEntry(pdir).AddCount(c);
-    }
-  }
-
-  public void AddSize (ulong c) {
-    lock (this) {
-      if (Invalid) return;
-      TotalSize += c;
-      string pdir = ParentDir();
-      if (pdir.Length == 0) return;
-      DirCache.GetCacheEntry(pdir).AddSize(c);
-    }
-  }
-
-  public string ParentDir () {
-    if (Path == Helpers.RootDir) return "";
-    char[] sa = {Helpers.DirSepC};
-    string p = srev(srev(Path).Split(sa, 2)[1]);
-    return (p.Length == 0 ? Helpers.RootDir : p);
-  }
-
-
-  static string srev (string s) {
-    char [] c = s.ToCharArray ();
-    Array.Reverse (c);
-    return new string (c);
-  }
 }

@@ -28,7 +28,7 @@ public class DirStats
   // Public state of the DirStats
   public string Name;
   public string FullName;
-  public ulong Length;
+  public long Length;
   public string Suffix;
   public bool IsDirectory = false;
   public UnixFileSystemInfo Info;
@@ -65,14 +65,6 @@ public class DirStats
   DirStats[] _Entries = null;
   DirStats[] Entries {
     get {
-      if (recursiveInfo.Invalid) {
-        _Entries = null;
-        if (IsDirectory) {
-          UpdateInfo (DirCache.GetCacheEntry(FullName));
-        } else {
-          UpdateInfo (new Dir(FullName));
-        }
-      }
       if (_Entries == null) {
         try {
           UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
@@ -94,27 +86,23 @@ public class DirStats
   public static DirStats Get (UnixFileSystemInfo f) {
     DirStats d;
     if (Helpers.IsDir(f))
-      d = new DirStats(DirCache.GetCacheEntry(f.FullName));
+      d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
     else
-      d = new DirStats(new Dir(f.FullName));
+      d = new DirStats(f, new Dir());
     return d;
   }
 
-  protected DirStats (Dir r)
+  protected DirStats (UnixFileSystemInfo f, Dir r)
   {
-    UpdateInfo (r);
+    UpdateInfo (f, r);
     Comparer = new NameComparer ();
     Scale = Height = 1.0;
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
-  void UpdateInfo (Dir r) {
+  void UpdateInfo (UnixFileSystemInfo f, Dir r) {
     recursiveInfo = r;
-    UnixFileSystemInfo f;
-    try {
-      f = new UnixDirectoryInfo (r.Path);
-    } catch (System.IO.FileNotFoundException) { IsDirectory=false; return; }
     Info = f;
     Name = f.Name;
     FullName = f.FullName;
@@ -140,7 +128,7 @@ public class DirStats
       extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
       extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
       if (recursiveInfo.InProgress) {
-        extras += String.Format(", {0} missing", recursiveInfo.Missing-recursiveInfo.Completed);
+//         extras += String.Format(", {0} missing", recursiveInfo.Missing-recursiveInfo.Completed);
       }
       return extras;
     } else {
@@ -428,14 +416,8 @@ public class DirStats
 
   void RequestInfo () {
     if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
-      WaitCallback cb = new WaitCallback(DirSizeCallback);
-      ThreadPool.QueueUserWorkItem(cb);
+      DirCache.RequestTraversal (FullName);
     }
-  }
-
-  void DirSizeCallback (Object stateInfo)
-  {
-    DirCache.RequestTraversal (FullName);
   }
 
 }

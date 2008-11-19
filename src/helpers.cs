@@ -168,14 +168,48 @@ public static class Helpers {
     catch (System.InvalidOperationException) { return (FileAccessPermissions)0; }
   }
 
-  public static ulong FileSize (UnixFileSystemInfo f) {
-    try { return (ulong)f.Length; }
+  public static long FileSize (UnixFileSystemInfo f) {
+    try { return f.Length; }
     catch (System.InvalidOperationException) { return 0; }
   }
 
   public static bool IsDir (UnixFileSystemInfo f) {
     try { return f.IsDirectory; }
     catch (System.InvalidOperationException) { return false; }
+  }
+
+  public static ArrayList SubDirs (string path) {
+    ArrayList a = new ArrayList ();
+    try {
+      foreach (UnixFileSystemInfo e in Entries (path))
+        if (IsDir (e)) a.Add (e);
+    }
+    catch (System.InvalidOperationException) {}
+    catch (System.IO.FileNotFoundException) {}
+    return a;
+  }
+
+  public static ArrayList SubDirnames (string path) {
+    ArrayList a = new ArrayList ();
+    foreach (UnixFileSystemInfo d in SubDirs (path))
+      a.Add (d.FullName);
+    return a;
+  }
+
+
+  /* Path helpers */
+
+  public static string Dirname (string path) {
+    if (path == RootDir) return "";
+    char[] sa = {DirSepC};
+    string p = srev(srev(path).Split(sa, 2)[1]);
+    return (p.Length == 0 ? RootDir : p);
+  }
+
+  static string srev (string s) {
+    char [] c = s.ToCharArray ();
+    Array.Reverse (c);
+    return new string (c);
   }
 
 }

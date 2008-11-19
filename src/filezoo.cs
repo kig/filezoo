@@ -85,6 +85,7 @@ class Filezoo : DrawingArea
 
   // Current dir invalidated?
   bool Invalidated = false;
+  Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
 
   // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ();
@@ -139,6 +140,7 @@ class Filezoo : DrawingArea
     lock (this) {
 //       Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
       Invalidated = true;
+      Invalids[e.FullPath] = true;
     }
     UpdateLayout ();
   }
@@ -148,6 +150,8 @@ class Filezoo : DrawingArea
     lock (this) {
 //       Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
       Invalidated = true;
+      Invalids[e.FullPath] = true;
+      Invalids[e.OldFullPath] = true;
     }
     UpdateLayout ();
   }
@@ -238,9 +242,11 @@ class Filezoo : DrawingArea
   {
     lock (this) {
       if (Invalidated) {
-        DirCache.Invalidate (CurrentDirPath);
+        foreach (string path in Invalids.Keys)
+          DirCache.Invalidate (path);
         BuildDirs (CurrentDirPath);
         Invalidated = false;
+        Invalids.Clear ();
       }
     }
     if (LayoutUpdateRequested) RecreateLayout();
