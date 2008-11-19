@@ -13,10 +13,8 @@ using Cairo;
 
   Every directory and file is presented by a DirStats instance.
 
-  A DirStats draws itself and its children on a Cairo Context.
-
-  If the DirStats instance's on-screen presence is small, it won't draw its children.
-  If the DirStats is hidden, it won't draw itself or its children.
+  A DirStats draws itself and its children on a Cairo Context
+  and and provides the Click-method to find out what to do when clicked.
 */
 public class DirStats
 {
@@ -236,6 +234,28 @@ public class DirStats
   }
 
   /** BLOCKING */
+  /**
+    Draw draws the DirStats instance to the given Cairo Context, clipping it
+    to the device-space Rectangle targetBox.
+
+    If firstFrame is set, Draw skips drawing children beyond depth 1 to be able
+    to draw the first frame of a directory fast.
+
+    If the DirStats instance's on-screen presence is small, it won't draw its children.
+    If the DirStats is hidden, it won't draw itself or its children.
+
+    Draw uses the targetBox rectangle to determine its visibility (i.e. does the
+    DirStats instance fall outside the draw area and what size to clip the drawn
+    rectangles.)
+
+    @param cr The Cairo.Context to draw on.
+    @param targetBox The device-space clip box for determining object visibility.
+    @param firstFrame Whether this frame should be drawn as fast as possible.
+    @returns The count of DirStats instances drawn.
+  */
+  public uint Draw (Context cr, Rectangle targetBox, bool firstFrame) {
+    return Draw (cr, targetBox, firstFrame, 0);
+  }
   public uint Draw (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
     if (depth == 0) FrameProfiler.Restart ();
@@ -357,6 +377,9 @@ public class DirStats
   /* Click handler */
 
   /** BLOCKING */
+  public DirAction Click
+  (Context cr, Rectangle target, double mouseX, double mouseY)
+  { return Click (cr, target, mouseX, mouseY, 0); }
   public DirAction Click
   (Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {

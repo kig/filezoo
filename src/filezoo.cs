@@ -306,7 +306,7 @@ class Filezoo : DrawingArea
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = CurrentDir.Draw (cr, targetBox, FirstFrameOfDir, 0);
+      uint c = CurrentDir.Draw (cr, targetBox, FirstFrameOfDir);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
@@ -407,7 +407,7 @@ class Filezoo : DrawingArea
     Rectangle box = Transform (cr, width, height);
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
-    DirAction action = CurrentDir.Click (cr, box, x, y, 0);
+    DirAction action = CurrentDir.Click (cr, box, x, y);
     switch (action.Type) {
       case DirAction.Action.Open:
         Console.WriteLine("Open {0}", action.Path);
