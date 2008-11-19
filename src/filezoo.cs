@@ -159,7 +159,7 @@ class Filezoo : DrawingArea
   FileSystemWatcher MakeWatcher (string dirname)
   {
     FileSystemWatcher watcher = new FileSystemWatcher ();
-    watcher.IncludeSubdirectories = false;
+    watcher.IncludeSubdirectories = true;
     watcher.NotifyFilter = (
         NotifyFilters.LastWrite
       | NotifyFilters.Size
