@@ -142,6 +142,11 @@ public static class DirCache
       size += c.TotalSize;
     }
     AddCountAndSize (path, count-d.TotalCount, size-d.TotalSize);
+    bool acc = AllChildrenComplete(path);
+    if (d.Complete != acc) {
+      if (acc) SetComplete(path);
+      else SetIncomplete(path);
+    }
   } }
 
   public static void Clear ()
@@ -169,6 +174,17 @@ public static class DirCache
       string p = Helpers.Dirname (path);
       if (p.Length > 0 && AllChildrenComplete (p))
         SetComplete (p);
+    }
+  } }
+
+  static void SetIncomplete (string path)
+  { lock (Cache) {
+    Dir d = GetCacheEntry (path);
+    d.Complete = false;
+    if (path != Helpers.RootDir) {
+      string p = Helpers.Dirname (path);
+      if (p.Length > 0)
+        SetIncomplete (p);
     }
   } }
 
