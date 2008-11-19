@@ -5,6 +5,14 @@ using Mono.Unix;
 using Cairo;
 
 public static class Helpers {
+
+  public static char DirSepC = System.IO.Path.DirectorySeparatorChar;
+  public static string DirSepS = System.IO.Path.DirectorySeparatorChar.ToString ();
+  public static string RootDir = System.IO.Path.DirectorySeparatorChar.ToString ();
+
+
+  /* Text drawing helpers */
+
   public static Pango.FontDescription UIFont = Pango.FontDescription.FromString ("Verdana");
 
   static Hashtable FontCache = new Hashtable(20);
@@ -78,6 +86,31 @@ public static class Helpers {
   }
 
 
+  /* Rectangle drawing helpers */
+
+  public static void DrawRectangle (Context cr, double x, double y, double w, double h, Rectangle target)
+  {
+    double x_a = cr.Matrix.X0+x*cr.Matrix.Xx;
+    double y_a = cr.Matrix.Y0+y*cr.Matrix.Yy;
+    double w_a = cr.Matrix.Xx*w;
+    double h_a = cr.Matrix.Yy*h;
+    double y2_a = y_a + h_a;
+    double x2_a = x_a + w_a;
+    x_a = Math.Max(-1, Math.Min(target.X+target.Width+1, x_a));
+    x2_a = Math.Max(-1, Math.Min(target.X+target.Width+1, x2_a));
+    y_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y_a));
+    y2_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y2_a));
+    w_a = x2_a - x_a;
+    h_a = y2_a - y_a;
+    cr.Save ();
+      cr.IdentityMatrix ();
+      cr.Rectangle (x_a, y_a, w_a, h_a);
+    cr.Restore ();
+  }
+
+
+  /* File opening helpers */
+
   public static void OpenTerminal (string path)
   {
     string cd = UnixDirectoryInfo.GetCurrentDirectory ();
@@ -90,6 +123,9 @@ public static class Helpers {
   {
     Process.Start (path);
   }
+
+
+  /* String formatting helpers */
 
   public static string FormatSI (double sz, string unit)
   {
@@ -108,6 +144,9 @@ public static class Helpers {
     }
     return String.Format("{0} {1}"+unit, sz.ToString("N1"), suffix);
   }
+
+
+  /* File info helpers */
 
   public static UnixFileSystemInfo[] Entries (string dirname) {
     UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);

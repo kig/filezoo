@@ -159,7 +159,7 @@ public class DirStats
   double GetFontSize (double h)
   {
     double fs;
-    fs = h * (IsDirectory ? 0.4 : 0.6);
+    fs = h * (IsDirectory ? 0.4 : 0.5);
     return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
   }
 
@@ -245,24 +245,24 @@ public class DirStats
   }
 
   static Color BG = new Color (1,1,1);
-  public uint Draw (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
+  public uint Draw (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
     if (depth == 0) FrameProfiler.Restart ();
-    if (!IsVisible(cr, targetTop, targetHeight)) {
+    if (!IsVisible(cr, targetBox.Y, targetBox.Height)) {
       return 0;
     }
     double h = GetScaledHeight ();
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      cr.Rectangle (-0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01);
+      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.01, targetBox);
       cr.Color = BG;
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
       cr.Color = co;
       if (!recursiveInfo.Complete) cr.Color = new Color (0.5, 0, 1);
       if (depth > 0) {
-        cr.Rectangle (0.0, 0.02, BoxWidth, 0.98);
+        Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
       }
       if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
@@ -272,7 +272,7 @@ public class DirStats
         if (depth == 0) shouldDrawChildren = true;
         if (shouldDrawChildren) {
           RequestInfo();
-          c += DrawChildren(cr, targetTop, targetHeight, firstFrame, depth);
+          c += DrawChildren(cr, targetBox, firstFrame, depth);
         }
       }
     cr.Restore ();
@@ -291,7 +291,7 @@ public class DirStats
     }
   }
 
-  uint DrawChildren (Context cr, double targetTop, double targetHeight, bool firstFrame, uint depth)
+  uint DrawChildren (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
     if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame && _Entries == null) return 0;
     cr.Save ();
@@ -299,7 +299,7 @@ public class DirStats
       uint c = 0;
       foreach (DirStats d in Entries) {
         UpdateChild (d);
-        c += d.Draw (cr, targetTop, targetHeight, firstFrame, depth+1);
+        c += d.Draw (cr, targetBox, firstFrame, depth+1);
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
       }
@@ -380,7 +380,7 @@ public class DirStats
         double ys = cr.Matrix.Yy;
         cr.IdentityMatrix ();
         if (cr.InFill(mouseX,mouseY)) {
-          if (ys < 20)
+          if (ys < 16)
             retval = DirAction.ZoomIn(ys / 20);
           else if (IsDirectory)
             retval = DirAction.Navigate(FullName);

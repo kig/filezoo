@@ -119,7 +119,7 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
-    if (dirname != "/") dirname = dirname.TrimEnd('/');
+    if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     CurrentDirPath = d.FullName;
     if (CurrentDir != null) CurrentDir.CancelTraversal ();
@@ -219,13 +219,19 @@ class Filezoo : DrawingArea
 
   /* Drawing */
 
-  void Transform (Context cr, uint width, uint height)
+  Rectangle Transform (Context cr, uint width, uint height)
   {
-    double boxSize = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
+    double boxHeight = Math.Max(1, height-FilesMarginTop-FilesMarginBottom);
+    double boxWidth = Math.Max(1, width-FilesMarginLeft-FilesMarginRight);
     cr.Translate(FilesMarginLeft, FilesMarginTop);
-    cr.Rectangle (0, 0, width-FilesMarginLeft-FilesMarginRight, boxSize);
+    double x = cr.Matrix.X0;
+    double y = cr.Matrix.Y0;
+    double w =  boxWidth * cr.Matrix.Xx;
+    double h = boxHeight * cr.Matrix.Yy;
+    cr.Rectangle (0, 0, boxWidth, boxHeight);
     cr.Clip ();
-    cr.Scale (boxSize, boxSize);
+    cr.Scale (boxHeight, boxHeight);
+    return new Rectangle (x,y,w,h);
   }
 
   void Draw (Context cr, uint width, uint height)
@@ -242,8 +248,8 @@ class Filezoo : DrawingArea
     cr.Save ();
       DrawClear (cr, width, height);
       DrawToolbars (cr);
-      Transform (cr, width, height);
-      DrawCurrentDir(cr);
+      Rectangle targetBox = Transform (cr, width, height);
+      DrawCurrentDir(cr, targetBox);
     cr.Restore ();
 
     dirLatencyProfiler.Stop ();
@@ -275,15 +281,13 @@ class Filezoo : DrawingArea
     p.Time ("DrawToolbars");
   }
 
-  void DrawCurrentDir (Context cr)
+  void DrawCurrentDir (Context cr, Rectangle targetBox)
   {
     Profiler p = new Profiler ();
     cr.Save ();
-      double boxHeight = cr.Matrix.Yy;
-      double boxTop = cr.Matrix.Y0;
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = CurrentDir.Draw (cr, boxTop, boxHeight, FirstFrameOfDir, 0);
+      uint c = CurrentDir.Draw (cr, targetBox, FirstFrameOfDir, 0);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
@@ -294,12 +298,12 @@ class Filezoo : DrawingArea
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.MoveTo (0.0, 0.0);
     FontSize = (BreadcrumbFontSize);
-    if (CurrentDirPath == "/") {
-      Helpers.DrawText (cr, FontSize, "/");
+    if (CurrentDirPath == Helpers.RootDir) {
+      Helpers.DrawText (cr, FontSize, Helpers.RootDir);
     } else {
-      foreach (string s in CurrentDirPath.Split('/')) {
+      foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
         Helpers.DrawText (cr, FontSize, s);
-        Helpers.DrawText (cr, FontSize, "/");
+        Helpers.DrawText (cr, FontSize, Helpers.DirSepS);
       }
     }
   }
@@ -407,13 +411,13 @@ class Filezoo : DrawingArea
     FontSize = (BreadcrumbFontSize);
     double advance = 0.0;
     int hitIndex = 0;
-    string[] segments = CurrentDirPath.Split('/');
-    if (CurrentDirPath != "/") {
+    string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
+    if (CurrentDirPath != Helpers.RootDir) {
       foreach (string s in segments) {
-        TextExtents te = Helpers.GetTextExtents (cr, FontSize, s + "/");
+        TextExtents te = Helpers.GetTextExtents (cr, FontSize, s + Helpers.DirSepS);
         if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
-          string newDir = String.Join("/", segments, 0, hitIndex+1);
-          if (newDir == "") newDir = "/";
+          string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
+          if (newDir == "") newDir = Helpers.RootDir;
           if (newDir != CurrentDirPath)
             BuildDirs (newDir);
           return true;

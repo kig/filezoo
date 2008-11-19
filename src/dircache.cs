@@ -5,6 +5,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
+
+/*
+  Refactor this into:
+    * A Cache that is the only object that edits the cache and its entries.
+    * Traversers that walk the tree and send information to Cache.
+*/
 public static class DirCache
 {
   public static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (200000);
@@ -179,10 +185,10 @@ public class Dir {
   }
 
   public string ParentDir () {
-    if (Path == "/") return "";
-    char[] sa = {'/'};
+    if (Path == Helpers.RootDir) return "";
+    char[] sa = {Helpers.DirSepC};
     string p = srev(srev(Path).Split(sa, 2)[1]);
-    return (p.Length == 0 ? "/" : p);
+    return (p.Length == 0 ? Helpers.RootDir : p);
   }
 
 
