@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Collections;
 using System.Diagnostics;
 using System;
@@ -121,7 +122,7 @@ public static class Helpers {
 
   public static void OpenFile (string path)
   {
-    Process.Start (path);
+    Process.Start ("gnome-open", EscapePath(path));
   }
 
 
@@ -178,6 +179,14 @@ public static class Helpers {
     catch (System.InvalidOperationException) { return false; }
   }
 
+  public static DateTime LastModified (string path) {
+    UnixFileSystemInfo f = new UnixFileInfo (path);
+    if (f.LastWriteTime > f.LastStatusChangeTime)
+      return f.LastWriteTime;
+    else
+      return f.LastStatusChangeTime;
+  }
+
   public static ArrayList SubDirs (string path) {
     ArrayList a = new ArrayList ();
     try {
@@ -204,6 +213,11 @@ public static class Helpers {
     char[] sa = {DirSepC};
     string p = srev(srev(path).Split(sa, 2)[1]);
     return (p.Length == 0 ? RootDir : p);
+  }
+
+  static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");
+  public static string EscapePath (string path) {
+    return specialChars.Replace(path, @"\");
   }
 
   static string srev (string s) {

@@ -8,10 +8,13 @@ using System.IO;
 
 public static class DirCache
 {
-  static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (200000);
+  static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (100000);
+  static Dictionary<string,ArrayList> Children = new Dictionary<string,ArrayList> (100000);
 
   static bool TraversalCancelled = false;
   static long TraversalCounter = 0;
+  public static long OptimalTraverseThreads = 10;
+  static long TraverseThreadCount = 0;
   static Dir CancelLock = new Dir ();
   static Dir TCLock = new Dir ();
 
@@ -22,13 +25,10 @@ public static class DirCache
         dc = Cache[name];
       } else {
         dc = new Dir ();
+        dc.LastModified = Helpers.LastModified(name);
         Cache[name] = dc;
         string s = Helpers.Dirname (name);
-        while (s.Length > 0) {
-          if (Cache.ContainsKey(s)) break;
-          Cache[s] = new Dir ();
-          s = Helpers.Dirname (s);
-        }
+        if (s.Length > 0) GetCacheEntry (s);
       }
       return dc;
   } }
@@ -51,13 +51,17 @@ public static class DirCache
   public static void RequestTraversal (string dirname)
   {
     lock (CancelLock) {}
-    WaitCallback cb = new WaitCallback(TraverseCallback);
-    ThreadPool.QueueUserWorkItem(cb, dirname);
+    ThreadTraverse(dirname);
   }
 
 
 
 
+
+  static void AddChild (string path, Dir d)
+  { lock (Cache) {
+    GetChildren(path).Add (d);
+  } }
 
   static ArrayList GetAncestors (string path)
   { lock (Cache) {
@@ -72,46 +76,52 @@ public static class DirCache
 
   static ArrayList GetChildren (string path)
   { lock (Cache) {
-    ArrayList childNames = Helpers.SubDirnames (path);
-    ArrayList a = new ArrayList ();
-    foreach (string s in childNames)
-      a.Add (GetCacheEntry (s));
-    return a;
+    if (Children.ContainsKey(path)) {
+      return Children[path];
+    } else {
+      return (Children[path] = new ArrayList ());
+    }
   } }
 
   public static void Invalidate (string path)
   { lock (Cache) {
-      Cache.Clear ();
+    Clear ();
+  } }
+
+  public static void Clear ()
+  { lock (Cache) {
+    Cache.Clear ();
+    Children.Clear ();
   } }
 
   public static void AddCountAndSize (string path, long count, long size)
   { lock (Cache) {
-      Dir d = GetCacheEntry (path);
-      d.TotalCount += count;
-      d.TotalSize += size;
-      foreach (Dir a in GetAncestors (path)) {
-        a.TotalCount += count;
-        a.TotalSize += size;
-      }
+    Dir d = GetCacheEntry (path);
+    d.TotalCount += count;
+    d.TotalSize += size;
+    foreach (Dir a in GetAncestors (path)) {
+      a.TotalCount += count;
+      a.TotalSize += size;
+    }
   } }
 
   static void SetComplete (string path)
   { lock (Cache) {
-      Dir d = GetCacheEntry (path);
-      d.Complete = true;
-      if (path != Helpers.RootDir) {
-        string p = Helpers.Dirname (path);
-        if (p.Length > 0 && AllChildrenComplete (p))
-          SetComplete (p);
-      }
+    Dir d = GetCacheEntry (path);
+    d.Complete = true;
+    if (path != Helpers.RootDir) {
+      string p = Helpers.Dirname (path);
+      if (p.Length > 0 && AllChildrenComplete (p))
+        SetComplete (p);
+    }
   } }
 
   static bool AllChildrenComplete (string path)
   { lock (Cache) {
-      ArrayList children = GetChildren (path);
-      foreach (Dir c in children)
-        if (!c.Complete) return false;
-      return true;
+    if (NeedFilePass(path)) return false;
+    foreach (Dir c in GetChildren (path))
+      if (!c.Complete) return false;
+    return true;
   } }
 
   static bool StartTraversal (string path)
@@ -132,9 +142,9 @@ public static class DirCache
     Dir d = GetCacheEntry (path);
     if (!d.FilePassDone) {
       AddCountAndSize (path, count, size);
+      d.FilePassDone = true;
       if (AllChildrenComplete(path))
         SetComplete (path);
-      d.FilePassDone = true;
     } else {
       Console.WriteLine("SetFilePassStats {0} when FilePassDone", path);
       throw new System.ArgumentException ("Can't SetFilePassStats when FilePassDone");
@@ -143,11 +153,29 @@ public static class DirCache
 
   static bool NeedFilePass (string path)
   { lock (Cache) {
-    Dir d = GetCacheEntry (path);
-    return !d.FilePassDone;
+    return !(GetCacheEntry(path).FilePassDone);
   } }
 
-  static void TraverseCallback (object state) { Traverse ((string)state); }
+
+
+  static void ThreadTraverse (string dirname) {
+    WaitCallback cb = new WaitCallback(TraverseCallback);
+    ThreadPool.QueueUserWorkItem(cb, dirname);
+  }
+
+  static void TraverseCallback (object state) {
+    lock (TCLock) TraverseThreadCount++;
+    Traverse ((string)state);
+    lock (TCLock) TraverseThreadCount--;
+  }
+
+  static void TraverseSub (string dirname)
+  {
+    bool useThread;
+    lock (TCLock) useThread = TraverseThreadCount < OptimalTraverseThreads;
+    if (useThread) ThreadTraverse (dirname);
+    else Traverse (dirname);
+  }
 
   static void Traverse (string dirname)
   {
@@ -171,13 +199,14 @@ public static class DirCache
       long size = 0;
       foreach (UnixFileSystemInfo f in files) {
         count++;
-        if (!Helpers.IsDir(f)) size += Helpers.FileSize(f);
+        if (Helpers.IsDir(f)) AddChild (dirname, GetCacheEntry(f.FullName));
+        else size += Helpers.FileSize(f);
       }
       SetFilePassStats (dirname, count, size);
     }
     if (TraversalCancelled) return;
     foreach (UnixFileSystemInfo f in files) {
-      if (Helpers.IsDir(f)) Traverse(f.FullName);
+      if (Helpers.IsDir(f)) TraverseSub(f.FullName);
       if (TraversalCancelled) return;
     }
   }
@@ -188,6 +217,7 @@ public static class DirCache
 public class Dir {
   public long TotalCount = 1;
   public long TotalSize = 0;
+  public DateTime LastModified;
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
