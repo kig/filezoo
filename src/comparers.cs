@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 class SortHandler {
@@ -17,7 +18,7 @@ public class SizeComparer : IComparer<DirStats> {
       if (b.IsDirectory) return 1;
     }
     long rv = a.Length - b.Length;
-    if (rv == 0) rv = a.Name.CompareTo(b.Name);
+    if (rv == 0) rv = String.CompareOrdinal(a.Name, b.Name);
     return rv > 0 ? 1 : (rv < 0 ? -1 : 0);
   }
 }
@@ -29,7 +30,7 @@ public class NameComparer : IComparer<DirStats> {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    return a.Name.CompareTo(b.Name);
+    return String.CompareOrdinal(a.Name, b.Name);
   }
 }
 
@@ -41,7 +42,7 @@ public class DateComparer : IComparer<DirStats> {
       if (b.IsDirectory) return 1;
     }
     int rv = a.LastModified.CompareTo(b.LastModified);
-    if (rv == 0) rv = a.Name.CompareTo(b.Name);
+    if (rv == 0) rv = String.CompareOrdinal(a.Name, b.Name);
     return rv;
   }
 }
@@ -53,10 +54,10 @@ public class TypeComparer : IComparer<DirStats> {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     } else if (a.IsDirectory) {
-      return a.Name.CompareTo(b.Name);
+      return String.CompareOrdinal(a.Name, b.Name);
     }
-    int rv = a.Suffix.CompareTo(b.Suffix);
-    if (rv == 0) rv = a.Name.CompareTo(b.Name);
+    int rv = String.CompareOrdinal(a.Suffix, b.Suffix);
+    if (rv == 0) rv = String.CompareOrdinal(a.Name, b.Name);
     return rv;
   }
 }

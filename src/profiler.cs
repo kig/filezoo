@@ -9,6 +9,7 @@ public class Profiler
   public Stopwatch Watch;
   public Print PrintProfile = Print.Global;
   public string Prefix;
+  public double MinTime = 100.0;
 
   /** FAST */
   public Profiler () : this("") {}
@@ -25,13 +26,22 @@ public class Profiler
   {
     double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
     if (
-      (PrintProfile == Print.Always) ||
-      ((PrintProfile == Print.Global) && GlobalPrintProfile)
+      (MinTime <= elapsedMilliseconds) &&
+      ((PrintProfile == Print.Always) ||
+      ((PrintProfile == Print.Global) && GlobalPrintProfile))
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      Console.WriteLine (Prefix + time.PadLeft(12) + message);
+      Console.WriteLine (time.PadLeft(12) + Prefix + "  " + message);
     }
     Restart ();
+  }
+
+  public void Time (string format, object o1) {
+    Time (String.Format(format, o1));
+  }
+
+  public void Time (string format, object o1, object o2) {
+    Time (String.Format(format, o1, o2));
   }
 
   /** FAST */

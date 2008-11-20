@@ -88,7 +88,7 @@ class Filezoo : DrawingArea
   Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
 
   // first frame latency profiler
-  Profiler dirLatencyProfiler = new Profiler (" --- ");
+  Profiler dirLatencyProfiler = new Profiler ("----");
 
   // FileSystemWatcher for watching the CurrentDirPath
   FileSystemWatcher Watcher;

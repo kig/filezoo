@@ -87,6 +87,7 @@ public class DirStats
   DirStats[] Entries {
     get {
       if (_Entries == null) {
+        Profiler p = new Profiler ("ENTRIES");
         try {
           UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
           _Entries = new DirStats[files.Length];
@@ -95,6 +96,7 @@ public class DirStats
         } catch (System.UnauthorizedAccessException) {
           _Entries = new DirStats[0];
         }
+        p.Time ("Got {0} Entries", _Entries.Length);
       }
       return _Entries;
     }
@@ -219,10 +221,12 @@ public class DirStats
     */
   public void Sort ()
   {
+    Profiler p = new Profiler ("SORT");
     if (!IsDirectory) return;
     Array.Sort (Entries, Comparer);
     if (SortDirection == SortingDirection.Descending)
       Array.Reverse (Entries);
+    p.Time("Sorted {0} DirStats", Entries.Length);
   }
 
   /** BLOCKING */
@@ -233,6 +237,7 @@ public class DirStats
   public void Relayout ()
   {
     if (!IsDirectory) return;
+    Profiler p = new Profiler ("RELAYOUT");
     double totalHeight = 0.0;
     foreach (DirStats f in Entries) {
       f.Height = Measurer.Measure(f);
@@ -242,6 +247,7 @@ public class DirStats
     foreach (DirStats f in Entries) {
       f.Scale = scale;
     }
+    p.Time("Layouted {0} DirStats", Entries.Length);
   }
 
 
@@ -420,21 +426,21 @@ public class DirStats
     */
   bool UpdateChild (DirStats d)
   {
-    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame)
-      return false;
     bool needRelayout = false;
+    bool needSort = false;
     if (d.Comparer != Comparer || d.SortDirection != SortDirection) {
-      d.Comparer = Comparer;
-      d.SortDirection = SortDirection;
+      needSort = true;
+      needRelayout = true;
+    }
+    if (d.Measurer != Measurer) needRelayout = true;
+    if (Measurer.DependsOnTotals && !d.Complete) needRelayout = true;
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame)
+      return !(needSort || needRelayout);
+    d.Comparer = Comparer;
+    d.SortDirection = SortDirection;
+    d.Measurer = Measurer;
+    if (needSort)
       d.Sort ();
-      needRelayout = true;
-    }
-    if (d.Measurer != Measurer) {
-      d.Measurer = Measurer;
-      needRelayout = true;
-    }
-    if (Measurer.DependsOnTotals && !d.Complete)
-      needRelayout = true;
     if (needRelayout)
       d.Relayout ();
     return true;

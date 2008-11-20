@@ -13,7 +13,7 @@ public static class DirCache
 
   static bool TraversalCancelled = false;
   static long TraversalCounter = 0;
-  public static long OptimalTraverseThreads = 10;
+  public static long OptimalTraverseThreads = 4;
   static long TraverseThreadCount = 0;
   static Dir CancelLock = new Dir ();
   static Dir TCLock = new Dir ();
@@ -275,7 +275,8 @@ public static class DirCache
   static void Traverse (string dirname)
   {
     lock (TCLock) TraversalCounter++;
-    TraverseDir (dirname);
+    try { TraverseDir (dirname); }
+    catch (Exception e) { Console.WriteLine("Traverse failed with {0}", e); }
     lock (TCLock) TraversalCounter--;
   }
 
