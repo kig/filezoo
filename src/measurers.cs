@@ -14,6 +14,13 @@ public interface IMeasurer {
   bool DependsOnTotals { get; }
 }
 
+
+public class NullMeasurer : IMeasurer {
+  public bool DependsOnTotals { get { return false; } }
+  /** UNIMPORTANT */
+  public double Measure (DirStats d) { return 1.0; }
+}
+
 public class SizeMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
   /** FAST */
