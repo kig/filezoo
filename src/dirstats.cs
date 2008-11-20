@@ -40,6 +40,7 @@ public class DirStats
 
   // Public state of the DirStats
   public string Name;
+  public string LCName;
   public string FullName;
   public long Length;
   public string Suffix;
@@ -50,18 +51,17 @@ public class DirStats
   FileTypes FileType;
 
   // How to sort directories
-  public IComparer<DirStats> Comparer;
+  public IComparer<DirStats> Comparer = new NullComparer ();
   public SortingDirection SortDirection = SortingDirection.Ascending;
 
   // How to scale file sizes
-  public IMeasurer Measurer;
-  public IZoomer Zoomer;
+  public IMeasurer Measurer = new NullMeasurer ();
 
   // Traversal progress flag, true if the
   // recursive traversal of the DirStats is completed.
   /** FAST */
   public virtual bool Complete
-  { get { return recursiveInfo.Complete; } }
+  { get { return !Measurer.DependsOnTotals || recursiveInfo.Complete; } }
 
   // Is the layout of this node and its subtree complete or was it interrupted?
   public bool LayoutComplete = false;
@@ -83,20 +83,24 @@ public class DirStats
   /** BLOCKING */
   /**
     The Entries getter gets the Entries for the files in this DirStats' directory.
+    This should be made ASYNC.
     */
   DirStats[] Entries {
     get {
-      if (_Entries == null) {
-        Profiler p = new Profiler ("ENTRIES");
-        try {
-          UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
-          _Entries = new DirStats[files.Length];
-          for (int i=0; i<files.Length; i++)
-            _Entries[i] = new DirStats (files[i]);
-        } catch (System.UnauthorizedAccessException) {
-          _Entries = new DirStats[0];
+      lock (this) {
+        if (_Entries == null) {
+          Profiler p = new Profiler ("ENTRIES");
+          try {
+            UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
+            DirStats[] e = new DirStats[files.Length];
+            for (int i=0; i<files.Length; i++)
+              e[i] = new DirStats (files[i]);
+            _Entries = e;
+          } catch (System.UnauthorizedAccessException) {
+            _Entries = new DirStats[0];
+          }
+          p.Time ("Got {0} Entries", _Entries.Length);
         }
-        p.Time ("Got {0} Entries", _Entries.Length);
       }
       return _Entries;
     }
@@ -117,7 +121,6 @@ public class DirStats
     Dir d;
     d = Helpers.IsDir(f) ? DirCache.GetCacheEntry(f.FullName) : new Dir();
     UpdateInfo (f, d);
-    Comparer = new NameComparer ();
     Scale = Height = 0.0;
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
@@ -127,6 +130,7 @@ public class DirStats
   void UpdateInfo (UnixFileSystemInfo f, Dir r) {
     recursiveInfo = r;
     Name = f.Name;
+    LCName = f.Name.ToLower ();
     FullName = f.FullName;
     FileType = Helpers.FileType(f);
     Permissions = Helpers.FilePermissions(f);
@@ -155,8 +159,19 @@ public class DirStats
   {
     if (IsDirectory) {
       string extras = "";
-      extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
-      extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
+      if (
+        !recursiveInfo.Complete &&
+        !Measurer.DependsOnTotals &&
+        GetRecursiveCount() == 0 &&
+        GetRecursiveSize() == 0
+      ) {
+        if (_Entries != null) {
+          extras += String.Format("{0} entries", _Entries.Length.ToString("N0"));
+        }
+      } else {
+        extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
+        extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
+      }
       return extras;
     } else {
       return String.Format("{0}", Helpers.FormatSI(Length, "B"));
@@ -311,12 +326,13 @@ public class DirStats
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
       cr.Color = co;
-      if (!recursiveInfo.Complete) cr.Color = UnfinishedDirectoryColor;
+      if (!recursiveInfo.Complete && Measurer.DependsOnTotals)
+        cr.Color = UnfinishedDirectoryColor;
       if (depth > 0) {
         Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
       }
-      if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
+      if (cr.Matrix.Yy > 0.5 || depth < 2) DrawTitle (cr, depth);
       if (IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = !firstFrame && childrenVisible;
@@ -433,7 +449,8 @@ public class DirStats
       needRelayout = true;
     }
     if (d.Measurer != Measurer) needRelayout = true;
-    if (Measurer.DependsOnTotals && !d.Complete) needRelayout = true;
+    if (Measurer.DependsOnTotals && !d.recursiveInfo.Complete)
+      needRelayout = true;
     if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame)
       return !(needSort || needRelayout);
     d.Comparer = Comparer;
@@ -569,8 +586,10 @@ public class DirStats
     completed.
     */
   void RequestInfo () {
+    if (Measurer.DependsOnTotals) {
     if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
       DirCache.RequestTraversal (FullName);
+    }
     }
   }
 
