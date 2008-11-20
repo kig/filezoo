@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
 using System;
@@ -225,15 +226,33 @@ public static class Helpers {
     return LastModified(f);
   }
 
+  public static Dictionary<long,string> OwnerNameCache = new Dictionary<long,string> ();
   /** BLOCKING */
   public static string OwnerName (UnixFileSystemInfo f) {
-    try { return f.OwnerUser.UserName; }
+    try {
+      long uid = f.ToStat().st_uid;
+      if (OwnerNameCache.ContainsKey(uid)) {
+        return OwnerNameCache[uid];
+      } else {
+        UnixUserInfo uf = f.OwnerUser;
+        return OwnerNameCache[uf.UserId] = uf.UserName;
+      }
+    }
     catch (System.InvalidOperationException) { return ""; }
   }
 
+  public static Dictionary<long,string> GroupNameCache = new Dictionary<long,string> ();
   /** BLOCKING */
   public static string GroupName (UnixFileSystemInfo f) {
-    try { return f.OwnerGroup.GroupName; }
+    try {
+      long gid = f.ToStat().st_gid;
+      if (GroupNameCache.ContainsKey(gid)) {
+        return GroupNameCache[gid];
+      } else {
+        UnixGroupInfo uf = f.OwnerGroup;
+        return GroupNameCache[uf.GroupId] = uf.GroupName;
+      }
+    }
     catch (System.InvalidOperationException) { return ""; }
   }
 
