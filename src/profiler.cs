@@ -9,7 +9,7 @@ public class Profiler
   public Stopwatch Watch;
   public Print PrintProfile = Print.Global;
   public string Prefix;
-  public double MinTime = 100.0;
+  public double MinTime = 50.0;
 
   /** FAST */
   public Profiler () : this("") {}
