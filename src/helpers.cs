@@ -108,10 +108,10 @@ public static class Helpers {
     double h_a = cr.Matrix.Yy*h;
     double y2_a = y_a + h_a;
     double x2_a = x_a + w_a;
-    x_a = Math.Max(-1, Math.Min(target.X+target.Width+1, x_a));
-    x2_a = Math.Max(-1, Math.Min(target.X+target.Width+1, x2_a));
-    y_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y_a));
-    y2_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y2_a));
+    x_a = Clamp(x_a, -1, target.X+target.Width+1);
+    x2_a = Clamp(x2_a, -1, target.X+target.Width+1);
+    y_a = Clamp(y_a, -1, target.Y+target.Height+1);
+    y2_a = Clamp(y2_a, -1, target.Y+target.Height+1);
     w_a = Math.Max(0.5, x2_a - x_a);
     if (h_a < 0.25 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
       return;
@@ -226,6 +226,18 @@ public static class Helpers {
   }
 
   /** BLOCKING */
+  public static string OwnerName (UnixFileSystemInfo f) {
+    try { return f.OwnerUser.UserName; }
+    catch (System.InvalidOperationException) { return ""; }
+  }
+
+  /** BLOCKING */
+  public static string GroupName (UnixFileSystemInfo f) {
+    try { return f.OwnerGroup.GroupName; }
+    catch (System.InvalidOperationException) { return ""; }
+  }
+
+  /** BLOCKING */
   public static ArrayList SubDirs (string path) {
     ArrayList a = new ArrayList ();
     try {
@@ -269,6 +281,18 @@ public static class Helpers {
     return new string (c);
   }
 
+
+  /* Math helpers */
+
+  /** FAST */
+  public static double Clamp (double v, double min, double max) {
+    if (min > max) {
+      double tmp = min;
+      min = max;
+      max = tmp;
+    }
+    return Math.Max(min, Math.Min(max, v));
+  }
 }
 
 

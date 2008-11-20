@@ -45,6 +45,8 @@ public class DirStats
   public long Length;
   public string Suffix;
   public bool IsDirectory = false;
+  public string Owner;
+  public string Group;
   public DateTime LastModified;
 
   FileAccessPermissions Permissions;
@@ -137,6 +139,8 @@ public class DirStats
     Length = Helpers.FileSize(f);
     LastModified = Helpers.LastModified(f);
     IsDirectory = Helpers.IsDir(f);
+    Owner = Helpers.OwnerName(f);
+    Group = Helpers.GroupName(f);
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
       recursiveInfo.Complete = true;
@@ -178,6 +182,36 @@ public class DirStats
     }
   }
 
+  /** FAST */
+  /**
+    Returns a "rwxr-x--- owner group" string for the DirStats.
+    */
+  public string PermissionString ()
+  {
+    string pstring = PermString (
+      FileAccessPermissions.UserRead,
+      FileAccessPermissions.UserWrite,
+      FileAccessPermissions.UserExecute
+    ) + PermString (
+      FileAccessPermissions.GroupRead,
+      FileAccessPermissions.GroupWrite,
+      FileAccessPermissions.GroupExecute
+    ) + PermString (
+      FileAccessPermissions.OtherRead,
+      FileAccessPermissions.OtherWrite,
+      FileAccessPermissions.OtherExecute
+    );
+    return String.Format ("{0} {1} {2}", pstring, Owner, Group);
+  }
+
+  string PermString (FileAccessPermissions r, FileAccessPermissions w, FileAccessPermissions x)
+  {
+    char[] chars = {'-', '-', '-'};
+    if ((Permissions & r) == r) chars[0] = 'r';
+    if ((Permissions & w) == w) chars[1] = 'w';
+    if ((Permissions & x) == x) chars[2] = 'x';
+    return new string(chars);
+  }
 
   /* Drawing helpers */
 
@@ -195,13 +229,10 @@ public class DirStats
   /** FAST */
   /**
     Gets the font size for the given device-space height of the DirStats.
-    The font size will be a number between MinFontSize and MaxFontSize.
     */
   double GetFontSize (double h)
   {
-    double fs;
-    fs = h * (IsDirectory ? 0.4 : 0.5);
-    return Math.Max(MinFontSize, Math.Min(MaxFontSize, fs));
+    return h * (IsDirectory ? 0.4 : 0.5);
   }
 
   /** FAST */
@@ -376,7 +407,8 @@ public class DirStats
   void DrawTitle (Context cr, uint depth)
   {
     double h = cr.Matrix.Yy;
-    double fs = GetFontSize(h);
+    double rfs = GetFontSize(h);
+    double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
       cr.Translate(BoxWidth * 1.1, 0.02);
       double x = cr.Matrix.X0;
@@ -385,10 +417,22 @@ public class DirStats
       cr.Translate (x, y);
       cr.NewPath ();
       if (fs > 4) {
-        cr.MoveTo (0, -fs*0.1);
+        if (depth == 0)
+          cr.Translate (0, -fs*1.3);
+        cr.MoveTo (0, -fs*0.2);
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
         Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
+
+        double sfs = Helpers.Clamp(
+          IsDirectory ? rfs*0.05 : rfs*0.2,
+          MinFontSize, MaxFontSize*0.6);
+        if (sfs > 1) {
+          cr.MoveTo (0, fs*1.4);
+          Helpers.DrawText (cr, sfs, "Modified " + LastModified.ToString());
+          cr.MoveTo (0, fs*1.4+sfs*1.4);
+          Helpers.DrawText (cr, sfs, PermissionString ());
+        }
       } else if (fs > 1) {
         cr.MoveTo (0, fs*0.1);
         Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle ());
@@ -506,7 +550,8 @@ public class DirStats
         (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 10)
       ) {
         cr.NewPath ();
-        double fs = GetFontSize(cr.Matrix.Yy);
+        double rfs = GetFontSize(h);
+        double fs = Math.Max(MinFontSize, Math.Min(MaxFontSize, rfs));
         if (fs < 10) {
           advance += fs / 2 * (Name.Length+15);
         } else {
