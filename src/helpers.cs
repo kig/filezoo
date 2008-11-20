@@ -30,7 +30,7 @@ public static class Helpers {
         GetFont (cr, i);
     }
     if (!FontCache.Contains(fontSize)) {
-      Pango.FontDescription font = Pango.FontDescription.FromString ("Verdana");
+      Pango.FontDescription font = Pango.FontDescription.FromString ("Sans");
       font.Size = (int)(fontSize * Pango.Scale.PangoScale);
       FontCache.Add(fontSize, font);
 
