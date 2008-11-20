@@ -34,7 +34,8 @@ public class DateMeasurer : IMeasurer {
   /** FAST */
   public double Measure (DirStats d) {
     long elapsed = (DateTime.Today.AddDays(1) - d.LastModified).Ticks;
-    return (1 / Math.Max(1.0, (double)elapsed / (10000.0 * 3600.0)));
+    double mul = (d.Name[0] == '.') ? 1.0 : 20.0;
+    return mul * (1 / Math.Max(1.0, (double)elapsed / (10000.0 * 300.0)));
   }
 }
 
