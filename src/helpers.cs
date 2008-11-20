@@ -108,8 +108,10 @@ public static class Helpers {
     x2_a = Math.Max(-1, Math.Min(target.X+target.Width+1, x2_a));
     y_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y_a));
     y2_a = Math.Max(-1, Math.Min(target.Y+target.Height+1, y2_a));
-    w_a = x2_a - x_a;
-    h_a = y2_a - y_a;
+    w_a = Math.Max(0.5, x2_a - x_a);
+    if (h_a < 0.25 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
+      return;
+    h_a = Math.Max(0.5, y2_a - y_a);
     cr.Save ();
       cr.IdentityMatrix ();
       cr.Rectangle (x_a, y_a, w_a, h_a);
