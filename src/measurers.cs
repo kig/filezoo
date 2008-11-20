@@ -29,6 +29,15 @@ public class SizeMeasurer : IMeasurer {
   }
 }
 
+public class DateMeasurer : IMeasurer {
+  public bool DependsOnTotals { get { return false; } }
+  /** FAST */
+  public double Measure (DirStats d) {
+    long elapsed = (DateTime.Today.AddDays(1) - d.LastModified).Ticks;
+    return (1 / Math.Max(1.0, (double)elapsed / (10000.0 * 3600.0)));
+  }
+}
+
 public class TotalMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
   /** FAST */

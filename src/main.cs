@@ -10,7 +10,7 @@ public static class FilezooApp {
     Profiler.GlobalPrintProfile = true;
     Application.Init ();
     Window win = new Window ("Filezoo");
-    win.SetDefaultSize (400, 768);
+    win.SetDefaultSize (420, 800);
     Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     win.Add (fz);

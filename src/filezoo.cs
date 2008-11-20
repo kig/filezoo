@@ -51,6 +51,7 @@ class Filezoo : DrawingArea
   public SizeHandler[] SizeFields = {
     new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
+    new SizeHandler("Date", new DateMeasurer()),
     new SizeHandler("Count", new CountMeasurer()),
     new SizeHandler("Total", new TotalMeasurer())
   };
