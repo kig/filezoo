@@ -6,6 +6,48 @@ using System.Collections.Generic;
 using System.IO;
 
 
+/**
+  DirCache is the filesystem cache server.
+  It is a static class, acting as a global singleton.
+
+  The DirCache allows retrieving its cache entries with:
+
+    Dir d = DirCache.GetCacheEntry(path);
+
+  To request traversal of a path (and thus ensuring that the cache entries
+  underlying it get traversed), you use RequestTraversal:
+
+    DirCache.RequestTraversal(path);
+
+  A cache entry is dynamically updated as it is traversed. Once the traversal
+  of the cache entry is complete, the cache entry is marked as complete.
+
+    bool complete = DirCache.GetCacheEntry(path).Complete;
+
+  If a cache entry is a current target for traversal, its InProgress is true.
+  The way you should use the cache to retrieve a dynamically updating cache
+  entry for a filesystem path is as follows:
+
+    Dir d = DirCache.GetCacheEntry(path);
+    if (!d.Complete && !d.InProgress)
+      DirCache.RequestTraversal(path);
+
+  When you want to cancel all traversals currently in progress (maybe you
+  navigated to a different directory and want to traverse its entries first),
+  use CancelTraversal:
+
+    DirCache.CancelTraversal();
+
+  Note that CancelTraversal blocks until all traversals have exited, which may
+  take hundreds of milliseconds.
+
+  To invalidate a cache entry (e.g. FileSystemWatcher told you of a change in
+  the filesystem and now you want to update the cache to match reality), use
+  Invalidate:
+
+    DirCache.Invalidate(path);
+
+  */
 public static class DirCache
 {
   static Dictionary<string,Dir> Cache = new Dictionary<string,Dir> (100000);
