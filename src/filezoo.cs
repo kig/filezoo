@@ -161,6 +161,7 @@ class Filezoo : DrawingArea
   }
 
   /** BLOCKING */
+  /* Blows up on paths with non-UTF characters */
   FileSystemWatcher MakeWatcher (string dirname)
   {
     FileSystemWatcher watcher = new FileSystemWatcher ();
@@ -178,7 +179,13 @@ class Filezoo : DrawingArea
     watcher.Created += new FileSystemEventHandler (WatcherChanged);
     watcher.Deleted += new FileSystemEventHandler (WatcherChanged);
     watcher.Renamed += new RenamedEventHandler (WatcherRenamed);
-    watcher.EnableRaisingEvents = true;
+    try {
+      watcher.EnableRaisingEvents = true;
+    } catch (System.ArgumentException e) {
+      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
+      Console.WriteLine("You should go and fix System.IO.Path.IsPathRooted.");
+      Console.WriteLine("Here's the exception output: {0}", e);
+    }
     return watcher;
   }
 
@@ -217,10 +224,6 @@ class Filezoo : DrawingArea
     if (CurrentDir.Measurer != SizeField.Measurer) {
       FirstFrameOfDir = true;
       CurrentDir.Measurer = SizeField.Measurer;
-    }
-    if (CurrentDir.Zoomer != Zoomer) {
-      FirstFrameOfDir = true;
-      CurrentDir.Zoomer = Zoomer;
     }
     CurrentDir.Relayout ();
     p.Time ("CurrentDir.Relayout");
