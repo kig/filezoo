@@ -19,17 +19,17 @@ using Cairo;
 public class DirStats
 {
   // Colors for the different file types, quite like ls
-  public static Color directoryColor = new Color (0,0,1);
-  public static Color blockDeviceColor = new Color (0.75,0.5,0);
-  public static Color characterDeviceColor = new Color (0.75,0.5,0);
-  public static Color fifoColor = new Color (0.75,0,0.82);
-  public static Color socketColor = new Color (0.75,0,0);
-  public static Color symlinkColor = new Color (0,0.75,0.93);
-  public static Color executableColor = new Color (0,0.75,0);
-  public static Color fileColor = new Color (0,0,0);
+  public static Color DirectoryColor = new Color (0,0,1);
+  public static Color BlockDeviceColor = new Color (0.75,0.5,0);
+  public static Color CharacterDeviceColor = new Color (0.75,0.5,0);
+  public static Color FifoColor = new Color (0.75,0,0.82);
+  public static Color SocketColor = new Color (0.75,0,0);
+  public static Color SymlinkColor = new Color (0,0.75,0.93);
+  public static Color ExecutableColor = new Color (0,0.75,0);
+  public static Color RegularFileColor = new Color (0,0,0);
 
-  public static Color unfinishedColor = new Color (0.5, 0, 1);
-  public static Color BG = new Color (1,1,1);
+  public static Color UnfinishedDirectoryColor = new Color (0.5, 0, 1);
+  public static Color BackgroundColor = new Color (1,1,1);
 
 
   // Style for the DirStats
@@ -45,8 +45,6 @@ public class DirStats
   public string Suffix;
   public bool IsDirectory = false;
   public DateTime LastModified;
-
-  UnixFileSystemInfo Info;
 
   FileAccessPermissions Permissions;
   FileTypes FileType;
@@ -65,6 +63,9 @@ public class DirStats
   public virtual bool Complete
   { get { return recursiveInfo.Complete; } }
 
+  // Is the layout of this node and its subtree complete or was it interrupted?
+  public bool LayoutComplete = false;
+
   // State variables for computing the recursive traversal of the DirStats
   public Dir recursiveInfo;
 
@@ -80,6 +81,9 @@ public class DirStats
   // DirStats objects for the children of a directory DirStats
   DirStats[] _Entries = null;
   /** BLOCKING */
+  /**
+    The Entries getter gets the Entries for the files in this DirStats' directory.
+    */
   DirStats[] Entries {
     get {
       if (_Entries == null) {
@@ -87,7 +91,7 @@ public class DirStats
           UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
           _Entries = new DirStats[files.Length];
           for (int i=0; i<files.Length; i++)
-            _Entries[i] = Get (files[i]);
+            _Entries[i] = new DirStats (files[i]);
         } catch (System.UnauthorizedAccessException) {
           _Entries = new DirStats[0];
         }
@@ -101,21 +105,18 @@ public class DirStats
   /* Constructor */
 
   /** BLOCKING */
-  public static DirStats Get (UnixFileSystemInfo f) {
-    DirStats d;
-    if (Helpers.IsDir(f))
-      d = new DirStats(f, DirCache.GetCacheEntry(f.FullName));
-    else
-      d = new DirStats(f, new Dir());
-    return d;
-  }
-
-  /** BLOCKING */
-  protected DirStats (UnixFileSystemInfo f, Dir r)
+  /**
+    The DirStats constructor takes the UnixFileSystemInfo that it represents
+    as its argument. The DirStats can then be used to draw the directory tree
+    starting from the UnixFileSystemInfo's path.
+    */
+  public DirStats (UnixFileSystemInfo f)
   {
-    UpdateInfo (f, r);
+    Dir d;
+    d = Helpers.IsDir(f) ? DirCache.GetCacheEntry(f.FullName) : new Dir();
+    UpdateInfo (f, d);
     Comparer = new NameComparer ();
-    Scale = Height = 1.0;
+    Scale = Height = 0.0;
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
@@ -123,7 +124,6 @@ public class DirStats
   /** BLOCKING */
   void UpdateInfo (UnixFileSystemInfo f, Dir r) {
     recursiveInfo = r;
-    Info = f;
     Name = f.Name;
     FullName = f.FullName;
     FileType = Helpers.FileType(f);
@@ -143,6 +143,12 @@ public class DirStats
   /* Subtitles */
 
   /** FAST */
+  /**
+    Gets the information subtitle for the DirStats instance.
+    For directories, the subtitle contains the size of the subtree in files and
+    bytes.
+    For files, the subtitle contains the size of the file.
+    */
   public string GetSubTitle ()
   {
     if (IsDirectory) {
@@ -159,52 +165,71 @@ public class DirStats
   /* Drawing helpers */
 
   /** FAST */
+  /**
+    Gets the scaled height for the DirStats.
+    The scaled height is a float between 0 and 1 normalized
+    so that the heights of the Entries of a DirStats sum to 1.
+    */
   public double GetScaledHeight ()
   {
     return Height * Scale;
   }
 
   /** FAST */
+  /**
+    Gets the font size for the given device-space height of the DirStats.
+    The font size will be a number between MinFontSize and MaxFontSize.
+    */
   double GetFontSize (double h)
   {
     double fs;
     fs = h * (IsDirectory ? 0.4 : 0.5);
-    return Math.Max(MinFontSize, QuantizeFontSize(Math.Min(MaxFontSize, fs)));
+    return Math.Max(MinFontSize, Math.Min(MaxFontSize, fs));
   }
 
   /** FAST */
-  double QuantizeFontSize (double fs) { return Math.Floor(fs); }
-
-  /** FAST */
-  static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
+  /**
+    Get the Cairo Color for the given filetype and permissions (permissions used
+    to color executables green.)
+    */
+  public static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
-      case FileTypes.Directory: return directoryColor;
-      case FileTypes.BlockDevice: return blockDeviceColor;
-      case FileTypes.CharacterDevice: return characterDeviceColor;
-      case FileTypes.Fifo: return fifoColor;
-      case FileTypes.Socket: return socketColor;
-      case FileTypes.SymbolicLink: return symlinkColor;
+      case FileTypes.Directory: return DirectoryColor;
+      case FileTypes.BlockDevice: return BlockDeviceColor;
+      case FileTypes.CharacterDevice: return CharacterDeviceColor;
+      case FileTypes.Fifo: return FifoColor;
+      case FileTypes.Socket: return SocketColor;
+      case FileTypes.SymbolicLink: return SymlinkColor;
     }
     if ((perm & FileAccessPermissions.UserExecute) != 0)
-      return executableColor;
-    return fileColor;
+      return ExecutableColor;
+    return RegularFileColor;
   }
 
 
   /* Relayout */
 
   /** BLOCKING */
+  /**
+    Sorts the Entries of the DirStats instance.
+    This is about the most expensive thing you can do, and Mono's retardedly
+    slow string comparison algorithm doesn't help. It's 40 friggin times slower
+    than OCaml for chrissakes.
+    */
   public void Sort ()
   {
-    if (IsDirectory) {
-      Array.Sort (Entries, Comparer);
-      if (SortDirection == SortingDirection.Descending)
-        Array.Reverse (Entries);
-    }
+    if (!IsDirectory) return;
+    Array.Sort (Entries, Comparer);
+    if (SortDirection == SortingDirection.Descending)
+      Array.Reverse (Entries);
   }
 
   /** BLOCKING */
+  /**
+    Relayouts the Entries of the DirStats instance.
+    Sets the Height and Scale for each of the entries according to Measurer.
+    */
   public void Relayout ()
   {
     if (!IsDirectory) return;
@@ -223,7 +248,13 @@ public class DirStats
   /* Drawing */
 
   /** FAST */
-  public bool IsVisible (Context cr, double targetTop, double targetHeight)
+  /**
+    Checks if a 1 unit high object (DirStats is 1 unit high) is clipped by the
+    target area and whether it falls between quarter pixels.
+    If either is true, returns false, otherwise reckons the DirStats would be
+    visible and returns true.
+    */
+  bool IsVisible (Context cr, double targetTop, double targetHeight)
   {
     double h = cr.Matrix.Yy * GetScaledHeight ();
     double y = cr.Matrix.Y0 - targetTop;
@@ -258,7 +289,10 @@ public class DirStats
   }
   public uint Draw (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
-    if (depth == 0) FrameProfiler.Restart ();
+    if (depth == 0) {
+      FrameProfiler.Restart ();
+      Height = Scale = 1.0;
+    }
     if (!IsVisible(cr, targetBox.Y, targetBox.Height)) {
       return 0;
     }
@@ -267,20 +301,14 @@ public class DirStats
     cr.Save ();
       cr.Scale (1, h);
       Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.02, targetBox);
-      cr.Color = BG;
+      cr.Color = BackgroundColor;
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
       cr.Color = co;
-      if (!recursiveInfo.Complete) cr.Color = unfinishedColor;
+      if (!recursiveInfo.Complete) cr.Color = UnfinishedDirectoryColor;
       if (depth > 0) {
         Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
-        if (IsDirectory) {
-          Helpers.DrawRectangle (cr, BoxWidth*0.1, 0.48, BoxWidth*0.9, 0.48, targetBox);
-          cr.Color = BG;
-          cr.Fill ();
-          cr.Color = co;
-        }
       }
       if (cr.Matrix.Yy > 1) DrawTitle (cr, depth);
       if (IsDirectory) {
@@ -298,6 +326,10 @@ public class DirStats
   }
 
   /** FAST */
+  /**
+    Sets up child area transform for the DirStats. Depth 0 child area is drawn
+    at full height to waste less screen space.
+    */
   void ChildTransform (Context cr, uint depth)
   {
     if (depth > 0) {
@@ -310,6 +342,15 @@ public class DirStats
   }
 
   /** BLOCKING */
+  /**
+    Draws the title for the DirStats.
+    Usually draws the filename bigger and the subtitle a bit smaller.
+
+    If the DirStats is small, draws the subtitle at the same size and same time
+    as the filename for speed.
+
+    If the DirStats is very small, draws a rectangle instead of text for speed.
+    */
   void DrawTitle (Context cr, uint depth)
   {
     double h = cr.Matrix.Yy;
@@ -336,26 +377,51 @@ public class DirStats
   }
 
   /** BLOCKING */
+  /**
+    Draws the children entries of this DirStats.
+    Bails out if no children are yet created and frame has run out of time.
+
+    Sets up the child area transform, updates each child's layout and draws it.
+
+    Sets LayoutComplete to true if all visible children have finished their
+    layout.
+
+    @returns The total amount of subtree DirStats drawn.
+    */
   uint DrawChildren (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
   {
-    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame && _Entries == null) return 0;
+    bool layoutComplete = true;
+    LayoutComplete = false;
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame
+        && _Entries == null
+    ) {
+      return 0;
+    }
     cr.Save ();
       ChildTransform (cr, depth);
       uint c = 0;
       foreach (DirStats d in Entries) {
-        UpdateChild (d);
+        layoutComplete &= UpdateChild (d);
         c += d.Draw (cr, targetBox, firstFrame, depth+1);
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
       }
     cr.Restore ();
+    LayoutComplete = layoutComplete;
     return c;
   }
 
   /** BLOCKING */
-  void UpdateChild (DirStats d)
+  /**
+    Update the given DirStats' layout to match this.
+    Bails out if the current frame has ran out of time.
+
+    @returns Whether the layout completed successfully.
+    */
+  bool UpdateChild (DirStats d)
   {
-    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame) return;
+    if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame)
+      return false;
     bool needRelayout = false;
     if (d.Comparer != Comparer || d.SortDirection != SortDirection) {
       d.Comparer = Comparer;
@@ -371,12 +437,30 @@ public class DirStats
       needRelayout = true;
     if (needRelayout)
       d.Relayout ();
+    return true;
   }
 
 
   /* Click handler */
 
   /** BLOCKING */
+  /**
+    Click handles the click events directed at the DirStats.
+    It takes the Cairo Context cr, the clip Rectangle target and the mouse
+    device-space coordinates as its arguments, and returns a DirAction object.
+
+    If the mouse coordinates lie outside the DirStats instance, returns
+    DirAction.None.
+    If the click is on a small item, returns a DirAction of the ZoomIn type.
+    If the click is on a larget item, returns a Navigation DirAction for
+    directories and a Open DirAction for files.
+
+    @param cr Cairo.Context to query.
+    @param target Target clip rectangle. See Draw for a better explanation.
+    @param mouseX The X coordinate of the mouse pointer, X grows right from left.
+    @param mouseY The Y coordinate of the mouse pointer, Y grows down from top.
+    @returns The DirAction to take.
+    */
   public DirAction Click
   (Context cr, Rectangle target, double mouseX, double mouseY)
   { return Click (cr, target, mouseX, mouseY, 0); }
@@ -422,6 +506,12 @@ public class DirStats
   }
 
   /** BLOCKING */
+  /**
+    Passes the click check to the children of this DirStats.
+    Sets up the child area transform and calls Click on each child in Entries.
+    If a child is hit, returns the child's action.
+    Otherwise returns DirAction.None.
+    */
   DirAction ClickChildren
   (Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
@@ -444,21 +534,34 @@ public class DirStats
   /* Directory traversal */
 
   /** FAST */
+  /**
+    @returns The total size in bytes for the filesystem subtree of the DirStats.
+    */
   public virtual double GetRecursiveSize () {
     return recursiveInfo.TotalSize;
   }
 
   /** FAST */
+  /**
+    @returns The total file count for the filesystem subtree of the DirStats.
+    */
   public virtual double GetRecursiveCount () {
     return recursiveInfo.TotalCount;
   }
 
-  /** FAST */
+  /** BLOCKING */
+  /**
+    Cancels traversal of the DirStats recursive information.
+    */
   public void CancelTraversal () {
     DirCache.CancelTraversal ();
   }
 
   /** ASYNC */
+  /**
+    Files a traversal request with DirCache if one isn't already in progress or
+    completed.
+    */
   void RequestInfo () {
     if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
       DirCache.RequestTraversal (FullName);

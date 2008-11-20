@@ -126,7 +126,7 @@ class Filezoo : DrawingArea
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     CurrentDirPath = d.FullName;
     if (CurrentDir != null) CurrentDir.CancelTraversal ();
-    CurrentDir = DirStats.Get (d);
+    CurrentDir = new DirStats (d);
     if (Watcher.Path != CurrentDirPath) {
       Watcher.Dispose ();
       Watcher = MakeWatcher (CurrentDirPath);
@@ -274,14 +274,14 @@ class Filezoo : DrawingArea
       FirstFrameOfDir = false;
       QueueDraw ();
     }
-    if (LayoutUpdateRequested || !CurrentDir.Complete)
+    if (LayoutUpdateRequested || !CurrentDir.Complete || !CurrentDir.LayoutComplete)
       UpdateLayout();
   }
 
   /** FAST */
   void DrawClear (Context cr, uint width, uint height)
   {
-    cr.Color = new Color (1,1,1);
+    cr.Color = DirStats.BackgroundColor;
     cr.Rectangle (0,0, width, height);
     cr.Fill ();
   }

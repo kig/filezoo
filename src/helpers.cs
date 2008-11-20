@@ -16,8 +16,8 @@ public static class Helpers {
 
   public static Pango.FontDescription UIFont = Pango.FontDescription.FromString ("Verdana");
 
-  static Hashtable FontCache = new Hashtable(20);
-  static Hashtable LayoutCache = new Hashtable(20);
+  static Hashtable FontCache = new Hashtable(21);
+  static Hashtable LayoutCache = new Hashtable(21);
   static bool fontCacheInit = false;
 
   /** BLOCKING */
@@ -25,8 +25,9 @@ public static class Helpers {
   {
     if (!fontCacheInit) {
       fontCacheInit = true;
-      for (int i=1; i<40; i++)
-        GetFont (cr, i * 0.5);
+      GetFont (cr, 0.5);
+      for (int i=1; i<20; i++)
+        GetFont (cr, i);
     }
     if (!FontCache.Contains(fontSize)) {
       Pango.FontDescription font = Pango.FontDescription.FromString ("Verdana");
@@ -40,12 +41,15 @@ public static class Helpers {
     return (Pango.Layout)LayoutCache[fontSize];
   }
 
+  /** FAST */
+  static double QuantizeFontSize (double fs) { return Math.Max(0.5, Math.Floor(fs)); }
+
   /** BLOCKING */
   public static void DrawText (Context cr, double fontSize, string text)
   {
   Stopwatch wa = new Stopwatch ();
   wa.Start ();
-    Pango.Layout layout = GetFont (cr, fontSize);
+    Pango.Layout layout = GetFont (cr, QuantizeFontSize(fontSize));
     layout.SetText (text);
     Pango.Rectangle pe, le;
     layout.GetExtents(out pe, out le);
