@@ -21,9 +21,9 @@ public class DirStats
   // Colors for the different file types, quite like ls
   public static Color DirectoryColor = new Color (0,0,1);
   public static Color BlockDeviceColor = new Color (0.75,0.5,0);
-  public static Color CharacterDeviceColor = new Color (0.75,0.5,0);
-  public static Color FifoColor = new Color (0.75,0,0.82);
-  public static Color SocketColor = new Color (0.75,0,0);
+  public static Color CharacterDeviceColor = new Color (0.5,0.25,0);
+  public static Color FifoColor = new Color (0.75,0,0.22);
+  public static Color SocketColor = new Color (0.75,0,0.82);
   public static Color SymlinkColor = new Color (0,0.75,0.93);
   public static Color ExecutableColor = new Color (0,0.75,0);
   public static Color RegularFileColor = new Color (0,0,0);
@@ -31,6 +31,40 @@ public class DirStats
   public static Color UnfinishedDirectoryColor = new Color (0.5, 0, 1);
   public static Color BackgroundColor = new Color (1,1,1);
 
+  static Dictionary<string, string> _Prefixes = null;
+  public static Dictionary<string, string> Prefixes
+  { get {
+    if (_Prefixes == null) {
+      _Prefixes = new Dictionary<string, string> ();
+      _Prefixes[".."] = "⇱";
+      _Prefixes["/dev"] = "⚠";
+      _Prefixes["/etc"] = "✦";
+      _Prefixes["/boot"] = "◉";
+      _Prefixes["/proc"] = _Prefixes["/sys"] = "◎";
+      _Prefixes["/usr"] = _Prefixes["/usr/local"] = "⬢";
+      _Prefixes["/usr/X11R6"] = "▤";
+      _Prefixes["/usr/src"] = _Prefixes["/usr/local/src"] = "⚒";
+      _Prefixes["/bin"] = _Prefixes["/usr/bin"] = _Prefixes["/usr/local/bin"] = "⌬";
+      _Prefixes["/sbin"] = _Prefixes["/usr/sbin"] = _Prefixes["/usr/local/sbin"] = "⏣";
+      _Prefixes["/lib"] = _Prefixes["/usr/lib"] = _Prefixes["/usr/local/lib"] =
+      _Prefixes["/lib32"] = _Prefixes["/usr/lib32"] = _Prefixes["/usr/local/lib32"] = "⬡";
+      _Prefixes["/include"] = _Prefixes["/usr/include"] = _Prefixes["/usr/local/include"] = "○";
+      _Prefixes["/tmp"] = "⌚";
+      _Prefixes["/home"] = "⌂";
+      _Prefixes["/root"] = "♔";
+      _Prefixes["/usr/share"] = _Prefixes["/usr/local/share"] = "✧";
+      _Prefixes["/var"] = "⚡";
+      _Prefixes["/usr/games"] = _Prefixes["/usr/local/games"] = "☺";
+      _Prefixes[Helpers.HomeDir] = "♜";
+      _Prefixes[Helpers.HomeDir+"/Trash"] =
+      _Prefixes[Helpers.HomeDir+"/.Trash"] = "♻";
+      _Prefixes[Helpers.HomeDir+"/downloads"] =
+      _Prefixes[Helpers.HomeDir+"/Downloads"] = "⬇";
+      _Prefixes[Helpers.HomeDir+"/music"] =
+      _Prefixes[Helpers.HomeDir+"/Music"] = "♬";
+    }
+    return _Prefixes;
+  } }
 
   // Style for the DirStats
   public double BoxWidth = 0.1;
@@ -92,15 +126,26 @@ public class DirStats
       lock (this) {
         if (_Entries == null) {
           Profiler p = new Profiler ("ENTRIES");
+          bool isRoot = (FullName == Helpers.RootDir);
+          DirStats[] e;
           try {
             UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
-            DirStats[] e = new DirStats[files.Length];
+            e = new DirStats[files.Length + (isRoot ? 0 : 1)];
             for (int i=0; i<files.Length; i++)
               e[i] = new DirStats (files[i]);
-            _Entries = e;
           } catch (System.UnauthorizedAccessException) {
-            _Entries = new DirStats[0];
+            e = new DirStats[isRoot ? 0 : 1];
           }
+          if (!isRoot) {
+            DirStats parent = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
+            string pr = " ";
+/*            if (Prefixes.ContainsKey(parent.FullName))
+              pr = " " + Prefixes[parent.FullName] + " ";*/
+            parent.Name = Prefixes[".."]+pr+parent.FullName;
+            parent.LCName = "..";
+            e[e.Length-1] = parent;
+          }
+          _Entries = e;
           p.Time ("Got {0} Entries", _Entries.Length);
         }
       }
@@ -134,6 +179,8 @@ public class DirStats
     Name = f.Name;
     LCName = f.Name.ToLower ();
     FullName = f.FullName;
+    if (Prefixes.ContainsKey(FullName))
+      Name = Prefixes[FullName] + " " + Name;
     FileType = Helpers.FileType(f);
     Permissions = Helpers.FilePermissions(f);
     Length = Helpers.FileSize(f);
@@ -170,7 +217,8 @@ public class DirStats
         GetRecursiveSize() == 0
       ) {
         if (_Entries != null) {
-          extras += String.Format("{0} entries", _Entries.Length.ToString("N0"));
+          // entries sans parent dir
+          extras += String.Format("{0} entries", (_Entries.Length-1).ToString("N0"));
         }
       } else {
         extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
@@ -204,6 +252,10 @@ public class DirStats
     return String.Format ("{0} {1} {2}", pstring, Owner, Group);
   }
 
+  /** FAST */
+  /**
+    @returns The "rwx"-string for the given permission enums.
+    */
   string PermString (FileAccessPermissions r, FileAccessPermissions w, FileAccessPermissions x)
   {
     char[] chars = {'-', '-', '-'};
@@ -212,6 +264,23 @@ public class DirStats
     if ((Permissions & x) == x) chars[2] = 'x';
     return new string(chars);
   }
+
+  /** FAST */
+  /**
+    @returns The total size in bytes for the filesystem subtree of the DirStats.
+    */
+  public virtual double GetRecursiveSize () {
+    return recursiveInfo.TotalSize;
+  }
+
+  /** FAST */
+  /**
+    @returns The total file count for the filesystem subtree of the DirStats.
+    */
+  public virtual double GetRecursiveCount () {
+    return recursiveInfo.TotalCount;
+  }
+
 
   /* Drawing helpers */
 
@@ -285,9 +354,20 @@ public class DirStats
     if (!IsDirectory) return;
     Profiler p = new Profiler ("RELAYOUT");
     double totalHeight = 0.0;
+    DirStats parent = null;
     foreach (DirStats f in Entries) {
       f.Height = Measurer.Measure(f);
       totalHeight += f.Height;
+      if (f.LCName == "..") parent = f;
+    }
+    if (parent != null) {
+      if (Entries.Length > 1) {
+        totalHeight -= parent.Height;
+        parent.Height = totalHeight / 30.0;
+        totalHeight += parent.Height;
+      } else {
+        totalHeight += totalHeight * 30.0;
+      }
     }
     double scale = 1.0 / totalHeight;
     foreach (DirStats f in Entries) {
@@ -389,7 +469,7 @@ public class DirStats
       cr.Translate (0.1*BoxWidth, 0.48);
       cr.Scale (0.9, 0.48);
     } else {
-      cr.Translate (0.0, 0.05);
+      cr.Translate (0.0, 0.06);
       cr.Scale (1.0, 0.93);
     }
   }
@@ -418,7 +498,7 @@ public class DirStats
       cr.NewPath ();
       if (fs > 4) {
         if (depth == 0)
-          cr.Translate (0, -fs*1.3);
+          cr.Translate (0, -fs*1.2);
         cr.MoveTo (0, -fs*0.2);
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
@@ -598,25 +678,19 @@ public class DirStats
   }
 
 
+  /** BLOCKING */
+  /**
+    Finds the deepest DirStats that covers the full screen.
+    Used to do zoom navigation.
+    */
+  public string FindCovering (Context cr, Rectangle target)
+  {
+    return FullName;
+  }
+
 
 
   /* Directory traversal */
-
-  /** FAST */
-  /**
-    @returns The total size in bytes for the filesystem subtree of the DirStats.
-    */
-  public virtual double GetRecursiveSize () {
-    return recursiveInfo.TotalSize;
-  }
-
-  /** FAST */
-  /**
-    @returns The total file count for the filesystem subtree of the DirStats.
-    */
-  public virtual double GetRecursiveCount () {
-    return recursiveInfo.TotalCount;
-  }
 
   /** BLOCKING */
   /**

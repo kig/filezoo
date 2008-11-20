@@ -12,6 +12,7 @@ public static class Helpers {
   public static string DirSepS = System.IO.Path.DirectorySeparatorChar.ToString ();
   public static string RootDir = System.IO.Path.DirectorySeparatorChar.ToString ();
 
+  public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
   /* Text drawing helpers */
 
@@ -234,8 +235,12 @@ public static class Helpers {
       if (OwnerNameCache.ContainsKey(uid)) {
         return OwnerNameCache[uid];
       } else {
-        UnixUserInfo uf = f.OwnerUser;
-        return OwnerNameCache[uf.UserId] = uf.UserName;
+        try {
+          UnixUserInfo uf = f.OwnerUser;
+          return OwnerNameCache[uf.UserId] = uf.UserName;
+        } catch (System.ArgumentException) {
+          return OwnerNameCache[uid] = uid.ToString();
+        }
       }
     }
     catch (System.InvalidOperationException) { return ""; }
@@ -249,8 +254,12 @@ public static class Helpers {
       if (GroupNameCache.ContainsKey(gid)) {
         return GroupNameCache[gid];
       } else {
-        UnixGroupInfo uf = f.OwnerGroup;
-        return GroupNameCache[uf.GroupId] = uf.GroupName;
+        try {
+          UnixGroupInfo uf = f.OwnerGroup;
+          return GroupNameCache[uf.GroupId] = uf.GroupName;
+        } catch (System.ArgumentException) {
+          return GroupNameCache[gid] = gid.ToString();
+        }
       }
     }
     catch (System.InvalidOperationException) { return ""; }

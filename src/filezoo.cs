@@ -10,8 +10,9 @@ class Filezoo : DrawingArea
 {
   // current directory style
   public double BreadcrumbFontSize = 12;
-  public double BreadcrumbMarginTop = 2;
+  public double BreadcrumbMarginTop = 6;
   public double BreadcrumbMarginLeft = 12;
+  public double BreadcrumbMarginRight = 12;
 
   // sort/size toolbar style
   public double ToolbarY = 24;
@@ -267,7 +268,7 @@ class Filezoo : DrawingArea
 
     cr.Save ();
       DrawClear (cr, width, height);
-      DrawToolbars (cr);
+      DrawToolbars (cr, width, height);
       Rectangle targetBox = Transform (cr, width, height);
       DrawCurrentDir(cr, targetBox);
     cr.Restore ();
@@ -291,11 +292,11 @@ class Filezoo : DrawingArea
   }
 
   /** FAST */
-  void DrawToolbars (Context cr)
+  void DrawToolbars (Context cr, uint width, uint height)
   {
     Profiler p = new Profiler ();
     cr.Save ();
-      DrawBreadcrumb (cr);
+      DrawBreadcrumb (cr, width);
       DrawSortBar (cr);
       DrawSizeBar (cr);
       DrawOpenTerminal (cr);
@@ -316,20 +317,27 @@ class Filezoo : DrawingArea
   }
 
   /** FAST */
-  void DrawBreadcrumb (Context cr)
+  void DrawBreadcrumb (Context cr, uint width)
   {
-    cr.Color = new Color (0,0,1);
+    TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontSize, CurrentDirPath);
+    cr.Color = DirStats.DirectoryColor;
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
-    cr.MoveTo (0.0, 0.0);
-    FontSize = (BreadcrumbFontSize);
-    if (CurrentDirPath == Helpers.RootDir) {
-      Helpers.DrawText (cr, FontSize, Helpers.RootDir);
-    } else {
-      foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
-        Helpers.DrawText (cr, FontSize, s);
-        Helpers.DrawText (cr, FontSize, Helpers.DirSepS);
+    cr.Save ();
+      double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
+      cr.Rectangle (0,0,areaWidth, te.Height);
+      cr.Clip ();
+      cr.Translate (Math.Min(0,areaWidth-te.Width), 0);
+      cr.MoveTo (0.0, 0.0);
+      FontSize = (BreadcrumbFontSize);
+      if (CurrentDirPath == Helpers.RootDir) {
+        Helpers.DrawText (cr, FontSize, Helpers.RootDir);
+      } else {
+        foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
+          Helpers.DrawText (cr, FontSize, s);
+          Helpers.DrawText (cr, FontSize, Helpers.DirSepS);
+        }
       }
-    }
+    cr.Restore ();
   }
 
   /** FAST */
@@ -386,7 +394,7 @@ class Filezoo : DrawingArea
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
-      if (ClickBreadcrumb (cr, x, y)) {
+      if (ClickBreadcrumb (cr, width, x, y)) {
         cr.Restore ();
         return;
       }
@@ -432,28 +440,36 @@ class Filezoo : DrawingArea
   }
 
   /** FAST */
-  bool ClickBreadcrumb (Context cr, double x, double y)
+  bool ClickBreadcrumb (Context cr, uint width, double x, double y)
   {
+    TextExtents te1 = Helpers.GetTextExtents (cr, BreadcrumbFontSize, CurrentDirPath);
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
-    cr.MoveTo (0.0, 0.0);
-    FontSize = (BreadcrumbFontSize);
-    double advance = 0.0;
-    int hitIndex = 0;
-    string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
-    if (CurrentDirPath != Helpers.RootDir) {
-      foreach (string s in segments) {
-        TextExtents te = Helpers.GetTextExtents (cr, FontSize, s + Helpers.DirSepS);
-        if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
-          string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
-          if (newDir == "") newDir = Helpers.RootDir;
-          if (newDir != CurrentDirPath)
-            BuildDirs (newDir);
-          return true;
+    cr.Save ();
+      double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
+      cr.Rectangle (0,0,areaWidth, te1.Height);
+      cr.Clip ();
+      cr.Translate (Math.Min(0,areaWidth-te1.Width), 0);
+      cr.MoveTo (0.0, 0.0);
+      FontSize = (BreadcrumbFontSize);
+      double advance = 0.0;
+      int hitIndex = 0;
+      string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
+      if (CurrentDirPath != Helpers.RootDir) {
+        foreach (string s in segments) {
+          TextExtents te = Helpers.GetTextExtents (cr, FontSize, s + Helpers.DirSepS);
+          if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
+            string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
+            if (newDir == "") newDir = Helpers.RootDir;
+            if (newDir != CurrentDirPath)
+              BuildDirs (newDir);
+            cr.Restore ();
+            return true;
+          }
+          advance += te.XAdvance;
+          hitIndex += 1;
         }
-        advance += te.XAdvance;
-        hitIndex += 1;
       }
-    }
+    cr.Restore ();
     return false;
   }
 
