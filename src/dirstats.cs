@@ -384,12 +384,13 @@ public class DirStats
       cr.IdentityMatrix ();
       cr.Translate (x, y);
       cr.NewPath ();
-      cr.MoveTo (0, -fs*0.3);
       if (fs > 4) {
+        cr.MoveTo (0, -fs*0.1);
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
         Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
       } else if (fs > 1) {
+        cr.MoveTo (0, fs*0.1);
         Helpers.DrawText (cr, fs, Name + "  " + GetSubTitle ());
       } else {
         cr.Rectangle (0.0, 0.0, fs / 2 * (Name.Length+15), fs/3);
