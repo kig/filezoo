@@ -48,8 +48,9 @@ public class DirStats
       _Prefixes["/bin"] = _Prefixes["/usr/bin"] = _Prefixes["/usr/local/bin"] = "⌬";
       _Prefixes["/sbin"] = _Prefixes["/usr/sbin"] = _Prefixes["/usr/local/sbin"] = "⏣";
       _Prefixes["/lib"] = _Prefixes["/usr/lib"] = _Prefixes["/usr/local/lib"] =
+      _Prefixes["/lib"] = _Prefixes["/usr/X11R6/lib"] = _Prefixes["/usr/X11R6/lib32"] =
       _Prefixes["/lib32"] = _Prefixes["/usr/lib32"] = _Prefixes["/usr/local/lib32"] = "⬡";
-      _Prefixes["/include"] = _Prefixes["/usr/include"] = _Prefixes["/usr/local/include"] = "○";
+      _Prefixes["/include"] = _Prefixes["/usr/include"] = _Prefixes["/usr/local/include"] = "◌";
       _Prefixes["/tmp"] = "⌚";
       _Prefixes["/home"] = "⌂";
       _Prefixes["/root"] = "♔";
@@ -60,13 +61,13 @@ public class DirStats
       _Prefixes[Helpers.HomeDir+"/Trash"] =
       _Prefixes[Helpers.HomeDir+"/.Trash"] = "♻";
       _Prefixes[Helpers.HomeDir+"/downloads"] =
-      _Prefixes[Helpers.HomeDir+"/Downloads"] = "⬇";
+      _Prefixes[Helpers.HomeDir+"/Downloads"] = "↴";
       _Prefixes[Helpers.HomeDir+"/music"] =
       _Prefixes[Helpers.HomeDir+"/Music"] = "♬";
       _Prefixes[Helpers.HomeDir+"/photos"] =
       _Prefixes[Helpers.HomeDir+"/Photos"] =
       _Prefixes[Helpers.HomeDir+"/pictures"] =
-      _Prefixes[Helpers.HomeDir+"/Pictures"] = "⚜";
+      _Prefixes[Helpers.HomeDir+"/Pictures"] = "❏";
       _Prefixes[Helpers.HomeDir+"/public_html"] = "⚓";
     }
     return _Prefixes;
@@ -463,7 +464,7 @@ public class DirStats
         if (LCName == "..")
           Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.90, targetBox);
         else
-          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
+          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, targetBox);
         cr.Fill ();
       }
       if (cr.Matrix.Yy > 0.5 || depth < 2) DrawTitle (cr, depth);
@@ -496,7 +497,7 @@ public class DirStats
       cr.Scale (0.9, 0.40);
     } else {
       cr.Translate (0.1*BoxWidth, 0.48);
-      cr.Scale (0.9, 0.48);
+      cr.Scale (0.9, 0.44);
     }
   }
 
