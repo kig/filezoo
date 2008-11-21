@@ -56,18 +56,33 @@ public class DirStats
       _Prefixes["/root"] = "♔";
       _Prefixes["/usr/share"] = _Prefixes["/usr/local/share"] = "✧";
       _Prefixes["/var"] = "⚡";
+      _Prefixes["/var/run"] = "⚡";
+      _Prefixes["/var/lib"] = "✦";
+      _Prefixes["/var/log"] = "✇";
       _Prefixes["/usr/games"] = _Prefixes["/usr/local/games"] = "☺";
       _Prefixes[Helpers.HomeDir] = "♜";
+      _Prefixes[Helpers.HomeDir+"/bin"] = "⌬";
+      _Prefixes[Helpers.HomeDir+"/code"] = "◌";
       _Prefixes[Helpers.HomeDir+"/Trash"] =
       _Prefixes[Helpers.HomeDir+"/.Trash"] = "♻";
       _Prefixes[Helpers.HomeDir+"/downloads"] =
       _Prefixes[Helpers.HomeDir+"/Downloads"] = "↴";
       _Prefixes[Helpers.HomeDir+"/music"] =
       _Prefixes[Helpers.HomeDir+"/Music"] = "♬";
+      _Prefixes[Helpers.HomeDir+"/Desktop"] = "▰";
+      _Prefixes[Helpers.HomeDir+"/documents"] =
+      _Prefixes[Helpers.HomeDir+"/Documents"] = "✎";
       _Prefixes[Helpers.HomeDir+"/photos"] =
       _Prefixes[Helpers.HomeDir+"/Photos"] =
       _Prefixes[Helpers.HomeDir+"/pictures"] =
       _Prefixes[Helpers.HomeDir+"/Pictures"] = "❏";
+      _Prefixes[Helpers.HomeDir+"/reading"] = "♾";
+      _Prefixes[Helpers.HomeDir+"/writing"] = "✍";
+      _Prefixes[Helpers.HomeDir+"/movies"] =
+      _Prefixes[Helpers.HomeDir+"/Movies"] =
+      _Prefixes[Helpers.HomeDir+"/logs"] = "✇";
+      _Prefixes[Helpers.HomeDir+"/video"] =
+      _Prefixes[Helpers.HomeDir+"/Video"] = "►";
       _Prefixes[Helpers.HomeDir+"/public_html"] = "⚓";
     }
     return _Prefixes;
@@ -308,7 +323,7 @@ public class DirStats
     */
   double GetFontSize (double h)
   {
-    return h * (IsDirectory ? (LCName == ".." ? 0.45 : 0.4) : 0.5);
+    return h * (IsDirectory ? 0.4 : 0.5);
   }
 
   /** FAST */
@@ -405,14 +420,14 @@ public class DirStats
     If either is true, returns false, otherwise reckons the DirStats would be
     visible and returns true.
     */
-  bool IsVisible (Context cr, double targetTop, double targetHeight)
+  bool IsVisible (Context cr, Rectangle target)
   {
     double h = cr.Matrix.Yy * GetScaledHeight ();
-    double y = cr.Matrix.Y0 - targetTop;
+    double y = cr.Matrix.Y0 - target.Y;
     // rectangle doesn't intersect any quarter-pixel midpoints
     if (h < 0.5 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
       return false;
-    return ((y < targetHeight) && ((y+h) > 0.0));
+    return ((y < target.Height) && ((y+h) > 0.0));
   }
 
   /** BLOCKING */
@@ -435,23 +450,23 @@ public class DirStats
     @param firstFrame Whether this frame should be drawn as fast as possible.
     @returns The count of DirStats instances drawn.
   */
-  public uint Draw (Context cr, Rectangle targetBox, bool firstFrame) {
-    return Draw (cr, targetBox, firstFrame, 0);
+  public uint Draw (Context cr, Rectangle target, bool firstFrame) {
+    return Draw (cr, target, firstFrame, 0);
   }
-  public uint Draw (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
+  public uint Draw (Context cr, Rectangle target, bool firstFrame, uint depth)
   {
     if (depth == 0) {
       FrameProfiler.Restart ();
       Height = Scale = 1.0;
     }
-    if (!IsVisible(cr, targetBox.Y, targetBox.Height)) {
+    if (!IsVisible(cr, target)) {
       return 0;
     }
     double h = GetScaledHeight ();
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.02, targetBox);
+      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.02, target);
       cr.Color = BackgroundColor;
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
@@ -460,13 +475,8 @@ public class DirStats
         cr.Color = UnfinishedDirectoryColor;
       if (LCName == "..")
         cr.Color = ParentDirectoryColor;
-      if (depth > 0) {
-        if (LCName == "..")
-          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.90, targetBox);
-        else
-          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, targetBox);
-        cr.Fill ();
-      }
+      Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
+      cr.Fill ();
       if (cr.Matrix.Yy > 0.5 || depth < 2) DrawTitle (cr, depth);
       if (IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
@@ -474,7 +484,7 @@ public class DirStats
         if (depth == 0) shouldDrawChildren = true;
         if (shouldDrawChildren) {
           RequestInfo();
-          c += DrawChildren(cr, targetBox, firstFrame, depth);
+          c += DrawChildren(cr, target, firstFrame, depth);
         }
       }
     cr.Restore ();
@@ -484,21 +494,12 @@ public class DirStats
 
   /** FAST */
   /**
-    Sets up child area transform for the DirStats. Depth 0 child area is drawn
-    at full height to waste less screen space.
+    Sets up child area transform for the DirStats.
     */
-  void ChildTransform (Context cr, uint depth)
+  void ChildTransform (Context cr)
   {
-    if (depth == 0) {
-      cr.Translate (0.0, 0.08);
-      cr.Scale (1.0, 0.92);
-    } else if (LCName == "..") {
-      cr.Translate (0.1*BoxWidth, 0.50);
-      cr.Scale (0.9, 0.40);
-    } else {
-      cr.Translate (0.1*BoxWidth, 0.48);
-      cr.Scale (0.9, 0.44);
-    }
+    cr.Translate (0.1*BoxWidth, 0.48);
+    cr.Scale (0.9, 0.44);
   }
 
   /** BLOCKING */
@@ -532,12 +533,14 @@ public class DirStats
         Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle ());
 
         double sfs = Helpers.Clamp(
-          IsDirectory ? rfs*0.05 : rfs*0.2,
+          IsDirectory ? rfs*0.05 : rfs*0.28,
           MinFontSize, MaxFontSize*0.6);
         if (sfs > 1) {
-          cr.MoveTo (0, fs*1.4);
+          double a = sfs / (MaxFontSize*0.6);
+          cr.Color = new Color (0,0,0, a*a);
+          cr.MoveTo (0, fs*1.1+sfs*0.8);
           Helpers.DrawText (cr, sfs, "Modified " + LastModified.ToString());
-          cr.MoveTo (0, fs*1.4+sfs*1.4);
+          cr.MoveTo (0, fs*1.1+sfs*2.0);
           Helpers.DrawText (cr, sfs, PermissionString ());
         }
       } else if (fs > 1) {
@@ -572,7 +575,7 @@ public class DirStats
       return 0;
     }
     cr.Save ();
-      ChildTransform (cr, depth);
+      ChildTransform (cr);
       uint c = 0;
       foreach (DirStats d in Entries) {
         layoutComplete &= UpdateChild (d);
@@ -642,7 +645,7 @@ public class DirStats
   public DirAction Click
   (Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
-    if (!IsVisible(cr, target.Y, target.Height)) {
+    if (!IsVisible(cr, target)) {
       return DirAction.None;
     }
     double h = GetScaledHeight ();
@@ -693,7 +696,7 @@ public class DirStats
   {
     DirAction retval = DirAction.None;
     cr.Save ();
-      ChildTransform (cr, depth);
+      ChildTransform (cr);
       foreach (DirStats d in Entries) {
         retval = d.Click (cr, target, mouseX, mouseY, depth+1);
         if (retval != DirAction.None) break;
@@ -705,14 +708,46 @@ public class DirStats
   }
 
 
+  /* Covering */
+
   /** BLOCKING */
   /**
     Finds the deepest DirStats that covers the full screen.
     Used to do zoom navigation.
+
+    Returns the Covering with the DirStats, the relative zoom and the relative pan.
     */
-  public string FindCovering (Context cr, Rectangle target)
+  public Covering FindCovering (Context cr, Rectangle target, uint depth)
   {
-    return FullName;
+    Covering retval = (depth == 0 ? GetCovering(cr, target) : null);
+    if (!IsDirectory || !IsVisible(cr, target))
+      return retval;
+    double h = GetScaledHeight ();
+    cr.Save ();
+      cr.Scale (1, h);
+//       Console.WriteLine("tY: {0} tH: {1} y0: {2} yy: {3}", target.Y, target.Height, cr.Matrix.Y0, cr.Matrix.Yy);
+      if (cr.Matrix.Y0 <= target.Y && cr.Matrix.Y0+cr.Matrix.Yy >= target.Y+target.Height) {
+        retval = GetCovering (cr, target);
+        ChildTransform (cr);
+        foreach (DirStats d in Entries) {
+          Covering c = d.FindCovering (cr, target, depth+1);
+          if (c != null) {
+            retval = c;
+            break;
+          }
+          cr.Translate (0.0, d.GetScaledHeight());
+        }
+      }
+    cr.Restore ();
+    return retval;
+  }
+
+  Covering GetCovering (Context cr, Rectangle target)
+  {
+    double z = cr.Matrix.Yy / target.Height;
+    double pan = (cr.Matrix.Y0-target.Y) / (target.Height*z);
+//     Console.WriteLine("{0} {1}", pan, z);
+    return new Covering (this, z, pan);
   }
 
 
@@ -790,3 +825,18 @@ public enum SortingDirection {
   Ascending,
   Descending
 }
+
+
+public class Covering
+{
+  public double Zoom;
+  public double Pan;
+  public DirStats Directory;
+  public Covering (DirStats d, double z, double p)
+  {
+    Directory = d;
+    Zoom = z;
+    Pan = p;
+  }
+}
+

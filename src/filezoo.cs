@@ -235,6 +235,8 @@ class Filezoo : DrawingArea
     }
     CurrentDir.Relayout ();
     p.Time ("CurrentDir.Relayout");
+    if (!SizeField.Measurer.DependsOnTotals)
+      CurrentDir.CancelTraversal ();
     LayoutUpdateRequested = !CurrentDir.Complete;
   }
 
@@ -569,12 +571,24 @@ class Filezoo : DrawingArea
   void ZoomBy
   (Context cr, uint width, uint height, double x, double y, double factor)
   {
-    double xr = x, yr = y, nz = Math.Max (1.0, Zoomer.Z * factor);
+    double xr = x, yr = y, nz = Zoomer.Z * factor;
+    if (CurrentDirPath == Helpers.RootDir && nz < 1) nz = 1;
     cr.Save ();
       Transform (cr, width, height);
       cr.InverseTransformPoint(ref xr, ref yr);
       double npy = (yr / nz) - (yr / Zoomer.Z) + Zoomer.Y;
+//       Console.WriteLine(npy);
       Zoomer.SetZoom (0.0, npy, nz);
+    cr.Restore ();
+    cr.Save ();
+      Rectangle r = Transform (cr, width, height);
+      cr.Scale (1, Zoomer.Z);
+      cr.Translate (0.0, Zoomer.Y);
+      Covering c = CurrentDir.FindCovering(cr, r, 0);
+      if (c.Directory != CurrentDir) {
+        BuildDirs(c.Directory.FullName);
+        Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
+      }
     cr.Restore ();
     UpdateLayout();
   }
