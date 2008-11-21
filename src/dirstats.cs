@@ -136,6 +136,8 @@ public class DirStats
   double Scale;
   double Height;
 
+  DirStats ParentDir;
+
   // DirStats objects for the children of a directory DirStats
   DirStats[] _Entries = null;
   /** BLOCKING */
@@ -159,13 +161,13 @@ public class DirStats
             e = new DirStats[isRoot ? 0 : 1];
           }
           if (!isRoot) {
-            DirStats parent = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
+            ParentDir = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
             string pr = " ";
 /*            if (Prefixes.ContainsKey(parent.FullName))
               pr = " " + Prefixes[parent.FullName] + " ";*/
-            parent.Name = Prefixes[".."]+pr+parent.FullName;
-            parent.LCName = "..";
-            e[e.Length-1] = parent;
+            ParentDir.Name = Prefixes[".."]+pr+ParentDir.FullName;
+            ParentDir.LCName = "..";
+            e[e.Length-1] = ParentDir;
           }
           _Entries = e;
           p.Time ("Got {0} Entries", _Entries.Length);
@@ -370,7 +372,7 @@ public class DirStats
     DirStats[] e = Entries;
     DirStats tmp;
     for (idx=0; idx < e.Length; idx++)
-      if (e[idx].LCName == "..") break;
+      if (e[idx] == ParentDir) break;
     for (int i=idx; i > 0; i--) {
       tmp = e[i-1];
       e[i-1] = e[i];
@@ -388,17 +390,15 @@ public class DirStats
     if (!IsDirectory) return;
     Profiler p = new Profiler ("RELAYOUT");
     double totalHeight = 0.0;
-    DirStats parent = null;
     foreach (DirStats f in Entries) {
       f.Height = Measurer.Measure(f);
       totalHeight += f.Height;
-      if (f.LCName == "..") parent = f;
     }
-    if (parent != null) {
+    if (ParentDir != null) {
       if (Entries.Length > 1) {
-        totalHeight -= parent.Height;
-        parent.Height = totalHeight / 32.0;
-        totalHeight += parent.Height;
+        totalHeight -= ParentDir.Height;
+        ParentDir.Height = totalHeight / 32.0;
+        totalHeight += ParentDir.Height;
       } else {
         totalHeight += totalHeight * 32.0;
       }
@@ -737,6 +737,19 @@ public class DirStats
           }
           cr.Translate (0.0, d.GetScaledHeight());
         }
+      } else if (depth == 0 && FullName != Helpers.RootDir) { // navigating upwards
+        FrameProfiler.Reset ();
+        UpdateChild(ParentDir);
+        double scale = 1.0;
+        double position = 0.48; // stupidity with magic numbers
+        foreach (DirStats d in ParentDir.Entries) {
+          if (d.FullName == FullName) {
+            scale = 1.0 / (0.44 * d.GetScaledHeight ());
+            break;
+          }
+          position += 0.44 * d.GetScaledHeight ();
+        }
+        retval = new Covering (ParentDir, scale, -position+((retval.Pan-0.5)/scale));
       }
     cr.Restore ();
     return retval;
