@@ -175,7 +175,13 @@ class Filezoo : DrawingArea
       | NotifyFilters.DirectoryName
       | NotifyFilters.CreationTime
     );
-    watcher.Path = dirname;
+    try {
+      watcher.Path = dirname;
+    } catch (System.ArgumentException e) {
+      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
+      Console.WriteLine("Here's the exception output: {0}", e);
+      return watcher;
+    }
     watcher.Filter = "";
     watcher.Changed += new FileSystemEventHandler (WatcherChanged);
     watcher.Created += new FileSystemEventHandler (WatcherChanged);
