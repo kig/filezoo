@@ -215,10 +215,14 @@ public static class Helpers {
 
   /** BLOCKING */
   public static DateTime LastModified (UnixFileSystemInfo f) {
-    if (f.LastWriteTime > f.LastStatusChangeTime)
-      return f.LastWriteTime;
-    else
-      return f.LastStatusChangeTime;
+    try {
+      if (f.LastWriteTime > f.LastStatusChangeTime)
+        return f.LastWriteTime;
+      else
+        return f.LastStatusChangeTime;
+    } catch (System.InvalidOperationException) {
+      return DateTime.Now;
+    }
   }
 
   /** BLOCKING */

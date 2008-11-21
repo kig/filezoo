@@ -27,6 +27,7 @@ public class DirStats
   public static Color SymlinkColor = new Color (0,0.75,0.93);
   public static Color ExecutableColor = new Color (0,0.75,0);
   public static Color RegularFileColor = new Color (0,0,0);
+  public static Color ParentDirectoryColor = new Color (0,0,1);
 
   public static Color UnfinishedDirectoryColor = new Color (0.5, 0, 1);
   public static Color BackgroundColor = new Color (1,1,1);
@@ -62,6 +63,11 @@ public class DirStats
       _Prefixes[Helpers.HomeDir+"/Downloads"] = "⬇";
       _Prefixes[Helpers.HomeDir+"/music"] =
       _Prefixes[Helpers.HomeDir+"/Music"] = "♬";
+      _Prefixes[Helpers.HomeDir+"/photos"] =
+      _Prefixes[Helpers.HomeDir+"/Photos"] =
+      _Prefixes[Helpers.HomeDir+"/pictures"] =
+      _Prefixes[Helpers.HomeDir+"/Pictures"] = "⚜";
+      _Prefixes[Helpers.HomeDir+"/public_html"] = "⚓";
     }
     return _Prefixes;
   } }
@@ -301,7 +307,7 @@ public class DirStats
     */
   double GetFontSize (double h)
   {
-    return h * (IsDirectory ? 0.4 : 0.5);
+    return h * (IsDirectory ? (LCName == ".." ? 0.45 : 0.4) : 0.5);
   }
 
   /** FAST */
@@ -363,10 +369,10 @@ public class DirStats
     if (parent != null) {
       if (Entries.Length > 1) {
         totalHeight -= parent.Height;
-        parent.Height = totalHeight / 30.0;
+        parent.Height = totalHeight / 32.0;
         totalHeight += parent.Height;
       } else {
-        totalHeight += totalHeight * 30.0;
+        totalHeight += totalHeight * 32.0;
       }
     }
     double scale = 1.0 / totalHeight;
@@ -439,8 +445,13 @@ public class DirStats
       cr.Color = co;
       if (!recursiveInfo.Complete && Measurer.DependsOnTotals)
         cr.Color = UnfinishedDirectoryColor;
+      if (LCName == "..")
+        cr.Color = ParentDirectoryColor;
       if (depth > 0) {
-        Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
+        if (LCName == "..")
+          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.90, targetBox);
+        else
+          Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.98, targetBox);
         cr.Fill ();
       }
       if (cr.Matrix.Yy > 0.5 || depth < 2) DrawTitle (cr, depth);
@@ -465,12 +476,16 @@ public class DirStats
     */
   void ChildTransform (Context cr, uint depth)
   {
-    if (depth > 0) {
+    if (depth == 0) {
+      double n = 60.0 / cr.Matrix.Yy;
+      cr.Translate (0.0, n);
+      cr.Scale (1.0, Math.Max(0.0001, 1.0-n));
+    } else if (LCName == "..") {
+      cr.Translate (0.1*BoxWidth, 0.50);
+      cr.Scale (0.9, 0.40);
+    } else {
       cr.Translate (0.1*BoxWidth, 0.48);
       cr.Scale (0.9, 0.48);
-    } else {
-      cr.Translate (0.0, 0.06);
-      cr.Scale (1.0, 0.93);
     }
   }
 
@@ -488,6 +503,7 @@ public class DirStats
   {
     double h = cr.Matrix.Yy;
     double rfs = GetFontSize(h);
+    if (depth == 0) rfs = MaxFontSize * 10;
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
       cr.Translate(BoxWidth * 1.1, 0.02);
@@ -497,8 +513,6 @@ public class DirStats
       cr.Translate (x, y);
       cr.NewPath ();
       if (fs > 4) {
-        if (depth == 0)
-          cr.Translate (0, -fs*1.2);
         cr.MoveTo (0, -fs*0.2);
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
@@ -627,7 +641,7 @@ public class DirStats
         retval = ClickChildren (cr, target, mouseX, mouseY, depth);
       if (
         retval == DirAction.None ||
-        (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 10)
+        (retval.Type == DirAction.Action.ZoomIn && cr.Matrix.Yy < 40)
       ) {
         cr.NewPath ();
         double rfs = GetFontSize(h);
