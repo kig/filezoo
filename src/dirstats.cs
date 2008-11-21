@@ -336,9 +336,6 @@ public class DirStats
   /** BLOCKING */
   /**
     Sorts the Entries of the DirStats instance.
-    This is about the most expensive thing you can do, and Mono's retardedly
-    slow string comparison algorithm doesn't help. It's 40 friggin times slower
-    than OCaml for chrissakes.
     */
   public void Sort ()
   {
@@ -347,7 +344,22 @@ public class DirStats
     Array.Sort (Entries, Comparer);
     if (SortDirection == SortingDirection.Descending)
       Array.Reverse (Entries);
+    MoveParentToFront() ;
     p.Time("Sorted {0} DirStats", Entries.Length);
+  }
+  void MoveParentToFront ()
+  {
+    if (FullName == Helpers.RootDir) return;
+    int idx;
+    DirStats[] e = Entries;
+    DirStats tmp;
+    for (idx=0; idx < e.Length; idx++)
+      if (e[idx].LCName == "..") break;
+    for (int i=idx; i > 0; i--) {
+      tmp = e[i-1];
+      e[i-1] = e[i];
+      e[i] = tmp;
+    }
   }
 
   /** BLOCKING */
@@ -720,10 +732,11 @@ public class DirStats
     completed.
     */
   void RequestInfo () {
+    if (LCName == "..") return;
     if (Measurer.DependsOnTotals) {
-    if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
-      DirCache.RequestTraversal (FullName);
-    }
+      if (!recursiveInfo.InProgress && !recursiveInfo.Complete) {
+        DirCache.RequestTraversal (FullName);
+      }
     }
   }
 
