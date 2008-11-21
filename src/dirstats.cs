@@ -477,9 +477,8 @@ public class DirStats
   void ChildTransform (Context cr, uint depth)
   {
     if (depth == 0) {
-      double n = 60.0 / cr.Matrix.Yy;
-      cr.Translate (0.0, n);
-      cr.Scale (1.0, Math.Max(0.0001, 1.0-n));
+      cr.Translate (0.0, 0.08);
+      cr.Scale (1.0, 0.92);
     } else if (LCName == "..") {
       cr.Translate (0.1*BoxWidth, 0.50);
       cr.Scale (0.9, 0.40);
@@ -503,7 +502,6 @@ public class DirStats
   {
     double h = cr.Matrix.Yy;
     double rfs = GetFontSize(h);
-    if (depth == 0) rfs = MaxFontSize * 10;
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
       cr.Translate(BoxWidth * 1.1, 0.02);
@@ -513,6 +511,8 @@ public class DirStats
       cr.Translate (x, y);
       cr.NewPath ();
       if (fs > 4) {
+        if (depth == 0)
+          cr.Translate (0, -fs*0.5);
         cr.MoveTo (0, -fs*0.2);
         Helpers.DrawText (cr, fs, Name);
         cr.RelMoveTo(0, fs*0.35);
