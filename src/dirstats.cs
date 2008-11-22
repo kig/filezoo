@@ -114,8 +114,8 @@ public class DirStats
   public string Group;
   public DateTime LastModified;
 
-  FileAccessPermissions Permissions;
-  FileTypes FileType;
+  public FileAccessPermissions Permissions;
+  public FileTypes FileType;
 
   // How to sort directories
   public IComparer<DirStats> Comparer = new NullComparer ();
@@ -139,22 +139,22 @@ public class DirStats
   // Frame rate profiler to help with maintaining the frame rate when doing
   // lots of in-frame work.
   static Profiler FrameProfiler = new Profiler ();
-  double MaxTimePerFrame = 50.0;
+  double MaxTimePerFrame = 80.0;
 
   // Drawing state variables
   double Scale;
   double Height;
 
-  DirStats ParentDir;
+  public DirStats ParentDir;
 
   // DirStats objects for the children of a directory DirStats
-  DirStats[] _Entries = null;
+  public DirStats[] _Entries = null;
   /** BLOCKING */
   /**
     The Entries getter gets the Entries for the files in this DirStats' directory.
     This should be made ASYNC.
     */
-  DirStats[] Entries {
+  public DirStats[] Entries {
     get {
       lock (this) {
         if (_Entries == null) {
@@ -206,14 +206,33 @@ public class DirStats
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
   }
 
+  /** FAST */
+  public DirStats (DirStats o)
+  {
+    FullName = o.FullName;
+    ResetName ();
+    recursiveInfo = o.recursiveInfo;
+    FileType = o.FileType;
+    Permissions = o.Permissions;
+    Length = o.Length;
+    LastModified = o.LastModified;
+    IsDirectory = o.IsDirectory;
+    Owner = o.Owner;
+    Group = o.Group;
+    Scale = o.Scale;
+    Height = o.Height;
+    Suffix = o.Suffix;
+    if (o._Entries != null) {
+      _Entries = (DirStats[])(o._Entries).Clone();
+      ParentDir = o.ParentDir;
+    }
+  }
+
   /** BLOCKING */
   void UpdateInfo (UnixFileSystemInfo f, Dir r) {
     recursiveInfo = r;
-    Name = f.Name;
-    LCName = f.Name.ToLower ();
     FullName = f.FullName;
-    if (Prefixes.ContainsKey(FullName))
-      Name = Prefixes[FullName] + " " + Name;
+    ResetName ();
     FileType = Helpers.FileType(f);
     Permissions = Helpers.FilePermissions(f);
     Length = Helpers.FileSize(f);
@@ -708,9 +727,9 @@ public class DirStats
           if (ys < 16)
             retval = DirAction.ZoomIn(ys / 20);
           else if (IsDirectory)
-            retval = DirAction.Navigate(FullName);
+            retval = DirAction.Navigate(this);
           else
-            retval = DirAction.Open(FullName);
+            retval = DirAction.Open(this);
         }
       }
     cr.Restore ();
@@ -775,11 +794,13 @@ public class DirStats
         UpdateChild(ParentDir);
         double scale = 1.0;
         double position = 0.48; // stupidity with magic numbers
+        int i = 0;
         foreach (DirStats d in ParentDir.Entries) {
           if (d.FullName == FullName) {
             scale = 1.0 / (0.44 * d.GetScaledHeight ());
             break;
           }
+          i++;
           position += 0.44 * d.GetScaledHeight ();
         }
         retval = new Covering (ParentDir, scale, -position);
@@ -828,7 +849,7 @@ public class DirStats
 public class DirAction
 {
   public Action Type;
-  public string Path;
+  public DirStats Path;
   public double Height;
 
   /** FAST */
@@ -836,22 +857,22 @@ public class DirAction
 
   /** FAST */
   public static DirAction GetNone ()
-  { return new DirAction (Action.None, "", 0.0); }
+  { return new DirAction (Action.None, null, 0.0); }
 
   /** FAST */
-  public static DirAction Open (string path)
+  public static DirAction Open (DirStats path)
   { return new DirAction (Action.Open, path, 0.0); }
 
   /** FAST */
-  public static DirAction Navigate (string path)
+  public static DirAction Navigate (DirStats path)
   { return new DirAction (Action.Navigate, path, 0.0); }
 
   /** FAST */
   public static DirAction ZoomIn (double h)
-  { return new DirAction (Action.ZoomIn, "", h); }
+  { return new DirAction (Action.ZoomIn, null, h); }
 
   /** FAST */
-  DirAction (Action type, string path, double height)
+  DirAction (Action type, DirStats path, double height)
   {
     Type = type;
     Path = path;

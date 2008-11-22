@@ -438,12 +438,14 @@ class Filezoo : DrawingArea
     DirAction action = CurrentDir.Click (cr, box, x, y);
     switch (action.Type) {
       case DirAction.Action.Open:
-        Console.WriteLine("Open {0}", action.Path);
-        Helpers.OpenFile(action.Path);
+        Console.WriteLine("Open {0}", action.Path.FullName);
+        Helpers.OpenFile(action.Path.FullName);
         break;
       case DirAction.Action.Navigate:
-        Console.WriteLine("Navigate {0}", action.Path);
-        BuildDirs (action.Path);
+        Console.WriteLine("Navigate {0}", action.Path.FullName);
+        SetDir (action.Path);
+        ResetZoom ();
+        UpdateLayout ();
         break;
       case DirAction.Action.ZoomIn:
         Console.WriteLine("ZoomIn {0}x", 1 / action.Height);
@@ -476,8 +478,12 @@ class Filezoo : DrawingArea
           if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
             string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
             if (newDir == "") newDir = Helpers.RootDir;
-            if (newDir != CurrentDirPath)
+            if (newDir != CurrentDirPath) {
               BuildDirs (newDir);
+            } else {
+              ResetZoom ();
+              QueueDraw ();
+            }
             cr.Restore ();
             return true;
           }
