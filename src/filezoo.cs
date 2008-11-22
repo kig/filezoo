@@ -565,6 +565,7 @@ class Filezoo : DrawingArea
   /** FAST */
   void ResetZoom () {
     Zoomer.ResetZoom ();
+    Zoomer.SetZoom (0.0, CurrentDir.DefaultPan, CurrentDir.DefaultZoom);
   }
 
   /** FAST */

@@ -430,6 +430,9 @@ public class DirStats
     return ((y < target.Height) && ((y+h) > 0.0));
   }
 
+  public double DefaultZoom = 2.0;
+  public double DefaultPan = -0.43;
+
   /** BLOCKING */
   /**
     Draw draws the DirStats instance to the given Cairo Context, clipping it
@@ -470,14 +473,20 @@ public class DirStats
       cr.Color = BackgroundColor;
       cr.Fill ();
       Color co = GetColor (FileType, Permissions);
-      cr.Color = co;
       if (!recursiveInfo.Complete && Measurer.DependsOnTotals)
-        cr.Color = UnfinishedDirectoryColor;
+        co = UnfinishedDirectoryColor;
       if (LCName == "..")
-        cr.Color = ParentDirectoryColor;
+        co = ParentDirectoryColor;
+      if (IsDirectory) // fade out dir based on size on screen
+        co.A = Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
+        // Color is a struct, so changing the A doesn't propagate
+      cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
       cr.Fill ();
-      if (cr.Matrix.Yy > 0.5 || depth < 2) DrawTitle (cr, depth);
+      co.A = 1.0;
+      cr.Color = co;
+      if (cr.Matrix.Yy > 0.5 || depth < 2)
+        DrawTitle (cr, depth);
       if (IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = !firstFrame && childrenVisible;
@@ -519,8 +528,12 @@ public class DirStats
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
       cr.Translate(BoxWidth * 1.1, 0.02);
+      if (IsDirectory && rfs > 60)
+        cr.Translate(0.0, 0.46);
       double x = cr.Matrix.X0;
       double y = cr.Matrix.Y0;
+      if (IsDirectory && rfs > 60)
+        y -= 60;
       cr.IdentityMatrix ();
       cr.Translate (x, y);
       cr.NewPath ();
@@ -749,7 +762,7 @@ public class DirStats
           }
           position += 0.44 * d.GetScaledHeight ();
         }
-        retval = new Covering (ParentDir, scale, -position+((retval.Pan-0.5)/scale));
+        retval = new Covering (ParentDir, scale, -position);
       }
     cr.Restore ();
     return retval;
