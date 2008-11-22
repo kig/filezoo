@@ -57,8 +57,17 @@ public class DirStats
       _Prefixes["/usr/share"] = _Prefixes["/usr/local/share"] = "✧";
       _Prefixes["/var"] = "⚡";
       _Prefixes["/var/run"] = "⚡";
+      _Prefixes["/var/backups"] = "❄";
+      _Prefixes["/var/cache"] = "♨";
+      _Prefixes["/var/crash"] = "☹";
+      _Prefixes["/var/games"] = "☺";
+      _Prefixes["/var/lock"] = "⚔";
+      _Prefixes["/var/mail"] = "✉";
+      _Prefixes["/var/spool"] = "✈";
+      _Prefixes["/var/tmp"] = "⌚";
       _Prefixes["/var/lib"] = "✦";
       _Prefixes["/var/log"] = "✇";
+      _Prefixes["/var/www"] = "⚓";
       _Prefixes["/usr/games"] = _Prefixes["/usr/local/games"] = "☺";
       _Prefixes[Helpers.HomeDir] = "♜";
       _Prefixes[Helpers.HomeDir+"/bin"] = "⌬";
