@@ -127,6 +127,7 @@ class Filezoo : DrawingArea
     if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     SetDir (new DirStats (d));
+    FirstFrameOfDir = true;
     ResetZoom ();
     UpdateSort ();
     p.Time("BuildDirs");
@@ -144,7 +145,6 @@ class Filezoo : DrawingArea
       Watcher.Dispose ();
       Watcher = MakeWatcher (CurrentDirPath);
     }
-    FirstFrameOfDir = true;
   }
 
   /** FAST */
