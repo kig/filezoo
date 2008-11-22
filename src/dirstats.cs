@@ -220,6 +220,16 @@ public class DirStats
     }
   }
 
+  /** FAST */
+  public void ResetName () {
+    if (FullName == Helpers.RootDir)
+      Name = Helpers.RootDir;
+    else
+      Name = Helpers.Basename(FullName);
+    LCName = Name.ToLower ();
+    if (Prefixes.ContainsKey(FullName))
+      Name = Prefixes[FullName] + " " + Name;
+  }
 
   /* Subtitles */
 
@@ -505,10 +515,11 @@ public class DirStats
   /**
     Sets up child area transform for the DirStats.
     */
-  void ChildTransform (Context cr)
+  void ChildTransform (Context cr, Rectangle target)
   {
-    cr.Translate (0.1*BoxWidth, 0.48);
-    cr.Scale (0.9, 0.44);
+    double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
+    cr.Translate (fac*BoxWidth, 0.48);
+    cr.Scale (1.0-fac, 0.44);
   }
 
   /** BLOCKING */
@@ -578,7 +589,7 @@ public class DirStats
 
     @returns The total amount of subtree DirStats drawn.
     */
-  uint DrawChildren (Context cr, Rectangle targetBox, bool firstFrame, uint depth)
+  uint DrawChildren (Context cr, Rectangle target, bool firstFrame, uint depth)
   {
     bool layoutComplete = true;
     LayoutComplete = false;
@@ -588,11 +599,11 @@ public class DirStats
       return 0;
     }
     cr.Save ();
-      ChildTransform (cr);
+      ChildTransform (cr, target);
       uint c = 0;
       foreach (DirStats d in Entries) {
         layoutComplete &= UpdateChild (d);
-        c += d.Draw (cr, targetBox, firstFrame, depth+1);
+        c += d.Draw (cr, target, firstFrame, depth+1);
         double h = d.GetScaledHeight();
         cr.Translate (0.0, h);
       }
@@ -709,7 +720,7 @@ public class DirStats
   {
     DirAction retval = DirAction.None;
     cr.Save ();
-      ChildTransform (cr);
+      ChildTransform (cr, target);
       foreach (DirStats d in Entries) {
         retval = d.Click (cr, target, mouseX, mouseY, depth+1);
         if (retval != DirAction.None) break;
@@ -741,7 +752,7 @@ public class DirStats
 //       Console.WriteLine("tY: {0} tH: {1} y0: {2} yy: {3}", target.Y, target.Height, cr.Matrix.Y0, cr.Matrix.Yy);
       if (cr.Matrix.Y0 <= target.Y && cr.Matrix.Y0+cr.Matrix.Yy >= target.Y+target.Height) {
         retval = GetCovering (cr, target);
-        ChildTransform (cr);
+        ChildTransform (cr, target);
         foreach (DirStats d in Entries) {
           Covering c = d.FindCovering (cr, target, depth+1);
           if (c != null) {

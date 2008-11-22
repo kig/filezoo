@@ -126,17 +126,25 @@ class Filezoo : DrawingArea
     dirLatencyProfiler.Restart ();
     if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
+    SetDir (new DirStats (d));
+    ResetZoom ();
+    UpdateSort ();
+    p.Time("BuildDirs");
+  }
+
+  /** BLOCKING */
+  void SetDir (DirStats d)
+  {
+    dirLatencyProfiler.Restart ();
     CurrentDirPath = d.FullName;
     if (CurrentDir != null) CurrentDir.CancelTraversal ();
-    CurrentDir = new DirStats (d);
+    d.ResetName ();
+    CurrentDir = d;
     if (Watcher.Path != CurrentDirPath) {
       Watcher.Dispose ();
       Watcher = MakeWatcher (CurrentDirPath);
     }
     FirstFrameOfDir = true;
-    ResetZoom ();
-    UpdateSort ();
-    p.Time("BuildDirs");
   }
 
   /** FAST */
@@ -587,7 +595,7 @@ class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Covering c = CurrentDir.FindCovering(cr, r, 0);
       if (c.Directory != CurrentDir) {
-        BuildDirs(c.Directory.FullName);
+        SetDir(c.Directory);
         Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
       }
     cr.Restore ();

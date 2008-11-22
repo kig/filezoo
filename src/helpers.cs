@@ -300,6 +300,13 @@ public static class Helpers {
     return (p.Length == 0 ? RootDir : p);
   }
 
+  public static string Basename (string path) {
+    if (path == RootDir) return "";
+    char[] sa = {DirSepC};
+    string p = srev(srev(path).TrimEnd(sa).Split(sa, 2)[0]);
+    return p;
+  }
+
   static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");
   /** FAST */
   public static string EscapePath (string path) {
