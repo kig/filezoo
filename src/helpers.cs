@@ -8,6 +8,8 @@ using Cairo;
 
 public static class Helpers {
 
+  public static Profiler StartupProfiler = new Profiler ("STARTUP");
+
   public static char DirSepC = System.IO.Path.DirectorySeparatorChar;
   public static string DirSepS = System.IO.Path.DirectorySeparatorChar.ToString ();
   public static string RootDir = System.IO.Path.DirectorySeparatorChar.ToString ();
@@ -216,10 +218,7 @@ public static class Helpers {
   /** BLOCKING */
   public static DateTime LastModified (UnixFileSystemInfo f) {
     try {
-      if (f.LastWriteTime > f.LastStatusChangeTime)
-        return f.LastWriteTime;
-      else
-        return f.LastStatusChangeTime;
+      return f.LastWriteTime;
     } catch (System.InvalidOperationException) {
       return DateTime.Now;
     }

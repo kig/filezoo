@@ -72,6 +72,9 @@ class Filezoo : DrawingArea
   // Do we need to sort before drawing
   public bool SortUpdateRequested = true;
 
+  // Whether to quit after startup
+  public bool QuitAfterFirstFrame = false;
+
   // are we drawing the first frame of a new directory
   bool FirstFrameOfDir = true;
 
@@ -226,23 +229,19 @@ class Filezoo : DrawingArea
   /** BLOCKING */
   void RecreateLayout ()
   {
-    Profiler p = new Profiler ();
-
     if (SortUpdateRequested) {
       CurrentDir.Comparer = SortField.Comparer;
       CurrentDir.SortDirection = SortDirection;
-      CurrentDir.Sort ();
+      CurrentDir.Sorted = false;
       SortUpdateRequested = false;
       FirstFrameOfDir = true;
-      p.Time ("CurrentDir.Sort");
     }
 
     if (CurrentDir.Measurer != SizeField.Measurer) {
       FirstFrameOfDir = true;
       CurrentDir.Measurer = SizeField.Measurer;
+      CurrentDir.Layouted = false;
     }
-    CurrentDir.Relayout ();
-    p.Time ("CurrentDir.Relayout");
     if (!SizeField.Measurer.DependsOnTotals)
       CurrentDir.CancelTraversal ();
     LayoutUpdateRequested = !CurrentDir.Complete;
@@ -297,6 +296,12 @@ class Filezoo : DrawingArea
     }
     if (LayoutUpdateRequested || !CurrentDir.Complete || !CurrentDir.LayoutComplete)
       UpdateLayout();
+    if (Helpers.StartupProfiler.Watch.IsRunning) {
+      Helpers.StartupProfiler.Time ("Draw complete");
+      Helpers.StartupProfiler.Total ("Startup complete");
+      Helpers.StartupProfiler.Stop ();
+      if (QuitAfterFirstFrame) Application.Quit ();
+    }
   }
 
   /** FAST */
@@ -714,6 +719,10 @@ class Filezoo : DrawingArea
     {
       int w, h;
       e.Window.GetSize (out w, out h);
+      if (Helpers.StartupProfiler.Watch.IsRunning) {
+        Helpers.StartupProfiler.Time ("First expose");
+        Helpers.StartupProfiler.Total ("Pre-drawing startup");
+      }
       Draw (cr, (uint)w, (uint)h);
     }
     return true;

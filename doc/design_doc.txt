@@ -1,0 +1,4 @@
+Filezoo Design Document
+-----------------------
+
+The Filezoo application is a high-performance zoomable file manager.

@@ -52,7 +52,7 @@ public class CountMeasurer : IMeasurer {
   /** FAST */
   public double Measure (DirStats d) {
     double mul = (d.Name[0] == '.') ? 1.0 : 20.0;
-    return (d.IsDirectory ? Math.Max(1, d.GetRecursiveCount()) : 5.0) * mul;
+    return (d.IsDirectory ? Math.Max(1, d.GetRecursiveCount()) : 1.0) * mul;
   }
 }
 

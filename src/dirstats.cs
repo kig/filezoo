@@ -25,7 +25,7 @@ public class DirStats
   public static Color FifoColor = new Color (0.75,0,0.22);
   public static Color SocketColor = new Color (0.75,0,0.82);
   public static Color SymlinkColor = new Color (0,0.75,0.93);
-  public static Color ExecutableColor = new Color (0,0.75,0);
+  public static Color ExecutableColor = new Color (0.2,0.6,0);
   public static Color RegularFileColor = new Color (0,0,0);
   public static Color ParentDirectoryColor = new Color (0,0,1);
 
@@ -156,30 +156,44 @@ public class DirStats
     */
   public DirStats[] Entries {
     get {
-      lock (this) {
-        if (_Entries == null) {
-          Profiler p = new Profiler ("ENTRIES");
-          bool isRoot = (FullName == Helpers.RootDir);
-          DirStats[] e;
-          try {
-            UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
-            e = new DirStats[files.Length + (isRoot ? 0 : 1)];
-            for (int i=0; i<files.Length; i++)
-              e[i] = new DirStats (files[i]);
-          } catch (System.UnauthorizedAccessException) {
-            e = new DirStats[isRoot ? 0 : 1];
+      if (LastModified != recursiveInfo.LastModified) {
+        lock (this) {
+          if (LastModified != recursiveInfo.LastModified) {
+            LastModified = recursiveInfo.LastModified;
+            UnixFileSystemInfo f = new UnixDirectoryInfo(FullName);
+            UpdateInfo (f, DirCache.GetCacheEntry(FullName));
+            if (LastModified != recursiveInfo.LastModified)
+              DirCache.Invalidate(FullName);
+            Layouted = Sorted = LayoutComplete = false;
           }
-          if (!isRoot) {
-            ParentDir = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
-            string pr = " ";
-/*            if (Prefixes.ContainsKey(parent.FullName))
-              pr = " " + Prefixes[parent.FullName] + " ";*/
-            ParentDir.Name = Prefixes[".."]+pr+ParentDir.FullName;
-            ParentDir.LCName = "..";
-            e[e.Length-1] = ParentDir;
+        }
+      }
+      if (_Entries == null) {
+        lock (this) {
+          if (_Entries == null) {
+            Profiler p = new Profiler ("ENTRIES");
+            bool isRoot = (FullName == Helpers.RootDir);
+            DirStats[] e;
+            try {
+              UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
+              e = new DirStats[files.Length + (isRoot ? 0 : 1)];
+              for (int i=0; i<files.Length; i++)
+                e[i] = new DirStats (files[i]);
+            } catch (System.UnauthorizedAccessException) {
+              e = new DirStats[isRoot ? 0 : 1];
+            }
+            if (!isRoot) {
+              ParentDir = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
+              string pr = " ";
+  /*            if (Prefixes.ContainsKey(parent.FullName))
+                pr = " " + Prefixes[parent.FullName] + " ";*/
+              ParentDir.Name = Prefixes[".."]+pr+ParentDir.FullName;
+              ParentDir.LCName = "..";
+              e[e.Length-1] = ParentDir;
+            }
+            _Entries = e;
+            p.Time ("Got {0} Entries: {1}", _Entries.Length, FullName);
           }
-          _Entries = e;
-          p.Time ("Got {0} Entries", _Entries.Length);
         }
       }
       return _Entries;
@@ -188,7 +202,19 @@ public class DirStats
 
 
 
+  public static Dictionary<string,DirStats> DirStatsCache = new Dictionary<string,DirStats> ();
+
+
   /* Constructor */
+
+  public static DirStats Get (UnixFileSystemInfo f)
+  {
+    if (DirStatsCache.ContainsKey(f.FullName)) {
+      return DirStatsCache[f.FullName];
+    } else {
+      return DirStatsCache[f.FullName] = new DirStats(f);
+    }
+  }
 
   /** BLOCKING */
   /**
@@ -204,6 +230,8 @@ public class DirStats
     Scale = Height = 0.0;
     string[] split = Name.Split('.');
     Suffix = (Name[0] == '.') ? "" : split[split.Length-1];
+    if (Suffix == Name) Suffix = "";
+    Suffix = Suffix.ToLower ();
   }
 
   /** FAST */
@@ -242,6 +270,7 @@ public class DirStats
     Group = Helpers.GroupName(f);
     if (!IsDirectory) {
       recursiveInfo.InProgress = false;
+      recursiveInfo.LastModified = LastModified;
       recursiveInfo.Complete = true;
       recursiveInfo.TotalSize = Length;
       recursiveInfo.TotalCount = 1;
@@ -388,6 +417,8 @@ public class DirStats
 
 
   /* Relayout */
+  public bool Sorted = false;
+  public bool Layouted = false;
 
   /** BLOCKING */
   /**
@@ -400,7 +431,8 @@ public class DirStats
     Array.Sort (Entries, Comparer);
     if (SortDirection == SortingDirection.Descending)
       Array.Reverse (Entries);
-    MoveParentToFront() ;
+    MoveParentToFront();
+    Sorted = true;
     p.Time("Sorted {0} DirStats", Entries.Length);
   }
   void MoveParentToFront ()
@@ -445,6 +477,7 @@ public class DirStats
     foreach (DirStats f in Entries) {
       f.Scale = scale;
     }
+    Layouted = true;
     p.Time("Layouted {0} DirStats", Entries.Length);
   }
 
@@ -470,6 +503,8 @@ public class DirStats
 
   public double DefaultZoom = 2.0;
   public double DefaultPan = -0.43;
+
+  ImageSurface Thumb;
 
   /** BLOCKING */
   /**
@@ -503,6 +538,8 @@ public class DirStats
     if (!IsVisible(cr, target)) {
       return 0;
     }
+    if (depth == 0)
+      UpdateChild(this);
     double h = GetScaledHeight ();
     uint c = 1;
     cr.Save ();
@@ -516,16 +553,20 @@ public class DirStats
       if (LCName == "..")
         co = ParentDirectoryColor;
       if (IsDirectory) // fade out dir based on size on screen
-        co.A = Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
+        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
         // Color is a struct, so changing the A doesn't propagate
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
-      cr.Fill ();
+//       if (Suffix == "png") {
+//         DrawThumb(cr);
+//       } else {
+        cr.Fill ();
+//       }
       co.A = 1.0;
       cr.Color = co;
       if (cr.Matrix.Yy > 0.5 || depth < 2)
         DrawTitle (cr, depth);
-      if (IsDirectory) {
+      if (IsDirectory && (LCName != ".." || cr.Matrix.Yy > 200)) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = !firstFrame && childrenVisible;
         if (depth == 0) shouldDrawChildren = true;
@@ -537,6 +578,25 @@ public class DirStats
     cr.Restore ();
     if (depth == 0) FrameProfiler.Stop ();
     return c;
+  }
+
+  void DrawThumb (Context cr) {
+    if (Thumb == null)
+      Thumb = new ImageSurface (FullName);
+    cr.Save ();
+      using (Pattern p = new Pattern (Thumb)) {
+        double wr = cr.Matrix.Xx * BoxWidth;
+        double hr = cr.Matrix.Yy * 0.96;
+        double wscale = wr / Thumb.Width;
+        double hscale = hr / Thumb.Height;
+        double scale = Math.Max (wscale, hscale);
+        cr.Translate (       0.5*BoxWidth*(1 - (scale/wscale)),
+                      0.02 + 0.5*0.48*(1 - (scale/hscale)));
+        cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
+        cr.Pattern = p;
+        cr.Fill ();
+      }
+    cr.Restore ();
   }
 
   /** FAST */
@@ -630,9 +690,10 @@ public class DirStats
       ChildTransform (cr, target);
       uint c = 0;
       foreach (DirStats d in Entries) {
-        layoutComplete &= UpdateChild (d);
-        c += d.Draw (cr, target, firstFrame, depth+1);
         double h = d.GetScaledHeight();
+        if (d.IsDirectory && (h * cr.Matrix.Yy > 2))
+          layoutComplete &= UpdateChild (d);
+        c += d.Draw (cr, target, firstFrame, depth+1);
         cr.Translate (0.0, h);
       }
     cr.Restore ();
@@ -649,8 +710,8 @@ public class DirStats
     */
   bool UpdateChild (DirStats d)
   {
-    bool needRelayout = false;
-    bool needSort = false;
+    bool needRelayout = !d.Layouted;
+    bool needSort = !d.Sorted;
     if (d.Comparer != Comparer || d.SortDirection != SortDirection) {
       needSort = true;
       needRelayout = true;
@@ -658,6 +719,8 @@ public class DirStats
     if (d.Measurer != Measurer) needRelayout = true;
     if (Measurer.DependsOnTotals && !d.recursiveInfo.Complete)
       needRelayout = true;
+    d.Layouted &= !needRelayout;
+    d.Sorted &= !needSort;
     if (FrameProfiler.Watch.ElapsedMilliseconds > MaxTimePerFrame)
       return !(needSort || needRelayout);
     d.Comparer = Comparer;

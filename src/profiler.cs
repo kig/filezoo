@@ -10,6 +10,7 @@ public class Profiler
   public Print PrintProfile = Print.Global;
   public string Prefix;
   public double MinTime = 50.0;
+  public double TotalElapsed = 0.0;
 
   /** FAST */
   public Profiler () : this("") {}
@@ -21,10 +22,8 @@ public class Profiler
     Watch.Start ();
   }
 
-  /** FAST */
-  public void Time (string message)
+  void PrintTime (string message, double elapsedMilliseconds)
   {
-    double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
     if (
       (MinTime <= elapsedMilliseconds) &&
       ((PrintProfile == Print.Always) ||
@@ -33,6 +32,14 @@ public class Profiler
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
       Console.WriteLine (time.PadLeft(12) + Prefix + "  " + message);
     }
+  }
+
+  /** FAST */
+  public void Time (string message)
+  {
+    double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
+    TotalElapsed += elapsedMilliseconds;
+    PrintTime (message, elapsedMilliseconds);
     Restart ();
   }
 
@@ -42,6 +49,10 @@ public class Profiler
 
   public void Time (string format, object o1, object o2) {
     Time (String.Format(format, o1, o2));
+  }
+
+  public void Total (string message) {
+    PrintTime ("Total time for: "+message, TotalElapsed);
   }
 
   /** FAST */
