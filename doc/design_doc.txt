@@ -63,3 +63,43 @@ Clean conceptual models aside, this is the overview of the current program:
     - handles all them events and redraws
     - sets up the zoom and pan, translates and scales accordingly before drawing
       the DirStats
+
+
+The road to a better design?
+
+  * FSCache -- filesystem model
+    - store files and directories
+    - store measurement info and sorted layouts
+    - do async traversal
+    - do async extra info fetches (thumbnails)
+    - fast lock-free read access
+    - manage watchers and invalidation
+
+    Implement by moving all FS-touching stuff, sorting and measuring from
+    DirStats to DirCache.
+
+  * FSDraw -- renderer
+    - fetch data from FSCache and draw it to screen
+    - provide wanted draw depth information to UI
+    - provide click target information to UI
+
+    Implement by turning DirStats into a static class and splitting the drawing
+    process into a gathering pass and a drawing pass. The gathering pass is run
+    at UI action time and tells what the renderer would like to draw. The
+    drawing pass is independent and draws whatever info there is in the FSCache.
+
+    So there is a rendering traversal thread that does an explicit traversal of
+    the rendered part of the filesystem, and a drawing thread that draws the
+    current results of the traversal thread.
+
+  * Filezoo -- user interface, controller
+    - all click action logic here
+    - guide traversal based on user actions
+    - call renderer when needed (expose, rendering traversal in progress)
+    - set up renderer drawing area transform
+
+  * Main -- init, finalize
+    - load/save config and session data, parse command line options
+      - directory emblem patterns
+      - directory view settings
+
