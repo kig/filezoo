@@ -14,6 +14,9 @@ public class FSEntry
   public IMeasurer Measurer;
   public IComparer<FSEntry> Comparer;
   public SortingDirection SortDirection;
+  public DateTime LastMeasure;
+  public DateTime LastSort;
+  public DateTime LastChange;
 
   public string Name;
   public string LCName;

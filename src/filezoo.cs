@@ -9,6 +9,9 @@ using Mono.Unix;
 
 class Filezoo : DrawingArea
 {
+  // Filename Unicode icons
+  public Dictionary<string, string> Prefixes = null;
+
   // current directory style
   public double BreadcrumbFontSize = 12;
   public double BreadcrumbMarginTop = 6;
@@ -98,6 +101,14 @@ class Filezoo : DrawingArea
   // empty surface for PreDraw context.
   ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
 
+
+  // modification monitor
+  DateTime LastRedraw = DateTime.Now;
+
+  bool Active = true;
+
+  bool PreDrawComplete = true;
+
   /* Constructor */
 
   /** BLOCKING - startup dir latency */
@@ -109,12 +120,26 @@ class Filezoo : DrawingArea
 
     BuildDirs (dirname);
 
+    GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
+
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
       | Gdk.EventMask.ButtonReleaseMask
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
     ));
+  }
+
+  bool CheckUpdates ()
+  {
+    if (LastRedraw != FSCache.LastChange) {
+      LastRedraw = FSCache.LastChange;
+      PreDraw ();
+      QueueDraw ();
+    } else if (!PreDrawComplete) {
+      QueueDraw ();
+    }
+    return Active;
   }
 
 
@@ -241,7 +266,7 @@ class Filezoo : DrawingArea
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = FSDraw.Draw(CurrentDirEntry, cr, targetBox);
+      uint c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }

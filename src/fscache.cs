@@ -56,6 +56,8 @@ public static class FSCache
   public static IComparer<FSEntry> Comparer;
   public static SortingDirection SortDirection;
 
+  public static DateTime LastChange = DateTime.Now;
+
   static bool TraversalCancelled = false;
   static long TraversalCounter = 0;
   public static long OptimalTraverseThreads = 4;
@@ -148,12 +150,14 @@ public static class FSCache
   /** ASYNC */
   public static void SortEntries (FSEntry f)
   { lock (Cache) {
-    if (f.Comparer != Comparer || f.SortDirection != SortDirection) {
+    if (f.Comparer != Comparer || f.SortDirection != SortDirection
+                               || f.LastSort != f.LastChange) {
       f.Comparer = Comparer;
       f.SortDirection = SortDirection;
       f.Entries.Sort(Comparer);
       if (SortDirection == SortingDirection.Descending)
         f.Entries.Reverse();
+      f.LastSort = f.LastChange;
     }
   } }
 
@@ -161,7 +165,8 @@ public static class FSCache
   public static void MeasureEntries (FSEntry f)
   { lock (Cache) {
     if (!f.IsDirectory) return;
-    if (f.Measurer == Measurer) return;
+    if (f.Measurer == Measurer && f.LastMeasure == f.LastChange)
+      return;
     f.Measurer = Measurer;
     double totalHeight = 0.0;
     foreach (FSEntry e in f.Entries) {
@@ -172,6 +177,7 @@ public static class FSCache
     foreach (FSEntry e in f.Entries) {
       e.Scale = scale;
     }
+    f.LastMeasure = f.LastChange;
   } }
 
   /** BLOCKING */
@@ -200,9 +206,11 @@ public static class FSCache
     FSEntry d = Get (path);
     d.SubTreeCount += count;
     d.SubTreeSize += size;
+    d.LastChange = LastChange = DateTime.Now;
     foreach (FSEntry a in GetAncestors (path)) {
       a.SubTreeCount += count;
       a.SubTreeSize += size;
+      a.LastChange = LastChange;
     }
   } }
 
@@ -211,6 +219,7 @@ public static class FSCache
   { lock (Cache) {
     FSEntry d = Get (path);
     d.Complete = true;
+    d.LastChange = LastChange = DateTime.Now;
     if (path != Helpers.RootDir) {
       string p = Helpers.Dirname (path);
       if (p.Length > 0 && AllChildrenComplete (p))
@@ -223,6 +232,7 @@ public static class FSCache
   { lock (Cache) {
     FSEntry d = Get (path);
     d.Complete = false;
+    d.LastChange = LastChange = DateTime.Now;
     if (path != Helpers.RootDir) {
       string p = Helpers.Dirname (path);
       if (p.Length > 0)
@@ -314,8 +324,8 @@ public static class FSCache
   /** FAST */
   static void WatcherChanged (object source, FileSystemEventArgs e)
   { lock (Cache) {
-      Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
-      Invalidate (e.FullPath);
+    Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+    Invalidate (e.FullPath);
   } }
 
   /** FAST */

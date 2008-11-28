@@ -178,10 +178,12 @@ public static class FSDraw
     @param firstFrame Whether this frame should be drawn as fast as possible.
     @returns The number of files instances drawn.
   */
-  public static uint Draw (FSEntry d, Context cr, Rectangle target) {
-    return Draw (d, cr, target, 0);
+  public static uint Draw
+  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target) {
+    return Draw (d, prefixes, cr, target, 0);
   }
-  public static uint Draw (FSEntry d, Context cr, Rectangle target, uint depth)
+  public static uint Draw
+  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
     if (depth == 0) {
       FrameProfiler.Restart ();
@@ -211,12 +213,12 @@ public static class FSDraw
       co.A = 1.0;
       cr.Color = co;
       if (cr.Matrix.Yy > 0.5 || depth < 2)
-        DrawTitle (d, cr, depth);
+        DrawTitle (d, prefixes, cr, depth);
       if (d.IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
         if (shouldDrawChildren) {
-          c += DrawChildren(d, cr, target, depth);
+          c += DrawChildren(d, prefixes, cr, target, depth);
         }
       }
     cr.Restore ();
@@ -267,7 +269,8 @@ public static class FSDraw
 
     If the FSEntry is very small, draws a rectangle instead of text for speed.
     */
-  static void DrawTitle (FSEntry d, Context cr, uint depth)
+  static void DrawTitle
+  (FSEntry d, Dictionary<string, string> prefixes, Context cr, uint depth)
   {
     double h = cr.Matrix.Yy;
     double rfs = GetFontSize(d, h);
@@ -283,11 +286,14 @@ public static class FSDraw
       cr.IdentityMatrix ();
       cr.Translate (x, y);
       cr.NewPath ();
+      string name = d.Name;
+      if (prefixes != null && prefixes.ContainsKey(d.FullName))
+        name = prefixes[d.FullName] + " " + name;
       if (fs > 4) {
         if (depth == 0)
           cr.Translate (0, -fs*0.5);
         cr.MoveTo (0, -fs*0.2);
-        Helpers.DrawText (cr, fs, d.Name);
+        Helpers.DrawText (cr, fs, name);
         cr.RelMoveTo(0, fs*0.35);
         Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle (d));
 
@@ -304,9 +310,9 @@ public static class FSDraw
         }
       } else if (fs > 1) {
         cr.MoveTo (0, fs*0.1);
-        Helpers.DrawText (cr, fs, d.Name + "  " + GetSubTitle (d));
+        Helpers.DrawText (cr, fs, name + "  " + GetSubTitle (d));
       } else {
-        cr.Rectangle (0.0, 0.0, fs / 2 * (d.Name.Length+15), fs/3);
+        cr.Rectangle (0.0, 0.0, fs / 2 * (name.Length+15), fs/3);
         cr.Fill ();
       }
     cr.Restore ();
@@ -321,14 +327,15 @@ public static class FSDraw
 
     @returns The total amount of subtree files drawn.
     */
-  static uint DrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
+  static uint DrawChildren
+  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
     cr.Save ();
       ChildTransform (d, cr, target);
       uint c = 0;
       foreach (FSEntry child in d.Entries) {
         double h = GetScaledHeight(child);
-        c += Draw (child, cr, target, depth+1);
+        c += Draw (child, prefixes, cr, target, depth+1);
         cr.Translate (0.0, h);
       }
     cr.Restore ();
