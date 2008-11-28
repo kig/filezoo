@@ -274,10 +274,15 @@ class Filezoo : DrawingArea
   void DrawCurrentDir (Context cr, Rectangle targetBox)
   {
     Profiler p = new Profiler ();
+    uint c;
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
+      lock (FSCache.Cache) {
+        FSCache.SortEntries(CurrentDirEntry);
+        FSCache.MeasureEntries(CurrentDirEntry);
+        c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
+      }
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }

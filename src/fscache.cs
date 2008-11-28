@@ -49,8 +49,8 @@ using Cairo;
   */
 public static class FSCache
 {
-  static Dictionary<string,FSEntry> Cache = new Dictionary<string,FSEntry> ();
-  static FileSystemWatcher Watcher;
+  public static Dictionary<string,FSEntry> Cache = new Dictionary<string,FSEntry> ();
+  public static FileSystemWatcher Watcher;
 
   public static IMeasurer Measurer;
   public static IComparer<FSEntry> Comparer;
