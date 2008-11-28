@@ -3,34 +3,34 @@ using System.Collections.Generic;
 
 class SortHandler {
   public string Name;
-  public IComparer<DirStats> Comparer;
-  public SortHandler (string name, IComparer<DirStats> comparer) {
+  public IComparer<FSEntry> Comparer;
+  public SortHandler (string name, IComparer<FSEntry> comparer) {
     Name = name;
     Comparer = comparer;
   }
 }
 
-public class NullComparer : IComparer<DirStats> {
+public class NullComparer : IComparer<FSEntry> {
   /** UNIMPORTANT */
-  int IComparer<DirStats>.Compare (DirStats a, DirStats b) { return 0; }
+  int IComparer<FSEntry>.Compare (FSEntry a, FSEntry b) { return 0; }
 }
 
-public class SizeComparer : IComparer<DirStats> {
+public class SizeComparer : IComparer<FSEntry> {
   /** BLOCKING */
-  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
+  int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    long rv = a.Length - b.Length;
+    long rv = a.Size - b.Size;
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv > 0 ? 1 : (rv < 0 ? -1 : 0);
   }
 }
 
-public class NameComparer : IComparer<DirStats> {
+public class NameComparer : IComparer<FSEntry> {
   /** BLOCKING */
-  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
+  int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
@@ -39,20 +39,9 @@ public class NameComparer : IComparer<DirStats> {
   }
 }
 
-public class FSNameComparer : IComparer<FSEntry> {
+public class DateComparer : IComparer<FSEntry> {
   /** BLOCKING */
   int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
-    if (a.IsDirectory != b.IsDirectory) {
-      if (a.IsDirectory) return -1;
-      if (b.IsDirectory) return 1;
-    }
-    return String.CompareOrdinal(a.Name.ToLower(), b.Name.ToLower());
-  }
-}
-
-public class DateComparer : IComparer<DirStats> {
-  /** BLOCKING */
-  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
@@ -63,9 +52,9 @@ public class DateComparer : IComparer<DirStats> {
   }
 }
 
-public class TypeComparer : IComparer<DirStats> {
+public class TypeComparer : IComparer<FSEntry> {
   /** BLOCKING */
-  int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
+  int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;

@@ -285,7 +285,7 @@ class Filezoo : DrawingArea
   /** FAST */
   void DrawClear (Context cr, uint width, uint height)
   {
-    cr.Color = DirStats.BackgroundColor;
+    cr.Color = FSDraw.BackgroundColor;
     cr.Rectangle (0,0, width, height);
     cr.Fill ();
   }
@@ -319,7 +319,7 @@ class Filezoo : DrawingArea
   void DrawBreadcrumb (Context cr, uint width)
   {
     TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontSize, CurrentDirPath);
-    cr.Color = DirStats.DirectoryColor;
+    cr.Color = FSDraw.DirectoryColor;
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.Save ();
       double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;

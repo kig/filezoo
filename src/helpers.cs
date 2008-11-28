@@ -306,6 +306,16 @@ public static class Helpers {
     return p;
   }
 
+  public static string Extname (string path) {
+    if (path == RootDir) return "";
+    string bn = Basename(path);
+    if (bn[0] == '.') return "";
+    char[] sa = {'.'};
+    string p = srev(srev(path).TrimEnd(sa).Split(sa, 2)[0]);
+    if (p == bn) return "";
+    return p;
+  }
+
   static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");
   /** FAST */
   public static string EscapePath (string path) {

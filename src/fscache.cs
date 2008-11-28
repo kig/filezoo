@@ -9,7 +9,7 @@ public static class FSCache
   static Dictionary<string,FSEntry> Cache = new Dictionary<string,FSEntry> ();
 
   public static IMeasurer Measurer;
-  public static IComparer<DirStats> Comparer;
+  public static IComparer<FSEntry> Comparer;
   public static SortingDirection SortDirection;
 
   public static FSEntry Get (string path)
@@ -52,7 +52,7 @@ public static class FSCache
     if (f.Comparer != Comparer || f.SortDirection != SortDirection) {
       f.Comparer = Comparer;
       f.SortDirection = SortDirection;
-      f.Entries.Sort(new FSNameComparer ());
+      f.Entries.Sort(Comparer);
       if (SortDirection == SortingDirection.Descending)
         f.Entries.Reverse();
     }
@@ -65,7 +65,7 @@ public static class FSCache
     f.Measurer = Measurer;
     double totalHeight = 0.0;
     foreach (FSEntry e in f.Entries) {
-      e.Height = 1.0; // Measurer.Measure(f);
+      e.Height = Measurer.Measure(e);
       totalHeight += e.Height;
     }
     double scale = 1.0 / totalHeight;
@@ -84,10 +84,12 @@ public class FSEntry
   public List<FSEntry> Entries = new List<FSEntry> ();
 
   public IMeasurer Measurer;
-  public IComparer<DirStats> Comparer;
+  public IComparer<FSEntry> Comparer;
   public SortingDirection SortDirection;
 
   public string Name;
+  public string LCName;
+  public string Suffix;
   public string FullName;
 
   public string Owner;
@@ -124,6 +126,7 @@ public class FSEntry
   {
     FullName = u.FullName;
     Name = u.Name;
+    LCName = Name.ToLower ();
 
     Owner = Helpers.OwnerName(u);
     Group = Helpers.GroupName(u);
@@ -133,6 +136,8 @@ public class FSEntry
     FileType = Helpers.FileType(u);
 
     IsDirectory = FileType == FileTypes.Directory;
+
+    Suffix = IsDirectory ? "" : Helpers.Extname(Name).ToLower();
 
     Count = IsDirectory ? 0 : 1;
     Size = IsDirectory ? 0 : Helpers.FileSize(u);
