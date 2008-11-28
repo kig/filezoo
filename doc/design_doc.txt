@@ -22,84 +22,41 @@ The dataflow between these parts is:
 
 Clean conceptual models aside, this is the overview of the current program:
 
-  * DirCache -- the filesystem [recursive traversal] model
-    - thread-safe directories-only model of the filesystem
+  * FSCache -- the filesystem model
+    - thread-safe model of the filesystem
+    - stores measurement info and sorted layouts
+    - fast lock-free read access
+    - manages file system watcher and invalidation
     - does multi-threaded recursive traversal with in-progress updates through
       shared object references
-    - all edits to the model are serialized through the DirCache static class
+    - all edits to the model are serialized through the FSCache static class
     - uses paths as keys to the model
     - can be told to start a recursive traversal of a path
     - can be told to stop all traversals in progress
     - can be told to invalidate a path's cache entry
 
-  * DirStats -- the filesystem [drawing and navigation] model and renderer part
-    - a model of a filesystem path
-    - draws itself on a Cairo context
-    - draws its children too, if there are any and if they should be visible
-    - creates its list of child DirStats dynamically when needed
-      - uses GetDirectoryEntries
-      - happens in the rendering loop (ARGH BAD)
-    - stats the related path on creation
-      - happens in the rendering loop (ARGH DOUBLE-BAD)
-    - sorts and resizes its children before drawing them
-      - happens in the rendering loop (ARGH TRIPLE-BAD)
-    - handles clicks to itself in the same recursive drawing manner
-      - returns an action object based on click target size and type
-        (should rather return the target itself, along with its size)
-    - requests filesystem traversal based on whether its measurer uses totals
-      (a measurer measures how large the DirStats should be drawn in relation
-      to its siblings)
-    - the messiest class of them all
+  * FSDraw -- the filesystem renderer part
+    - reads data from FSCache and draws it to screen recursively
+    - does draw area bounded traversal (PreDraw) to build the draw model
+      asynchronously, the renderer draws only parts that are set ready to draw
+      by the traversal thread
+    - provides click target information to the UI
+    - provides zoom navigation information to the UI
 
   * Filezoo -- the user interface and renderer, a Gtk DrawingArea
-    - sets up the DirStats root model for the current directory
-    - cancels traversals on changing current directory
-    - sets up a watcher to watch changes to the current directory, and informs
-      DirCache about them at the start of a drawing frame (not too hot an idea
-      as invalidation needs to acquire a lock to the cache _and_ does filesystem
-      operations)
+    - gets the root model for the current directory
+    - starts PreDraw on user actions and on FSCache changes
+    - redraws screen using a timer (redraw if PreDraw in progress or PreDraw
+      completed and not yet drawn.)
+    - tells FSCache to set up a watcher to watch changes to the current
+      directory
     - draws the toolbars
     - handles executing click actions
-    - handles all them events and redraws
+    - handles UI events
     - sets up the zoom and pan, translates and scales accordingly before drawing
-      the DirStats
-
-
-The road to a better design?
-
-  * FSCache -- filesystem model
-    - store files and directories
-    - store measurement info and sorted layouts
-    - do async traversal
-    - do async extra info fetches (thumbnails)
-    - fast lock-free read access
-    - manage watchers and invalidation
-
-    Implement by moving all FS-touching stuff, sorting and measuring from
-    DirStats to DirCache.
-
-  * FSDraw -- renderer
-    - fetch data from FSCache and draw it to screen
-    - provide wanted draw depth information to UI
-    - provide click target information to UI
-
-    Implement by turning DirStats into a static class and splitting the drawing
-    process into a gathering pass and a drawing pass. The gathering pass is run
-    at UI action time and tells what the renderer would like to draw. The
-    drawing pass is independent and draws whatever info there is in the FSCache.
-
-    So there is a rendering traversal thread that does an explicit traversal of
-    the rendered part of the filesystem, and a drawing thread that draws the
-    current results of the traversal thread.
-
-  * Filezoo -- user interface, controller
-    - all click action logic here
-    - guide traversal based on user actions
-    - call renderer when needed (expose, rendering traversal in progress)
-    - set up renderer drawing area transform
 
   * Main -- init, finalize
-    - load/save config and session data, parse command line options
+    - sets up config and session data [, parses command line options]
       - directory emblem patterns
-      - directory view settings
+      [- directory view settings, some day]
 
