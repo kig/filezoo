@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using Gtk;
@@ -64,7 +65,7 @@ class Filezoo : DrawingArea
 
   // current directory
   private string CurrentDirPath = null;
-  private DirStats CurrentDir = null;
+  private FSEntry CurrentDirEntry;
 
   // Do we need to relayout before drawing
   public bool LayoutUpdateRequested = true;
@@ -84,6 +85,9 @@ class Filezoo : DrawingArea
   double dragStartY = 0.0;
   double dragX = 0.0;
   double dragY = 0.0;
+
+  uint Width = 1;
+  uint Height = 1;
 
   // font size state variable
   double FontSize;
@@ -129,25 +133,18 @@ class Filezoo : DrawingArea
     dirLatencyProfiler.Restart ();
     if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
-    SetDir (new DirStats (d));
-    FirstFrameOfDir = true;
-    ResetZoom ();
-    UpdateSort ();
-    p.Time("BuildDirs");
-  }
-
-  /** BLOCKING */
-  void SetDir (DirStats d)
-  {
-    dirLatencyProfiler.Restart ();
     CurrentDirPath = d.FullName;
-    if (CurrentDir != null) CurrentDir.CancelTraversal ();
-    d.ResetName ();
-    CurrentDir = d;
+    dirLatencyProfiler.Restart ();
     if (Watcher.Path != CurrentDirPath) {
       Watcher.Dispose ();
       Watcher = MakeWatcher (CurrentDirPath);
     }
+    CurrentDirEntry = FSCache.Get (CurrentDirPath);
+    FSCache.FilePass (CurrentDirEntry);
+    FirstFrameOfDir = true;
+    ResetZoom ();
+    UpdateLayout ();
+    p.Time("BuildDirs");
   }
 
   /** FAST */
@@ -215,36 +212,29 @@ class Filezoo : DrawingArea
   /** FAST */
   void UpdateLayout ()
   {
-    LayoutUpdateRequested = true;
     QueueDraw ();
   }
 
-  /** FAST */
-  void UpdateSort ()
+  ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
+
+  void PreDraw ()
   {
-    SortUpdateRequested = true;
-    UpdateLayout ();
+    FSCache.Measurer = SizeField.Measurer;
+    FSCache.SortDirection = SortDirection;
+    FSCache.Comparer = SortField.Comparer;
+    using (Context cr = new Context (PreDrawSurface)) {
+      cr.IdentityMatrix ();
+      Rectangle target = Transform (cr, Width, Height);
+      cr.Scale (1, Zoomer.Z);
+      cr.Translate (0.0, Zoomer.Y);
+      FSDraw.PreDraw (CurrentDirEntry, cr, target, 0);
+    }
   }
 
   /** BLOCKING */
   void RecreateLayout ()
   {
-    if (SortUpdateRequested) {
-      CurrentDir.Comparer = SortField.Comparer;
-      CurrentDir.SortDirection = SortDirection;
-      CurrentDir.Sorted = false;
-      SortUpdateRequested = false;
-      FirstFrameOfDir = true;
-    }
-
-    if (CurrentDir.Measurer != SizeField.Measurer) {
-      FirstFrameOfDir = true;
-      CurrentDir.Measurer = SizeField.Measurer;
-      CurrentDir.Layouted = false;
-    }
-    if (!SizeField.Measurer.DependsOnTotals)
-      CurrentDir.CancelTraversal ();
-    LayoutUpdateRequested = !CurrentDir.Complete;
+    PreDraw ();
   }
 
 
@@ -270,16 +260,7 @@ class Filezoo : DrawingArea
   /** BLOCKING */
   void Draw (Context cr, uint width, uint height)
   {
-    lock (this) {
-      if (Invalidated) {
-        foreach (string path in Invalids.Keys)
-          DirCache.Invalidate (path);
-        BuildDirs (CurrentDirPath);
-        Invalidated = false;
-        Invalids.Clear ();
-      }
-    }
-    if (LayoutUpdateRequested) RecreateLayout();
+    RecreateLayout ();
 
     cr.Save ();
       DrawClear (cr, width, height);
@@ -292,10 +273,7 @@ class Filezoo : DrawingArea
     if (FirstFrameOfDir) {
       dirLatencyProfiler.Time ("Directory latency");
       FirstFrameOfDir = false;
-      QueueDraw ();
     }
-    if (LayoutUpdateRequested || !CurrentDir.Complete || !CurrentDir.LayoutComplete)
-      UpdateLayout();
     if (Helpers.StartupProfiler.Watch.IsRunning) {
       Helpers.StartupProfiler.Time ("Draw complete");
       Helpers.StartupProfiler.Total ("Startup complete");
@@ -332,7 +310,7 @@ class Filezoo : DrawingArea
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      uint c = CurrentDir.Draw (cr, targetBox, FirstFrameOfDir);
+      uint c = FSDraw.Draw(CurrentDirEntry, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
@@ -440,25 +418,27 @@ class Filezoo : DrawingArea
     Rectangle box = Transform (cr, width, height);
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
-    DirAction action = CurrentDir.Click (cr, box, x, y);
-    switch (action.Type) {
-      case DirAction.Action.Open:
-        Console.WriteLine("Open {0}", action.Path.FullName);
-        Helpers.OpenFile(action.Path.FullName);
-        break;
-      case DirAction.Action.Navigate:
-        Console.WriteLine("Navigate {0}", action.Path.FullName);
-        SetDir (action.Path);
-        ResetZoom ();
-        UpdateLayout ();
-        break;
-      case DirAction.Action.ZoomIn:
-        Console.WriteLine("ZoomIn {0}x", 1 / action.Height);
+    ArrayList hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
+    foreach (ClickHit c in hits) {
+      if (c.Height < 20) {
+        Console.WriteLine("ZoomIn {0}x", 1 / c.Height);
         cr.Save ();
           cr.IdentityMatrix ();
-          ZoomBy(cr, width, height, x, y, 1 / action.Height);
+          ZoomBy(cr, width, height, x, y, 1 / c.Height);
         cr.Restore ();
         break;
+      } else {
+        if (c.Target.IsDirectory) {
+          Console.WriteLine("Navigate {0}", c.Target.FullName);
+          BuildDirs (c.Target.FullName);
+          ResetZoom ();
+          UpdateLayout ();
+        } else {
+          Console.WriteLine("Open {0}", c.Target.FullName);
+          Helpers.OpenFile(c.Target.FullName);
+        }
+        break;
+      }
     }
   }
 
@@ -519,7 +499,7 @@ class Filezoo : DrawingArea
           SortField = sf;
         }
         ResetZoom ();
-        UpdateSort ();
+        UpdateLayout ();
         return true;
       }
       advance += te.XAdvance;
@@ -533,7 +513,7 @@ class Filezoo : DrawingArea
                       SortingDirection.Descending :
                       SortingDirection.Ascending;
       ResetZoom ();
-      UpdateSort ();
+      UpdateLayout ();
       return true;
     }
     advance += te.XAdvance;
@@ -584,7 +564,7 @@ class Filezoo : DrawingArea
   /** FAST */
   void ResetZoom () {
     Zoomer.ResetZoom ();
-    Zoomer.SetZoom (0.0, CurrentDir.DefaultPan, CurrentDir.DefaultZoom);
+    Zoomer.SetZoom (0.0, FSDraw.DefaultPan, FSDraw.DefaultZoom);
   }
 
   /** FAST */
@@ -604,9 +584,9 @@ class Filezoo : DrawingArea
       Rectangle r = Transform (cr, width, height);
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      Covering c = CurrentDir.FindCovering(cr, r, 0);
-      if (c.Directory != CurrentDir) {
-        SetDir(c.Directory);
+      Covering c = FSDraw.FindCovering(CurrentDirEntry, cr, r, 0);
+      if (c.Directory.FullName != CurrentDirPath) {
+        BuildDirs(c.Directory.FullName);
         Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
       }
     cr.Restore ();
@@ -719,11 +699,15 @@ class Filezoo : DrawingArea
     {
       int w, h;
       e.Window.GetSize (out w, out h);
+      if (Width != (uint)w || Height != (uint)h) {
+        Width = (uint) w;
+        Height = (uint) h;
+      }
       if (Helpers.StartupProfiler.Watch.IsRunning) {
         Helpers.StartupProfiler.Time ("First expose");
         Helpers.StartupProfiler.Total ("Pre-drawing startup");
       }
-      Draw (cr, (uint)w, (uint)h);
+      Draw (cr, Width, Height);
     }
     return true;
   }

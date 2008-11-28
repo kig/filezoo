@@ -156,45 +156,29 @@ public class DirStats
     */
   public DirStats[] Entries {
     get {
-      if (LastModified != recursiveInfo.LastModified) {
-        lock (this) {
-          if (LastModified != recursiveInfo.LastModified) {
-            LastModified = recursiveInfo.LastModified;
-            UnixFileSystemInfo f = new UnixDirectoryInfo(FullName);
-            UpdateInfo (f, DirCache.GetCacheEntry(FullName));
-            if (LastModified != recursiveInfo.LastModified)
-              DirCache.Invalidate(FullName);
-            Layouted = Sorted = LayoutComplete = false;
-          }
-        }
-      }
       if (_Entries == null) {
-        lock (this) {
-          if (_Entries == null) {
-            Profiler p = new Profiler ("ENTRIES");
-            bool isRoot = (FullName == Helpers.RootDir);
-            DirStats[] e;
-            try {
-              UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
-              e = new DirStats[files.Length + (isRoot ? 0 : 1)];
-              for (int i=0; i<files.Length; i++)
-                e[i] = new DirStats (files[i]);
-            } catch (System.UnauthorizedAccessException) {
-              e = new DirStats[isRoot ? 0 : 1];
-            }
-            if (!isRoot) {
-              ParentDir = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
-              string pr = " ";
-  /*            if (Prefixes.ContainsKey(parent.FullName))
-                pr = " " + Prefixes[parent.FullName] + " ";*/
-              ParentDir.Name = Prefixes[".."]+pr+ParentDir.FullName;
-              ParentDir.LCName = "..";
-              e[e.Length-1] = ParentDir;
-            }
-            _Entries = e;
-            p.Time ("Got {0} Entries: {1}", _Entries.Length, FullName);
-          }
+        Profiler p = new Profiler ("ENTRIES");
+        bool isRoot = (FullName == Helpers.RootDir);
+        DirStats[] e;
+        try {
+          UnixFileSystemInfo[] files = Helpers.EntriesMaybe (FullName);
+          e = new DirStats[files.Length];
+          for (int i=0; i<files.Length; i++)
+            e[i] = new DirStats (files[i]);
+        } catch (System.UnauthorizedAccessException) {
+          e = new DirStats[0];
         }
+        if (!isRoot) {
+          ParentDir = new DirStats (new UnixDirectoryInfo(Helpers.Dirname(FullName)));
+          string pr = " ";
+          ParentDir.Name = Prefixes[".."]+pr+ParentDir.FullName;
+          ParentDir.LCName = "..";
+        /*
+          e[e.Length-1] = ParentDir;
+        */
+        }
+        _Entries = e;
+        p.Time ("Got {0} Entries: {1}", _Entries.Length, FullName);
       }
       return _Entries;
     }
@@ -301,19 +285,12 @@ public class DirStats
   {
     if (IsDirectory) {
       string extras = "";
-      if (
-        !recursiveInfo.Complete &&
-        !Measurer.DependsOnTotals &&
-        GetRecursiveCount() == 0 &&
-        GetRecursiveSize() == 0
-      ) {
-        if (_Entries != null) {
-          // entries sans parent dir
-          extras += String.Format("{0} entries", (_Entries.Length-1).ToString("N0"));
+      if (_Entries != null) {
+        extras = String.Format("{0} entries", _Entries.Length.ToString("N0"));
+        if ( Measurer.DependsOnTotals ) {
+          extras += String.Format(", {0} files", GetRecursiveCount().ToString("N0"));
+          extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
         }
-      } else {
-        extras += String.Format("{0} files", GetRecursiveCount().ToString("N0"));
-        extras += String.Format(", {0} total", Helpers.FormatSI(GetRecursiveSize(), "B"));
       }
       return extras;
     } else {
@@ -431,23 +408,8 @@ public class DirStats
     Array.Sort (Entries, Comparer);
     if (SortDirection == SortingDirection.Descending)
       Array.Reverse (Entries);
-    MoveParentToFront();
     Sorted = true;
     p.Time("Sorted {0} DirStats", Entries.Length);
-  }
-  void MoveParentToFront ()
-  {
-    if (FullName == Helpers.RootDir) return;
-    int idx;
-    DirStats[] e = Entries;
-    DirStats tmp;
-    for (idx=0; idx < e.Length; idx++)
-      if (e[idx] == ParentDir) break;
-    for (int i=idx; i > 0; i--) {
-      tmp = e[i-1];
-      e[i-1] = e[i];
-      e[i] = tmp;
-    }
   }
 
   /** BLOCKING */
@@ -463,15 +425,6 @@ public class DirStats
     foreach (DirStats f in Entries) {
       f.Height = Measurer.Measure(f);
       totalHeight += f.Height;
-    }
-    if (ParentDir != null) {
-      if (Entries.Length > 1) {
-        totalHeight -= ParentDir.Height;
-        ParentDir.Height = totalHeight / 32.0;
-        totalHeight += ParentDir.Height;
-      } else {
-        totalHeight += totalHeight * 32.0;
-      }
     }
     double scale = 1.0 / totalHeight;
     foreach (DirStats f in Entries) {
@@ -550,23 +503,16 @@ public class DirStats
       Color co = GetColor (FileType, Permissions);
       if (!recursiveInfo.Complete && Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
-      if (LCName == "..")
-        co = ParentDirectoryColor;
       if (IsDirectory) // fade out dir based on size on screen
         co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
-        // Color is a struct, so changing the A doesn't propagate
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
-//       if (Suffix == "png") {
-//         DrawThumb(cr);
-//       } else {
         cr.Fill ();
-//       }
       co.A = 1.0;
       cr.Color = co;
       if (cr.Matrix.Yy > 0.5 || depth < 2)
         DrawTitle (cr, depth);
-      if (IsDirectory && (LCName != ".." || cr.Matrix.Yy > 200)) {
+      if (IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = !firstFrame && childrenVisible;
         if (depth == 0) shouldDrawChildren = true;
@@ -578,25 +524,6 @@ public class DirStats
     cr.Restore ();
     if (depth == 0) FrameProfiler.Stop ();
     return c;
-  }
-
-  void DrawThumb (Context cr) {
-    if (Thumb == null)
-      Thumb = new ImageSurface (FullName);
-    cr.Save ();
-      using (Pattern p = new Pattern (Thumb)) {
-        double wr = cr.Matrix.Xx * BoxWidth;
-        double hr = cr.Matrix.Yy * 0.96;
-        double wscale = wr / Thumb.Width;
-        double hscale = hr / Thumb.Height;
-        double scale = Math.Max (wscale, hscale);
-        cr.Translate (       0.5*BoxWidth*(1 - (scale/wscale)),
-                      0.02 + 0.5*0.48*(1 - (scale/hscale)));
-        cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
-        cr.Pattern = p;
-        cr.Fill ();
-      }
-    cr.Restore ();
   }
 
   /** FAST */
@@ -834,13 +761,12 @@ public class DirStats
     */
   public Covering FindCovering (Context cr, Rectangle target, uint depth)
   {
-    Covering retval = (depth == 0 ? GetCovering(cr, target) : null);
+    Covering retval = depth == 0 ? GetCovering(cr, target) : null;
     if (!IsDirectory || !IsVisible(cr, target))
       return retval;
     double h = GetScaledHeight ();
     cr.Save ();
       cr.Scale (1, h);
-//       Console.WriteLine("tY: {0} tH: {1} y0: {2} yy: {3}", target.Y, target.Height, cr.Matrix.Y0, cr.Matrix.Yy);
       if (cr.Matrix.Y0 <= target.Y && cr.Matrix.Y0+cr.Matrix.Yy >= target.Y+target.Height) {
         retval = GetCovering (cr, target);
         ChildTransform (cr, target);
@@ -866,20 +792,24 @@ public class DirStats
           i++;
           position += 0.44 * d.GetScaledHeight ();
         }
-        retval = new Covering (ParentDir, scale, -position);
+        retval = new Covering (ParentDir.ToFSEntry(), scale, -position);
       }
     cr.Restore ();
     return retval;
+  }
+
+  FSEntry ToFSEntry ()
+  {
+    FSEntry rv = new FSEntry (FullName);
+    return rv;
   }
 
   Covering GetCovering (Context cr, Rectangle target)
   {
     double z = cr.Matrix.Yy / target.Height;
     double pan = (cr.Matrix.Y0-target.Y) / (target.Height*z);
-//     Console.WriteLine("{0} {1}", pan, z);
-    return new Covering (this, z, pan);
+    return new Covering (this.ToFSEntry(), z, pan);
   }
-
 
 
   /* Directory traversal */
@@ -951,22 +881,4 @@ public class DirAction
 }
 
 
-public enum SortingDirection {
-  Ascending,
-  Descending
-}
-
-
-public class Covering
-{
-  public double Zoom;
-  public double Pan;
-  public DirStats Directory;
-  public Covering (DirStats d, double z, double p)
-  {
-    Directory = d;
-    Zoom = z;
-    Pan = p;
-  }
-}
 

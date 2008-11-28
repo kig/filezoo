@@ -39,6 +39,17 @@ public class NameComparer : IComparer<DirStats> {
   }
 }
 
+public class FSNameComparer : IComparer<FSEntry> {
+  /** BLOCKING */
+  int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
+    if (a.IsDirectory != b.IsDirectory) {
+      if (a.IsDirectory) return -1;
+      if (b.IsDirectory) return 1;
+    }
+    return String.CompareOrdinal(a.Name.ToLower(), b.Name.ToLower());
+  }
+}
+
 public class DateComparer : IComparer<DirStats> {
   /** BLOCKING */
   int IComparer<DirStats>.Compare ( DirStats a, DirStats b ) {
