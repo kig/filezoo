@@ -1,11 +1,11 @@
 Filezoo is a minimalistic filesystem browser that has view modes for visualizing
 the disk usage of files and directories both in terms of bytes and file count.
 
-Filezoo's development principles are visualization and blinding speed. Most
-directories open in under 100ms (== time from clicking the directory to first
-frame drawn) on my 2GHz computer.
+Filezoo's guiding principles are effective visualization and blinding speed.
+Most directories open in under 100ms (== time from clicking the directory to
+first frame drawn) on my 2GHz computer.
 
-Filezoo uses Cairo for the drawing and Gtk# for the windows.
+Filezoo is written using Gtk# and Cairo.
 
 Requirements:
   mono
