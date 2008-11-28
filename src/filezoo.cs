@@ -164,7 +164,7 @@ class Filezoo : DrawingArea
 
   /* Layout */
 
-  /** FAST */
+  /** BLOCKING */
   void UpdateLayout ()
   {
     PreDraw ();
@@ -173,6 +173,7 @@ class Filezoo : DrawingArea
   System.Object PreDrawLock = new System.Object ();
   System.Object PreDrawProgressLock = new System.Object ();
   bool PreDrawInProgress = false;
+  /** BLOCKING */
   void PreDraw ()
   {
     lock (PreDrawLock) {
@@ -189,6 +190,7 @@ class Filezoo : DrawingArea
     }
   }
 
+  /** ASYNC */
   void PreDrawCallback (object state)
   {
     lock (PreDrawProgressLock) {

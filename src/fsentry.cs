@@ -55,7 +55,12 @@ public class FSEntry
 
   public FSEntry (string path) : this (new UnixDirectoryInfo(path)) {}
 
-  public FSEntry (UnixDirectoryInfo u)
+  public FSEntry (UnixFileSystemInfo u)
+  {
+    Setup(u);
+  }
+
+  public void Setup (UnixFileSystemInfo u)
   {
     FullName = u.FullName;
     Name = u.Name;

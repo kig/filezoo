@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using System.Timers;
 using System.IO;
 using System;
 using Mono.Unix;
@@ -52,6 +53,8 @@ public static class FSCache
   public static Dictionary<string,FSEntry> Cache = new Dictionary<string,FSEntry> ();
   public static FileSystemWatcher Watcher;
 
+  static Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
+
   public static IMeasurer Measurer;
   public static IComparer<FSEntry> Comparer;
   public static SortingDirection SortDirection;
@@ -65,12 +68,20 @@ public static class FSCache
   static Object CancelLock = new Object ();
   static Object TCLock = new Object ();
 
+  static System.Timers.Timer InvalidsTimer = null;
+
   /** BLOCKING */
   public static void Watch (string path)
   { lock (Cache) {
     if (Watcher == null || Watcher.Path != path) {
       if (Watcher != null) Watcher.Dispose ();
       Watcher = MakeWatcher (path);
+      if (InvalidsTimer == null) {
+        InvalidsTimer = new System.Timers.Timer ();
+        InvalidsTimer.Elapsed += new ElapsedEventHandler(ProcessInvalids);
+        InvalidsTimer.Interval = 200;
+        InvalidsTimer.Enabled = true;
+      }
     }
   } }
 
@@ -193,7 +204,7 @@ public static class FSCache
   public static void Invalidate (string path)
   { lock (Cache) {
     if (Cache.ContainsKey(path)) {
-      if (Helpers.FileExists(path) && Helpers.IsDir(path)) {
+      if (Helpers.FileExists(path)) {
         Modified (path);
       } else {
         Deleted (path);
@@ -204,6 +215,20 @@ public static class FSCache
       return;
     }
   } }
+
+
+  public static void ProcessInvalids (object sender, ElapsedEventArgs e)
+  {
+    string[] paths;
+    lock (Invalids) {
+      if (Invalids.Keys.Count == 0) return;
+      paths = new string[Invalids.Keys.Count];
+      Invalids.Keys.CopyTo (paths, 0);
+      Invalids.Clear ();
+    }
+    foreach (string path in paths)
+      Invalidate (path);
+  }
 
 
 
@@ -319,12 +344,19 @@ public static class FSCache
     // redo path's file pass
     // enter new data to parent
     FSEntry d = Get (path);
-    d.FilePassDone = false;
-    bool oc = d.Complete;
-    FilePass (path);
-    if (d.Complete != oc) {
-      if (d.Complete) SetComplete(path);
-      else SetIncomplete(path);
+    if (d.IsDirectory) {
+      d.FilePassDone = false;
+      bool oc = d.Complete;
+      FilePass (path);
+      if (d.Complete != oc) {
+        if (d.Complete) SetComplete(path);
+        else SetIncomplete(path);
+      }
+    } else {
+      UnixFileInfo u = new UnixFileInfo (path);
+      long oldSize = d.Size;
+      d.Setup(u);
+      AddCountAndSize(d.ParentDir.FullName, 0, d.Size-oldSize);
     }
   } }
 
@@ -334,17 +366,17 @@ public static class FSCache
 
   /** FAST */
   static void WatcherChanged (object source, FileSystemEventArgs e)
-  { lock (Cache) {
-    Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
-    Invalidate (e.FullPath);
+  { lock (Invalids) {
+//     Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+    Invalids[e.FullPath] = true;
   } }
 
   /** FAST */
   static void WatcherRenamed (object source, RenamedEventArgs e)
-  { lock (Cache) {
-    Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
-    Invalidate (e.FullPath);
-    Invalidate (e.OldFullPath);
+  { lock (Invalids) {
+//     Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
+    Invalids[e.FullPath] = true;
+    Invalids[e.OldFullPath] = true;
   } }
 
   /** BLOCKING */
