@@ -178,7 +178,7 @@ public static class Helpers {
   /** BLOCKING */
   public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
     try { return Entries(dirname); }
-    catch (System.IO.FileNotFoundException) { return new UnixFileSystemInfo[0]; }
+    catch (Exception) { return new UnixFileSystemInfo[0]; }
   }
 
   /** BLOCKING */

@@ -92,15 +92,11 @@ class Filezoo : DrawingArea
   // font size state variable
   double FontSize;
 
-  // Current dir invalidated?
-  bool Invalidated = false;
-  Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
-
   // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ("----");
 
-  // FileSystemWatcher for watching the CurrentDirPath
-  FileSystemWatcher Watcher;
+  // empty surface for PreDraw context.
+  ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
 
   /* Constructor */
 
@@ -110,8 +106,6 @@ class Filezoo : DrawingArea
     SortField = SortFields[0];
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
-
-    Watcher = MakeWatcher (dirname);
 
     BuildDirs (dirname);
 
@@ -135,76 +129,14 @@ class Filezoo : DrawingArea
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     CurrentDirPath = d.FullName;
     dirLatencyProfiler.Restart ();
-    if (Watcher.Path != CurrentDirPath) {
-      Watcher.Dispose ();
-      Watcher = MakeWatcher (CurrentDirPath);
-    }
+    FSCache.Watch (CurrentDirPath);
     CurrentDirEntry = FSCache.Get (CurrentDirPath);
-    FSCache.FilePass (CurrentDirEntry);
+    FSCache.FilePass (CurrentDirPath);
     FirstFrameOfDir = true;
     ResetZoom ();
     UpdateLayout ();
     p.Time("BuildDirs");
   }
-
-  /** FAST */
-  void WatcherChanged (object source, FileSystemEventArgs e)
-  {
-    lock (this) {
-      Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
-      Invalidated = true;
-      Invalids[e.FullPath] = true;
-    }
-    UpdateLayout ();
-  }
-
-  /** FAST */
-  void WatcherRenamed (object source, RenamedEventArgs e)
-  {
-    lock (this) {
-      Console.WriteLine("Invalidating {0} and {1}: renamed to latter", e.FullPath, e.OldFullPath);
-      Invalidated = true;
-      Invalids[e.FullPath] = true;
-      Invalids[e.OldFullPath] = true;
-    }
-    UpdateLayout ();
-  }
-
-  /** BLOCKING */
-  /* Blows up on paths with non-UTF characters */
-  FileSystemWatcher MakeWatcher (string dirname)
-  {
-    FileSystemWatcher watcher = new FileSystemWatcher ();
-    watcher.IncludeSubdirectories = false;
-    watcher.NotifyFilter = (
-        NotifyFilters.LastWrite
-      | NotifyFilters.Size
-      | NotifyFilters.FileName
-      | NotifyFilters.DirectoryName
-      | NotifyFilters.CreationTime
-    );
-    try {
-      watcher.Path = dirname;
-    } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
-      Console.WriteLine("Here's the exception output: {0}", e);
-      return watcher;
-    }
-    watcher.Filter = "";
-    watcher.Changed += new FileSystemEventHandler (WatcherChanged);
-    watcher.Created += new FileSystemEventHandler (WatcherChanged);
-    watcher.Deleted += new FileSystemEventHandler (WatcherChanged);
-    watcher.Renamed += new RenamedEventHandler (WatcherRenamed);
-    try {
-      watcher.EnableRaisingEvents = true;
-    } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
-      Console.WriteLine("You should go and fix System.IO.Path.IsPathRooted.");
-      Console.WriteLine("Here's the exception output: {0}", e);
-    }
-    return watcher;
-  }
-
 
 
   /* Layout */
@@ -214,8 +146,6 @@ class Filezoo : DrawingArea
   {
     QueueDraw ();
   }
-
-  ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
 
   void PreDraw ()
   {
@@ -307,6 +237,7 @@ class Filezoo : DrawingArea
   void DrawCurrentDir (Context cr, Rectangle targetBox)
   {
     Profiler p = new Profiler ();
+    p.MinTime = 0;
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
@@ -418,13 +349,13 @@ class Filezoo : DrawingArea
     Rectangle box = Transform (cr, width, height);
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
-    ArrayList hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
+    List<ClickHit> hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
     foreach (ClickHit c in hits) {
       if (c.Height < 20) {
-        Console.WriteLine("ZoomIn {0}x", 1 / c.Height);
+        Console.WriteLine("ZoomIn {0}x", 20 / c.Height);
         cr.Save ();
           cr.IdentityMatrix ();
-          ZoomBy(cr, width, height, x, y, 1 / c.Height);
+          ZoomBy(cr, width, height, x, y, 20 / c.Height);
         cr.Restore ();
         break;
       } else {

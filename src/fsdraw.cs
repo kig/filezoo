@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections;
 using System.Diagnostics;
 using System.Threading;
 using System.IO;
@@ -48,7 +47,7 @@ public static class FSDraw
       // entries sans parent dir
       extras += String.Format("{0} entries", d.Count.ToString("N0"));
       if (d.TotalCount != 0) {
-        extras += String.Format("{0} files", d.TotalCount.ToString("N0"));
+        extras += String.Format(", {0} files", d.TotalCount.ToString("N0"));
         extras += String.Format(", {0} total", Helpers.FormatSI(d.TotalSize, "B"));
       }
       return extras;
@@ -362,7 +361,7 @@ public static class FSDraw
   {
     ChildTransform (d, cr, target);
     if (!d.FilePassDone)
-      FSCache.FilePass(d);
+      FSCache.FilePass(d.FullName);
     FSCache.SortEntries(d);
     FSCache.MeasureEntries(d);
     foreach (FSEntry ch in d.Entries) {
@@ -384,7 +383,7 @@ public static class FSDraw
   /**
     Click handles the click events directed at the FSEntry.
     It takes the Cairo Context cr, the clip Rectangle target and the mouse
-    device-space coordinates as its arguments, and returns an ArrayList of
+    device-space coordinates as its arguments, and returns an List<ClickHit> of
     ClickHit objects for the entries hit.
 
     @param d FSEntry to query.
@@ -392,19 +391,19 @@ public static class FSDraw
     @param target Target clip rectangle. See Draw for a better explanation.
     @param mouseX The X coordinate of the mouse pointer, X grows right from left.
     @param mouseY The Y coordinate of the mouse pointer, Y grows down from top.
-    @returns An ArrayList of the hit entries.
+    @returns A List<ClickHit> of the hit entries.
     */
-  public static ArrayList Click
+  public static List<ClickHit> Click
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY)
   { return Click (d, cr, target, mouseX, mouseY, 0); }
-  public static ArrayList Click
+  public static List<ClickHit> Click
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     if (depth > 0 && !IsVisible(d, cr, target)) {
-      return new ArrayList ();
+      return new List<ClickHit> ();
     }
     double h = depth == 0 ? 1 : GetScaledHeight (d);
-    ArrayList retval = new ArrayList ();
+    List<ClickHit> retval = new List<ClickHit> ();
     double advance = 0.0;
     cr.Save ();
       cr.Scale (1, h);
@@ -433,12 +432,12 @@ public static class FSDraw
     Passes the click check to the children of the FSEntry.
     Sets up the child area transform and calls Click on each child in d.Entries.
     Returns the first Click return value with one or more entries.
-    If nothing was hit, returns an empty ArrayList.
+    If nothing was hit, returns an empty List.
     */
-  static ArrayList ClickChildren
+  static List<ClickHit> ClickChildren
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
-    ArrayList retval = new ArrayList ();
+    List<ClickHit> retval = new List<ClickHit> ();
     cr.Save ();
       ChildTransform (d, cr, target);
       foreach (FSEntry child in d.Entries) {
