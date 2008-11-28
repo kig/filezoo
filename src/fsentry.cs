@@ -18,6 +18,8 @@ public class FSEntry
   public DateTime LastSort;
   public DateTime LastChange;
 
+  public bool ReadyToDraw = false;
+
   public string Name;
   public string LCName;
   public string Suffix;
@@ -76,6 +78,7 @@ public class FSEntry
     if (!IsDirectory) {
       Complete = true;
       FilePassDone = true;
+      ReadyToDraw = true;
     }
   }
 

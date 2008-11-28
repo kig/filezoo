@@ -150,14 +150,20 @@ public static class FSCache
   /** ASYNC */
   public static void SortEntries (FSEntry f)
   { lock (Cache) {
+    if (!f.IsDirectory) return;
     if (f.Comparer != Comparer || f.SortDirection != SortDirection
                                || f.LastSort != f.LastChange) {
       f.Comparer = Comparer;
       f.SortDirection = SortDirection;
-      f.Entries.Sort(Comparer);
-      if (SortDirection == SortingDirection.Descending)
-        f.Entries.Reverse();
+      lock (f) {
+        List<FSEntry> entries = new List<FSEntry> (f.Entries);
+        entries.Sort(Comparer);
+        if (SortDirection == SortingDirection.Descending)
+          entries.Reverse();
+        f.Entries = entries;
+      }
       f.LastSort = f.LastChange;
+      f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
     }
   } }
 
@@ -178,6 +184,9 @@ public static class FSCache
       e.Scale = scale;
     }
     f.LastMeasure = f.LastChange;
+    f.ReadyToDraw = ( f.Comparer == Comparer
+                      && f.SortDirection == SortDirection
+                      && f.LastSort == f.LastChange);
   } }
 
   /** BLOCKING */
@@ -250,7 +259,7 @@ public static class FSCache
   } }
 
   /** ASYNC */
-  static bool NeedFilePass (string path)
+  public static bool NeedFilePass (string path)
   { lock (Cache) {
     return !(Get(path).FilePassDone);
   } }
@@ -284,7 +293,9 @@ public static class FSCache
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
     DeleteChildren (path);
-    d.ParentDir.Entries.Remove(d);
+    List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
+    e.Remove(d);
+    d.ParentDir.Entries = e;
     AddCountAndSize (d.ParentDir.FullName, -d.TotalCount, -d.TotalSize);
     if (!d.Complete && AllChildrenComplete(d.ParentDir.FullName))
       SetComplete (d.ParentDir.FullName);

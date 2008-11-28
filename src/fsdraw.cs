@@ -217,7 +217,7 @@ public static class FSDraw
       if (d.IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
-        if (shouldDrawChildren) {
+        if (shouldDrawChildren && d.ReadyToDraw) {
           c += DrawChildren(d, prefixes, cr, target, depth);
         }
       }
@@ -345,36 +345,59 @@ public static class FSDraw
 
   /* Visibility */
 
-  /** ASYNC */
-  public static void PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
+  static System.Object PreDrawCancelLock = new System.Object ();
+  static System.Object PreDrawLock = new System.Object ();
+  static int PreDrawInProgress = 0;
+  static bool PreDrawCancelled = false;
+
+  public static void CancelPreDraw ()
   {
-    if (depth > 0 && !IsVisible(d, cr, target)) return;
-    double h = depth == 0 ? 1 : GetScaledHeight (d);
-    cr.Save ();
-      cr.Scale (1, h);
-      RequestThumbnail (d);
-      if (d.IsDirectory) {
-        bool childrenVisible = cr.Matrix.Yy > 2;
-        bool shouldDrawChildren = (depth == 0 || childrenVisible);
-        if (shouldDrawChildren) {
-          PreDrawChildren(d, cr, target, depth);
-        }
-      }
-    cr.Restore ();
+    lock (PreDrawCancelLock) {
+      PreDrawCancelled = true;
+      while (PreDrawInProgress != 0)
+        Thread.Sleep (5);
+      PreDrawCancelled = false;
+    }
   }
 
   /** ASYNC */
-  static void PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
+  public static bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
+  {
+    if (depth > 0 && !IsVisible(d, cr, target)) return true;
+    lock (PreDrawLock) PreDrawInProgress ++;
+    bool rv = true;
+    double h = depth == 0 ? 1 : GetScaledHeight (d);
+    if (!PreDrawCancelled) {
+      RequestThumbnail (d);
+      cr.Save ();
+        cr.Scale (1, h);
+        if (d.IsDirectory) {
+          bool childrenVisible = cr.Matrix.Yy > 2;
+          bool shouldDrawChildren = (depth == 0 || childrenVisible);
+          if (shouldDrawChildren)
+            rv &= PreDrawChildren(d, cr, target, depth);
+        }
+      cr.Restore ();
+    } else { rv = false; }
+    lock (PreDrawLock) PreDrawInProgress --;
+    return rv;
+  }
+
+  /** ASYNC */
+  static bool PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     ChildTransform (d, cr, target);
     if (!d.FilePassDone)
       FSCache.FilePass(d.FullName);
     FSCache.SortEntries(d);
     FSCache.MeasureEntries(d);
+    if (PreDrawCancelled) return false;
     foreach (FSEntry ch in d.Entries) {
       PreDraw (ch, cr, target, depth+1);
       cr.Translate (0.0, GetScaledHeight(ch));
+      if (PreDrawCancelled) return false;
     }
+    return true;
   }
 
   /** ASYNC */
@@ -414,7 +437,7 @@ public static class FSDraw
     double advance = 0.0;
     cr.Save ();
       cr.Scale (1, h);
-      if (d.IsDirectory && (cr.Matrix.Yy > 2))
+      if (d.IsDirectory && (cr.Matrix.Yy > 2) && d.ReadyToDraw)
         retval.AddRange( ClickChildren (d, cr, target, mouseX, mouseY, depth) );
       cr.NewPath ();
       double rfs = GetFontSize(d, h);
@@ -471,27 +494,32 @@ public static class FSDraw
   (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     Covering retval = (depth == 0 ? GetCovering(d, cr, target) : null);
-    if (!d.IsDirectory || !IsVisible(d, cr, target))
+    if (!d.IsDirectory || (depth > 0 && !IsVisible(d, cr, target)))
       return retval;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     cr.Save ();
       cr.Scale (1, h);
       if (cr.Matrix.Y0 <= target.Y && cr.Matrix.Y0+cr.Matrix.Yy >= target.Y+target.Height) {
         retval = GetCovering (d, cr, target);
-        ChildTransform (d, cr, target);
-        foreach (FSEntry ch in d.Entries) {
-          Covering c = FindCovering (ch, cr, target, depth+1);
-          if (c != null) {
-            retval = c;
-            break;
+        if (d.ReadyToDraw) {
+          ChildTransform (d, cr, target);
+          foreach (FSEntry ch in d.Entries) {
+            Covering c = FindCovering (ch, cr, target, depth+1);
+            if (c != null) {
+              retval = c;
+              break;
+            }
+            cr.Translate (0.0, GetScaledHeight(ch));
           }
-          cr.Translate (0.0, GetScaledHeight(ch));
         }
       } else if (depth == 0 && d.FullName != Helpers.RootDir) { // navigating upwards
-        FrameProfiler.Reset ();
         double scale = 1.0;
         double position = 0.48; // stupidity with magic numbers
         int i = 0;
+        if (FSCache.NeedFilePass( d.ParentDir.FullName ))
+          FSCache.FilePass ( d.ParentDir.FullName );
+        FSCache.MeasureEntries( d.ParentDir );
+        FSCache.SortEntries ( d.ParentDir );
         foreach (FSEntry ch in d.ParentDir.Entries) {
           if (ch.FullName == d.FullName) {
             scale = 1.0 / (0.44 * GetScaledHeight (ch));
