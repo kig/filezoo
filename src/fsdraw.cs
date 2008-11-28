@@ -45,9 +45,10 @@ public static class FSDraw
     if (d.IsDirectory) {
       string extras = "";
       // entries sans parent dir
-      extras += String.Format("{0} entries", d.Count.ToString("N0"));
-      if (d.TotalCount != 0) {
-        extras += String.Format(", {0} files", d.TotalCount.ToString("N0"));
+      extras += String.Format("{0} ", d.Count.ToString("N0"));
+      extras += (d.Count == 1) ? "entry" : "entries";
+      if (FSCache.Measurer.DependsOnTotals) {
+        extras += String.Format(", {0} files", d.SubTreeCount.ToString("N0"));
         extras += String.Format(", {0} total", Helpers.FormatSI(d.TotalSize, "B"));
       }
       return extras;
