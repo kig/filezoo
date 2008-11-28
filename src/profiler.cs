@@ -14,12 +14,19 @@ public class Profiler
 
   /** FAST */
   public Profiler () : this("") {}
+
   /** FAST */
   public Profiler (string prefix)
   {
     Prefix = prefix;
     Watch = new Stopwatch ();
     Watch.Start ();
+  }
+
+  /** FAST */
+  public Profiler (string prefix, double minTime) : this(prefix)
+  {
+    MinTime = minTime;
   }
 
   void PrintTime (string message, double elapsedMilliseconds)

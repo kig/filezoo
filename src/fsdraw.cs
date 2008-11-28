@@ -49,7 +49,7 @@ public static class FSDraw
       extras += (d.Count == 1) ? "entry" : "entries";
       if (FSCache.Measurer.DependsOnTotals) {
         extras += String.Format(", {0} files", d.SubTreeCount.ToString("N0"));
-        extras += String.Format(", {0} total", Helpers.FormatSI(d.TotalSize, "B"));
+        extras += String.Format(", {0} total", Helpers.FormatSI(d.SubTreeSize, "B"));
       }
       return extras;
     } else {
@@ -370,6 +370,8 @@ public static class FSDraw
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     if (!PreDrawCancelled) {
       RequestThumbnail (d);
+      if (depth < 2  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
+        FSCache.RequestTraversal(d.FullName);
       cr.Save ();
         cr.Scale (1, h);
         if (d.IsDirectory) {

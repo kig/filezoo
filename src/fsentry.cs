@@ -42,9 +42,6 @@ public class FSEntry
   public long SubTreeCount = 0;
   public long SubTreeSize = 0;
 
-  public long TotalCount { get { return Count + SubTreeCount; } }
-  public long TotalSize { get { return Size + SubTreeSize; } }
-
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
@@ -81,6 +78,8 @@ public class FSEntry
     Size = IsDirectory ? 0 : Helpers.FileSize(u);
 
     if (!IsDirectory) {
+      SubTreeSize = Size;
+      SubTreeCount = 1;
       Complete = true;
       FilePassDone = true;
       ReadyToDraw = true;

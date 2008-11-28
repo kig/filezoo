@@ -149,10 +149,10 @@ public static class FSCache
           f.Entries = entries;
           f.Size = size;
           f.Count = count;
-          AddCountAndSize (path, subTreeSize-f.SubTreeSize, subTreeCount-f.SubTreeCount);
+          AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
+          f.FilePassDone = true;
           if (AllChildrenComplete(path))
             SetComplete (path);
-          f.FilePassDone = true;
         }
       }
     }
@@ -321,7 +321,7 @@ public static class FSCache
     List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
     e.Remove(d);
     d.ParentDir.Entries = e;
-    AddCountAndSize (d.ParentDir.FullName, -d.TotalCount, -d.TotalSize);
+    AddCountAndSize (d.ParentDir.FullName, -d.SubTreeCount, -d.SubTreeSize);
     if (!d.Complete && AllChildrenComplete(d.ParentDir.FullName))
       SetComplete (d.ParentDir.FullName);
   } }
@@ -428,12 +428,6 @@ public static class FSCache
     return true;
   } }
 
-  /** ASYNC */
-  static void Fail (string path)
-  { lock (Cache) {
-    SetComplete (path);
-  } }
-
   /** BLOCKING */
   static void ThreadTraverse (string dirname) {
     WaitCallback cb = new WaitCallback(TraverseCallback);
@@ -442,6 +436,7 @@ public static class FSCache
 
   /** ASYNC */
   static void TraverseCallback (object state) {
+    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     lock (TCLock) TraverseThreadCount++;
     Traverse ((string)state);
     lock (TCLock) TraverseThreadCount--;
@@ -469,18 +464,12 @@ public static class FSCache
   static void TraverseDir (string dirname)
   {
     if (TraversalCancelled) return;
-    UnixFileSystemInfo[] files;
     if (!StartTraversal (dirname)) return;
-    try { files = Helpers.Entries (dirname); }
-    catch (Exception) {
-      Fail (dirname);
-      return;
-    }
     if (NeedFilePass (dirname))
       FilePass (dirname);
     if (TraversalCancelled) return;
-    foreach (UnixFileSystemInfo f in files) {
-      if (Helpers.IsDir(f)) TraverseSub(f.FullName);
+    foreach (FSEntry f in Get(dirname).Entries) {
+      if (f.IsDirectory) TraverseSub(f.FullName);
       if (TraversalCancelled) return;
     }
   }

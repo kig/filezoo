@@ -56,9 +56,9 @@ class Filezoo : DrawingArea
   public SizeHandler[] SizeFields = {
     new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
-    new SizeHandler("Date", new DateMeasurer())/*,
+    new SizeHandler("Date", new DateMeasurer()),
     new SizeHandler("Count", new CountMeasurer()),
-    new SizeHandler("Total", new TotalMeasurer())*/
+    new SizeHandler("Total", new TotalMeasurer())
   };
   // current file sizer
   public SizeHandler SizeField;
@@ -93,7 +93,10 @@ class Filezoo : DrawingArea
   double FontSize;
 
   // first frame latency profiler
-  Profiler dirLatencyProfiler = new Profiler ("----");
+  Profiler dirLatencyProfiler = new Profiler ("----", 100);
+
+  // interaction profiler, time from user event to draw complete
+  Profiler InteractionProfiler = new Profiler ("UI", 100);
 
   // empty surface for PreDraw context.
   ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
@@ -193,6 +196,9 @@ class Filezoo : DrawingArea
   /** ASYNC */
   void PreDrawCallback (object state)
   {
+    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+    if (!FSCache.Measurer.DependsOnTotals)
+      FSCache.CancelTraversal ();
     lock (PreDrawProgressLock) {
       if (PreDrawInProgress) return;
       PreDrawInProgress = true;
@@ -604,6 +610,7 @@ class Filezoo : DrawingArea
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
     if (e.Button == 1 && !dragging) {
+      InteractionProfiler.Restart ();
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
       {
         int w, h;
@@ -621,6 +628,7 @@ class Filezoo : DrawingArea
     if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
         (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask
     ) {
+      InteractionProfiler.Restart ();
       dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
       double dx = e.X - dragX;
       double dy = e.Y - dragY;
@@ -639,6 +647,7 @@ class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnScrollEvent (Gdk.EventScroll e)
   {
+    InteractionProfiler.Restart ();
     if (e.Direction == Gdk.ScrollDirection.Up) {
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
       {
@@ -681,6 +690,10 @@ class Filezoo : DrawingArea
         Helpers.StartupProfiler.Total ("Pre-drawing startup");
       }
       Draw (cr, Width, Height);
+    }
+    if (InteractionProfiler.Watch.IsRunning) {
+      InteractionProfiler.Time ("Interaction latency");
+      InteractionProfiler.Stop ();
     }
     return true;
   }

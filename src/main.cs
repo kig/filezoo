@@ -83,6 +83,7 @@ public static class FilezooApp {
     Window win = new Window ("Filezoo");
     win.SetDefaultSize (420, 800);
     p.Time ("Init done");
+    System.Threading.ThreadPool.SetMinThreads (10, 20);
     Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
     fz.Prefixes = Prefixes;
 //     fz.QuitAfterFirstFrame = true;

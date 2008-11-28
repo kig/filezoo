@@ -43,7 +43,7 @@ public class TotalMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
   /** FAST */
   public double Measure (FSEntry d) {
-    return Math.Max(1.0, d.TotalSize);
+    return Math.Max(1.0, d.SubTreeSize);
   }
 }
 
@@ -52,7 +52,7 @@ public class CountMeasurer : IMeasurer {
   /** FAST */
   public double Measure (FSEntry d) {
     double mul = (d.Name[0] == '.') ? 1.0 : 20.0;
-    return (d.IsDirectory ? Math.Max(1, d.TotalCount) : 1.0) * mul;
+    return (d.IsDirectory ? Math.Max(1, d.SubTreeCount) : 1.0) * mul;
   }
 }
 
