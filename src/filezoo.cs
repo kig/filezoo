@@ -109,6 +109,8 @@ class Filezoo : DrawingArea
 
   bool PreDrawComplete = true;
 
+  Menu ContextMenu;
+
   /* Constructor */
 
   /** BLOCKING - startup dir latency */
@@ -121,6 +123,11 @@ class Filezoo : DrawingArea
     BuildDirs (dirname);
 
     GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
+
+    ContextMenu = new Menu ();
+    MenuItem exit = new MenuItem ("Exit");
+    exit.Activated += ExitHandler;
+    ContextMenu.Append (exit);
 
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
@@ -604,6 +611,10 @@ class Filezoo : DrawingArea
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
     dragging = false;
+    if (e.Button == 3) {
+      ContextMenu.ShowAll ();
+      ContextMenu.Popup ();
+    }
     return true;
   }
 
@@ -697,6 +708,11 @@ class Filezoo : DrawingArea
       InteractionProfiler.Stop ();
     }
     return true;
+  }
+
+  void ExitHandler (object o, EventArgs args)
+  {
+    Application.Quit ();
   }
 
 }
