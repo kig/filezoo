@@ -124,11 +124,6 @@ class Filezoo : DrawingArea
 
     GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
 
-    ContextMenu = new Menu ();
-    MenuItem exit = new MenuItem ("Exit");
-    exit.Activated += ExitHandler;
-    ContextMenu.Append (exit);
-
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
       | Gdk.EventMask.ButtonReleaseMask
@@ -547,6 +542,65 @@ class Filezoo : DrawingArea
   }
 
 
+  /* Context menu code duplication, banzai */
+
+  string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
+
+  /** BLOCKING */
+  void ContextClick (Menu menu, Context cr, uint width, uint height, double x, double y)
+  {
+    cr.Save();
+      Rectangle box = Transform (cr, width, height);
+      cr.Scale (1, Zoomer.Z);
+      cr.Translate (0.0, Zoomer.Y);
+      List<ClickHit> hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
+      foreach (ClickHit c in hits) {
+        if (c.Height > 8) {
+          menu.Title = c.Target.FullName;
+          if (c.Target.IsDirectory) {
+          // Directory menu items
+
+            MenuItem goTo = new MenuItem ("Go to " + c.Target.FullName);
+            goTo.Activated += new EventHandler(delegate {
+              BuildDirs (menu.Title); });
+            menu.Append (goTo);
+
+            MenuItem term = new MenuItem ("Open terminal");
+            term.Activated += new EventHandler(delegate {
+              Helpers.OpenTerminal (menu.Title); });
+            menu.Append (term);
+
+          } else {
+          // File menu items
+
+            MenuItem open = new MenuItem ("Open " + c.Target.FullName);
+            open.Activated += new EventHandler(delegate {
+              Helpers.OpenFile (menu.Title); });
+            menu.Append (open);
+
+            /** DESTRUCTIVE */
+            if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
+              MenuItem ex = new MenuItem ("Extract");
+              ex.Activated += new EventHandler(delegate {
+                Helpers.ExtractFile (menu.Title); });
+              menu.Append (ex);
+            }
+
+          }
+
+          /** DESTRUCTIVE */
+          MenuItem trash = new MenuItem ("Delete");
+          trash.Activated += new EventHandler(delegate {
+            Helpers.Delete(menu.Title); });
+          menu.Append (trash);
+          break;
+        }
+      }
+    cr.Restore ();
+  }
+
+
+
   /* Zooming and panning */
 
   /** FAST */
@@ -612,6 +666,14 @@ class Filezoo : DrawingArea
     dragStartY = dragY = e.Y;
     dragging = false;
     if (e.Button == 3) {
+      if (ContextMenu != null) ContextMenu.Dispose ();
+      ContextMenu = new Menu ();
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        ContextClick (ContextMenu, cr, (uint)w, (uint)h, e.X, e.Y);
+      }
       ContextMenu.ShowAll ();
       ContextMenu.Popup ();
     }
@@ -708,11 +770,6 @@ class Filezoo : DrawingArea
       InteractionProfiler.Stop ();
     }
     return true;
-  }
-
-  void ExitHandler (object o, EventArgs args)
-  {
-    Application.Quit ();
   }
 
 }

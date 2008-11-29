@@ -1,0 +1,49 @@
+#!/usr/bin/ruby
+require 'fileutils'
+
+extractors = {
+  'application/x-zip' => lambda{|fn| system('unzip', fn) },
+  'application/x-tar' => lambda{|fn| system('tar', 'xf', fn) },
+  'application/x-rar' => lambda{|fn| system('unrar', 'x', fn) },
+  'application/x-gzip' => lambda{|fn|
+    if fn =~ /\.t(ar\.)?gz$/i
+      extractors['application/x-tar'][fn]
+    else
+      system('gunzip', fn)
+    end
+  },
+  'application/x-bzip2' => lambda{|fn|
+    if fn =~ /\.t(ar\.)?bz2$/i
+      extractors['application/x-tar'][fn]
+    else
+      system('bunzip2', fn)
+    end
+  }
+}
+
+fails = []
+ARGV.each{|fn|
+  mt = `file -ib '#{fn.gsub(/'/,"\\\\'")}'`.strip.split(',')[0]
+  ex = extractors[mt]
+  if ex
+    dirname = File.expand_path(fn + ".dir.0")
+    dirname.succ! while File.exist?(dirname) 
+    FileUtils.mkdir(dirname)
+    Dir.chdir(dirname)
+    ex[fn]
+    files = Dir["*"] - [".", ".."]
+    if files.length == 1
+      FileUtils.touch(files[0])
+      FileUtils.mv(files[0], "..")
+      Dir.chdir("..")
+      Dir.rmdir(dirname)
+    else
+      Dir.chdir("..")
+    end
+  else
+    fails << [fn,mt]
+  end
+}
+fails.each{|fn,mt|
+  STDERR.puts("No extractor for #{mt}: #{fn.dump}")
+}

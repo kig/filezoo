@@ -16,6 +16,8 @@ public static class Helpers {
 
   public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
+  public static string TrashDir = HomeDir + "/.Trash";
+
   /* Text drawing helpers */
 
   public static Pango.FontDescription UIFont = Pango.FontDescription.FromString ("Verdana");
@@ -142,6 +144,20 @@ public static class Helpers {
   public static void OpenFile (string path)
   {
     Process.Start ("gnome-open", EscapePath(path));
+  }
+
+  /** DESTRUCTIVE, ASYNC */
+  public static void ExtractFile (string path)
+  {
+    Process.Start ("ex", EscapePath(path));
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
+  public static void Delete (string path)
+  {
+    if (!FileExists (TrashDir))
+      new UnixDirectoryInfo(TrashDir).Create();
+    System.IO.File.Move (path, TrashDir + DirSepS + Basename(path));
   }
 
 
