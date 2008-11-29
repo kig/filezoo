@@ -289,7 +289,6 @@ class Filezoo : DrawingArea
       DrawBreadcrumb (cr, width);
       DrawSortBar (cr);
       DrawSizeBar (cr);
-      DrawOpenTerminal (cr);
     cr.Restore ();
     p.Time ("DrawToolbars");
   }
@@ -372,15 +371,6 @@ class Filezoo : DrawingArea
     Helpers.DrawText (cr, FontSize, " ");
   }
 
-  /** FAST */
-  void DrawOpenTerminal (Context cr)
-  {
-    FontSize = ToolbarLabelFontSize;
-    cr.Color = InActiveColor;
-    Helpers.DrawText (cr, FontSize, "  ");
-    cr.Color = TermColor;
-    Helpers.DrawText (cr, FontSize, OpenTerminalLabel);
-  }
 
 
   /* Click handling */
@@ -396,8 +386,7 @@ class Filezoo : DrawingArea
       double advance = 0.0;
       if (
         ClickSortBar (ref advance, cr, x, y) ||
-        ClickSizeBar (ref advance, cr, x, y) ||
-        ClickOpenTerminal (ref advance, cr, x, y)
+        ClickSizeBar (ref advance, cr, x, y)
       ) {
         cr.Restore ();
         return;
@@ -539,20 +528,6 @@ class Filezoo : DrawingArea
     return false;
   }
 
-  /** FAST */
-  bool ClickOpenTerminal (ref double advance, Context cr, double x, double y)
-  {
-    TextExtents te;
-    FontSize = ToolbarLabelFontSize;
-    advance += Helpers.GetTextExtents (cr, FontSize, "  ").XAdvance;
-    te = Helpers.GetTextExtents (cr, FontSize, OpenTerminalLabel);
-    if (Helpers.CheckTextExtents (cr, advance, te, x, y)) {
-      Helpers.OpenTerminal(CurrentDirPath);
-      return true;
-    }
-    advance += te.XAdvance;
-    return false;
-  }
 
 
   /* Context menu code duplication, banzai */
