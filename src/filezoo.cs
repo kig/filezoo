@@ -548,7 +548,7 @@ class Filezoo : DrawingArea
           if (c.Target.IsDirectory) {
           // Directory menu items
 
-            MenuItem goTo = new MenuItem ("Go to " + c.Target.FullName);
+            MenuItem goTo = new MenuItem ("Go to " + c.Target.Name);
             goTo.Activated += new EventHandler(delegate {
               BuildDirs (menu.Title); });
             menu.Append (goTo);
@@ -561,7 +561,7 @@ class Filezoo : DrawingArea
           } else {
           // File menu items
 
-            MenuItem open = new MenuItem ("Open " + c.Target.FullName);
+            MenuItem open = new MenuItem ("Open " + c.Target.Name);
             open.Activated += new EventHandler(delegate {
               Helpers.OpenFile (menu.Title); });
             menu.Append (open);

@@ -130,6 +130,8 @@ public static class FSCache
 
   /** BLOCKING */
   public static void FilePass (string path)
+  { FilePass (path, true); }
+  public static void FilePass (string path, bool createFiles)
   {
     FSEntry f = Get (path);
     lock (f) {
@@ -139,11 +141,18 @@ public static class FSCache
         List<FSEntry> entries = new List<FSEntry> ();
         long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;
         foreach (UnixFileSystemInfo u in Helpers.EntriesMaybe (f.FullName)) {
-          FSEntry d = Get (u.FullName);
-          entries.Add (d);
-          size += d.Size;
-          subTreeSize += d.SubTreeSize;
-          subTreeCount += d.SubTreeCount;
+          if (Helpers.IsDir(u) || createFiles) {
+            FSEntry d = Get (u.FullName);
+            entries.Add (d);
+            size += d.Size;
+            subTreeSize += d.SubTreeSize;
+            subTreeCount += d.SubTreeCount;
+          } else {
+            long sz = Helpers.FileSize (u);
+            size += sz;
+            subTreeSize += sz;
+            subTreeCount++;
+          }
           count++;
         }
         lock (Cache) {
@@ -154,6 +163,8 @@ public static class FSCache
           f.FilePassDone = true;
           if (AllChildrenComplete(path))
             SetComplete (path);
+          if (!createFiles) // force FilePass on next time
+            f.LastFileChange = Helpers.DefaultTime;
         }
       }
     }
@@ -419,7 +430,6 @@ public static class FSCache
 
   /* Traversal */
 
-
   /** ASYNC */
   static bool StartTraversal (string path)
   { lock (Cache) {
@@ -467,7 +477,7 @@ public static class FSCache
     if (TraversalCancelled) return;
     if (!StartTraversal (dirname)) return;
     if (NeedFilePass (dirname))
-      FilePass (dirname);
+      FilePass (dirname, false);
     if (TraversalCancelled) return;
     foreach (FSEntry f in Get(dirname).Entries) {
       if (f.IsDirectory) TraverseSub(f.FullName);

@@ -231,7 +231,7 @@ public static class Helpers {
     return (new UnixFileInfo (path)).Exists;
   }
 
-  static DateTime DefaultTime = DateTime.Parse ("1900-01-01T00:00:00.0000000Z");
+  public static DateTime DefaultTime = DateTime.Parse ("1900-01-01T00:00:00.0000000Z");
 
   /** BLOCKING */
   public static DateTime LastModified (UnixFileSystemInfo f) {

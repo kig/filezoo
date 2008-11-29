@@ -390,8 +390,7 @@ public static class FSDraw
   static bool PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     ChildTransform (d, cr, target);
-    if (!d.FilePassDone)
-      FSCache.FilePass(d.FullName);
+    FSCache.FilePass(d.FullName);
     FSCache.SortEntries(d);
     FSCache.MeasureEntries(d);
     if (PreDrawCancelled) return false;
