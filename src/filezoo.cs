@@ -159,6 +159,7 @@ class Filezoo : DrawingArea
     CurrentDirEntry = FSCache.Get (CurrentDirPath);
     FSCache.FilePass (CurrentDirPath);
     FirstFrameOfDir = true;
+    FSCache.CancelTraversal ();
     ResetZoom ();
     PreDraw ();
     p.Time("BuildDirs");
@@ -400,11 +401,11 @@ class Filezoo : DrawingArea
     cr.Translate (0.0, Zoomer.Y);
     List<ClickHit> hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
     foreach (ClickHit c in hits) {
-      if (c.Height < 20) {
-        Console.WriteLine("ZoomIn {0}x", 24 / c.Height);
+      if (c.Height < 16) {
+        Console.WriteLine("ZoomIn {0}x", 18 / c.Height);
         cr.Save ();
           cr.IdentityMatrix ();
-          ZoomBy(cr, width, height, x, y, 24 / c.Height);
+          ZoomBy(cr, width, height, x, y, 18 / c.Height);
         cr.Restore ();
         break;
       } else {
