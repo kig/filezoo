@@ -184,9 +184,19 @@ public static class Helpers {
         Process p = Process.Start (psi);
         p.WaitForExit ();
       }
-      return new ImageSurface (thumbPath);
-    } catch (Exception) {
-      return null;
+      if (FileExists(thumbPath))
+        return new ImageSurface (thumbPath);
+      else
+        throw new ArgumentException (String.Format("Failed to thumbnail {0}",path), "path");
+    } catch (Exception e) {
+      Console.WriteLine ("Thumbnailing failed for {0}: {1}", path, e);
+      ImageSurface thumb = new ImageSurface (Format.ARGB32, 1, 1);
+      using (Context cr = new Context(thumb)) {
+        cr.Color = new Color (1,0,0);
+        cr.Rectangle (0,0,2,2);
+        cr.Fill ();
+      }
+      return thumb;
     }
   }
 

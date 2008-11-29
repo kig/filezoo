@@ -245,15 +245,16 @@ public static class FSCache
   /* Thumbnails */
 
   static Thread ThumbnailThread;
-  static Queue<string> ThumbnailQueue = new Queue<string> ();
+  static PriorityQueue ThumbnailQueue = new PriorityQueue ();
 
-  public static void FetchThumbnail (string path)
+  public static string[] thumbnailable = {"png", "jpg", "jpeg", "gif", "bmp", "ps", "pdf"};
+  public static void FetchThumbnail (string path, int priority)
   {
     FSEntry f = Get (path);
     if (f.Thumbnail != null) return;
-    if (f.Suffix == "png" || f.Suffix == "jpg" || f.Suffix == "gif" || f.Suffix == "bmp")
+    if (Array.IndexOf (thumbnailable, f.Suffix) > -1)
     {
-        lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName);
+        lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName, priority);
     }
     if (ThumbnailThread == null) {
       ThumbnailThread = new Thread(new ThreadStart(ThumbnailQueueProcessor));
@@ -295,7 +296,6 @@ public static class FSCache
     }
     GetThumbnail (tn);
   }
-
 
 
 

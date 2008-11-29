@@ -369,11 +369,11 @@ public static class FSDraw
     bool rv = true;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     if (!PreDrawCancelled) {
-      RequestThumbnail (d);
       if (depth < 2  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
         FSCache.RequestTraversal(d.FullName);
       cr.Save ();
         cr.Scale (1, h);
+        RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);
         if (d.IsDirectory) {
           bool childrenVisible = cr.Matrix.Yy > 2;
           bool shouldDrawChildren = (depth == 0 || childrenVisible);
@@ -403,9 +403,9 @@ public static class FSDraw
   }
 
   /** ASYNC */
-  static void RequestThumbnail (FSEntry d)
+  static void RequestThumbnail (string path, int priority)
   {
-    FSCache.FetchThumbnail (d.FullName);
+    FSCache.FetchThumbnail (path, priority);
   }
 
 
