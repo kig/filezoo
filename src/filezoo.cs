@@ -215,6 +215,7 @@ class Filezoo : DrawingArea
     Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     if (!FSCache.Measurer.DependsOnTotals)
       FSCache.CancelTraversal ();
+    FSCache.CancelThumbnailing ();
     lock (PreDrawProgressLock) {
       if (PreDrawInProgress) return;
       PreDrawInProgress = true;

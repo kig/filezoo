@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
+using System.IO;
 using System;
 using Mono.Unix;
 using Cairo;
@@ -16,7 +18,8 @@ public static class Helpers {
 
   public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
-  public static string TrashDir = HomeDir + "/.Trash";
+  public static string TrashDir = HomeDir + DirSepS + ".Trash";
+  public static string ThumbDir = HomeDir + DirSepS + ".filezoo" + DirSepS + "Thumbs";
 
   /* Text drawing helpers */
 
@@ -158,6 +161,33 @@ public static class Helpers {
     if (!FileExists (TrashDir))
       new UnixDirectoryInfo(TrashDir).Create();
     System.IO.File.Move (path, TrashDir + DirSepS + Basename(path));
+  }
+
+  /** ASYNC, DESTRUCTIVE */
+  public static ImageSurface GetThumbnail (string path)
+  {
+    try {
+      HashAlgorithm hash = HashAlgorithm.Create ("MD5");
+      FileStream fs = File.OpenRead (path);
+      byte[] digest = hash.ComputeHash (fs);
+      fs.Close ();
+      string thumbPath = ThumbDir + DirSepS + BitConverter.ToString (digest) + ".png";
+      if (!FileExists(thumbPath)) {
+        if (!FileExists(Dirname(ThumbDir)))
+          new UnixDirectoryInfo(Dirname(ThumbDir)).Create ();
+        if (!FileExists(ThumbDir))
+          new UnixDirectoryInfo(ThumbDir).Create ();
+        ProcessStartInfo psi = new ProcessStartInfo ();
+        psi.FileName = "convert";
+        psi.Arguments = EscapePath(path) + "[0] -thumbnail 128x128 " + EscapePath(thumbPath);
+        psi.UseShellExecute = false;
+        Process p = Process.Start (psi);
+        p.WaitForExit ();
+      }
+      return new ImageSurface (thumbPath);
+    } catch (Exception) {
+      return null;
+    }
   }
 
 

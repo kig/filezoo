@@ -242,6 +242,61 @@ public static class FSCache
       Invalidate (path);
   }
 
+  /* Thumbnails */
+
+  static Thread ThumbnailThread;
+  static Queue<string> ThumbnailQueue = new Queue<string> ();
+
+  public static void FetchThumbnail (string path)
+  {
+    FSEntry f = Get (path);
+    if (f.Thumbnail != null) return;
+    if (f.Suffix == "png" || f.Suffix == "jpg" || f.Suffix == "gif" || f.Suffix == "bmp")
+    {
+        lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName);
+    }
+    if (ThumbnailThread == null) {
+      ThumbnailThread = new Thread(new ThreadStart(ThumbnailQueueProcessor));
+      ThumbnailThread.IsBackground = true;
+      ThumbnailThread.Start ();
+    }
+  }
+
+  public static void CancelThumbnailing ()
+  { lock (ThumbnailQueue) {
+    ThumbnailQueue.Clear ();
+  } }
+
+  static void GetThumbnail (string path)
+  {
+    if (Get (path).Thumbnail == null) {
+      Get (path).Thumbnail = Helpers.GetThumbnail (path);
+      LastChange = DateTime.Now;
+    }
+  }
+
+  static void ThumbnailQueueProcessor ()
+  {
+    while (true) {
+      while (ThumbnailQueue.Count > 0)
+        ProcessThumbnailQueue ();
+      Thread.Sleep(100);
+    }
+  }
+
+  static void ProcessThumbnailQueue ()
+  {
+    string tn;
+    lock (ThumbnailQueue) {
+      if (ThumbnailQueue.Count > 0)
+        tn = ThumbnailQueue.Dequeue();
+      else
+        return;
+    }
+    GetThumbnail (tn);
+  }
+
+
 
 
   /* Tree editing */

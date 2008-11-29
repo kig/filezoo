@@ -1,5 +1,6 @@
 
 using System.Collections.Generic;
+using System.Threading;
 using System;
 using Mono.Unix;
 using Cairo;
@@ -46,7 +47,6 @@ public class FSEntry
   public bool Complete = false;
   public bool FilePassDone = false;
   public bool InProgress = false;
-  public bool HasThumbnail = false;
 
   public ImageSurface Thumbnail = null;
 

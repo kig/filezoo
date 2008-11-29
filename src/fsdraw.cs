@@ -206,7 +206,7 @@ public static class FSDraw
         co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
-      if (d.HasThumbnail)
+      if (d.Thumbnail != null)
         DrawThumb (d, cr);
       else
         cr.Fill ();
@@ -233,8 +233,8 @@ public static class FSDraw
     */
   static void DrawThumb (FSEntry d, Context cr) {
     ImageSurface thumb = d.Thumbnail;
-    cr.Save ();
-      using (Pattern p = new Pattern (thumb)) {
+    using (Pattern p = new Pattern (thumb)) {
+      cr.Save ();
         double wr = cr.Matrix.Xx * BoxWidth;
         double hr = cr.Matrix.Yy * 0.96;
         double wscale = wr / thumb.Width;
@@ -245,8 +245,8 @@ public static class FSDraw
         cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
         cr.Pattern = p;
         cr.Fill ();
-      }
-    cr.Restore ();
+      cr.Restore ();
+    }
   }
 
   /** FAST */
@@ -405,7 +405,7 @@ public static class FSDraw
   /** ASYNC */
   static void RequestThumbnail (FSEntry d)
   {
-    return;
+    FSCache.FetchThumbnail (d.FullName);
   }
 
 
