@@ -133,7 +133,8 @@ public static class FSCache
   {
     FSEntry f = Get (path);
     lock (f) {
-      if (f.FilePassDone) return;
+      if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
+      f.LastFileChange = Helpers.LastChange(path);
       if (f.IsDirectory) {
         List<FSEntry> entries = new List<FSEntry> ();
         long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;

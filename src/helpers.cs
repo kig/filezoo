@@ -231,12 +231,14 @@ public static class Helpers {
     return (new UnixFileInfo (path)).Exists;
   }
 
+  static DateTime DefaultTime = DateTime.Parse ("1900-01-01T00:00:00.0000000Z");
+
   /** BLOCKING */
   public static DateTime LastModified (UnixFileSystemInfo f) {
     try {
       return f.LastWriteTime;
-    } catch (System.InvalidOperationException) {
-      return DateTime.Now;
+    } catch (Exception) {
+      return DefaultTime;
     }
   }
 
@@ -244,6 +246,19 @@ public static class Helpers {
   public static DateTime LastModified (string path) {
     UnixFileSystemInfo f = new UnixFileInfo (path);
     return LastModified(f);
+  }
+
+  /** BLOCKING */
+  public static DateTime LastChange (string path) {
+    UnixFileSystemInfo f = new UnixFileInfo (path);
+    try {
+      if (f.LastWriteTime > f.LastStatusChangeTime)
+        return f.LastWriteTime;
+      else
+        return f.LastStatusChangeTime;
+    } catch (Exception) {
+      return DefaultTime;
+    }
   }
 
   public static Dictionary<long,string> OwnerNameCache = new Dictionary<long,string> ();

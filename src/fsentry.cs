@@ -17,6 +17,7 @@ public class FSEntry
   public DateTime LastMeasure;
   public DateTime LastSort;
   public DateTime LastChange;
+  public DateTime LastFileChange;
 
   public bool ReadyToDraw = false;
 
@@ -67,6 +68,7 @@ public class FSEntry
     Group = Helpers.GroupName(u);
 
     LastModified = Helpers.LastModified(u);
+    LastFileChange = Helpers.LastChange(FullName);
     Permissions = Helpers.FilePermissions(u);
     FileType = Helpers.FileType(u);
 

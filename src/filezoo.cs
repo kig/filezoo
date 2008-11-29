@@ -123,6 +123,7 @@ class Filezoo : DrawingArea
     BuildDirs (dirname);
 
     GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
+    GLib.Timeout.Add (1030, new GLib.TimeoutHandler (LongMonitor));
 
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
@@ -144,6 +145,18 @@ class Filezoo : DrawingArea
     }
     return Active;
   }
+
+  bool LongMonitor ()
+  { lock (FSCache.Cache) {
+    foreach (FSEntry e in CurrentDirEntry.Entries) {
+      DateTime mtime = Helpers.LastChange(e.FullName);
+      if (e.IsDirectory && !(e.LastFileChange == mtime)) {
+        e.LastFileChange = mtime;
+        FSCache.Invalidate(e.FullName);
+      }
+    }
+    return Active;
+  } }
 
 
   /* Files model */

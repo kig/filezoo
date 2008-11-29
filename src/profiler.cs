@@ -37,7 +37,8 @@ public class Profiler
       ((PrintProfile == Print.Global) && GlobalPrintProfile))
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      Console.WriteLine (time.PadLeft(12) + Prefix + "  " + message);
+      string bar = "".PadLeft((int)Math.Min(10, Math.Round(elapsedMilliseconds / 20)), '#');
+      Console.WriteLine (bar.PadLeft(10) + " " + time.PadLeft(10) + Prefix + "  " + message);
     }
   }
 
