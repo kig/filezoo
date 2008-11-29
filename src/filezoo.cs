@@ -543,49 +543,58 @@ class Filezoo : DrawingArea
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
       List<ClickHit> hits = FSDraw.Click (CurrentDirEntry, cr, box, x, y);
-      foreach (ClickHit c in hits) {
-        if (c.Height > 8) {
-          menu.Title = c.Target.FullName;
-          if (c.Target.IsDirectory) {
-          // Directory menu items
-
-            MenuItem goTo = new MenuItem ("Go to " + c.Target.Name);
-            goTo.Activated += new EventHandler(delegate {
-              BuildDirs (menu.Title); });
-            menu.Append (goTo);
-
-            MenuItem term = new MenuItem ("Open terminal");
-            term.Activated += new EventHandler(delegate {
-              Helpers.OpenTerminal (menu.Title); });
-            menu.Append (term);
-
-          } else {
-          // File menu items
-
-            MenuItem open = new MenuItem ("Open " + c.Target.Name);
-            open.Activated += new EventHandler(delegate {
-              Helpers.OpenFile (menu.Title); });
-            menu.Append (open);
-
-            /** DESTRUCTIVE */
-            if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
-              MenuItem ex = new MenuItem ("Extract");
-              ex.Activated += new EventHandler(delegate {
-                Helpers.ExtractFile (menu.Title); });
-              menu.Append (ex);
-            }
-
+      if (hits.Count == 0) {
+        FillMenu (menu, new ClickHit(CurrentDirEntry, cr.Matrix.Yy));
+      } else {
+        foreach (ClickHit c in hits) {
+          if (c.Height > 8) {
+            FillMenu (menu, c);
+            break;
           }
-
-          /** DESTRUCTIVE */
-          MenuItem trash = new MenuItem ("Delete");
-          trash.Activated += new EventHandler(delegate {
-            Helpers.Delete(menu.Title); });
-          menu.Append (trash);
-          break;
         }
       }
     cr.Restore ();
+  }
+
+  void FillMenu (Menu menu, ClickHit c)
+  {
+    menu.Title = c.Target.FullName;
+    if (c.Target.IsDirectory) {
+    // Directory menu items
+
+      MenuItem goTo = new MenuItem ("Go to " + c.Target.Name);
+      goTo.Activated += new EventHandler(delegate {
+        BuildDirs (menu.Title); });
+      menu.Append (goTo);
+
+      MenuItem term = new MenuItem ("Open terminal");
+      term.Activated += new EventHandler(delegate {
+        Helpers.OpenTerminal (menu.Title); });
+      menu.Append (term);
+
+    } else {
+    // File menu items
+
+      MenuItem open = new MenuItem ("Open " + c.Target.Name);
+      open.Activated += new EventHandler(delegate {
+        Helpers.OpenFile (menu.Title); });
+      menu.Append (open);
+
+      /** DESTRUCTIVE */
+      if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
+        MenuItem ex = new MenuItem ("Extract");
+        ex.Activated += new EventHandler(delegate {
+          Helpers.ExtractFile (menu.Title); });
+        menu.Append (ex);
+      }
+
+    }
+
+    /** DESTRUCTIVE */
+    MenuItem trash = new MenuItem ("Delete");
+    trash.Activated += new EventHandler(delegate {
+      Helpers.Delete(menu.Title); });
+    menu.Append (trash);
   }
 
 

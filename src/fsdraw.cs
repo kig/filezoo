@@ -431,7 +431,13 @@ public static class FSDraw
   public static List<ClickHit> Click
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
-    if (depth > 0 && !IsVisible(d, cr, target)) {
+    // return empty list if click outside target or if non-root d is not visible
+    if (
+      (depth == 0 &&
+        (mouseX < target.X || mouseX > target.X+target.Width ||
+        mouseY < target.Y || mouseY > target.Y+target.Height)) ||
+      (depth > 0 && !IsVisible(d, cr, target))
+    ) {
       return new List<ClickHit> ();
     }
     double h = depth == 0 ? 1 : GetScaledHeight (d);
