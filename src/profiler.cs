@@ -29,7 +29,7 @@ public class Profiler
     MinTime = minTime;
   }
 
-  void PrintTime (string message, double elapsedMilliseconds)
+  void PrintTime (string message, double elapsedMilliseconds, string prefix)
   {
     if (
       (MinTime <= elapsedMilliseconds) &&
@@ -38,7 +38,7 @@ public class Profiler
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
       string bar = "".PadLeft((int)Math.Min(10, Math.Round(elapsedMilliseconds / 20)), '#');
-      Console.WriteLine (bar.PadLeft(10) + " " + time.PadLeft(10) + Prefix + "  " + message);
+      Console.WriteLine (prefix + bar.PadLeft(10) + " " + time.PadLeft(10) + Prefix + "  " + message);
     }
   }
 
@@ -47,7 +47,7 @@ public class Profiler
   {
     double elapsedMilliseconds = Watch.ElapsedTicks / 10000.0;
     TotalElapsed += elapsedMilliseconds;
-    PrintTime (message, elapsedMilliseconds);
+    PrintTime (message, elapsedMilliseconds, "");
     Restart ();
   }
 
@@ -60,7 +60,7 @@ public class Profiler
   }
 
   public void Total (string message) {
-    PrintTime ("Total time for: "+message, TotalElapsed);
+    PrintTime (message+"\n", TotalElapsed, "Total ".PadRight(50, '-')+"\n");
   }
 
   /** FAST */
