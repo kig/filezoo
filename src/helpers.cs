@@ -196,7 +196,7 @@ public static class Helpers {
   {
     try {
       Profiler pr = new Profiler ("GetThumbnail", 10);
-      ImageSurface thumb;
+      ImageSurface thumb = null;
       string thumbPath;
       if (path.StartsWith(ThumbDir))
         thumbPath = path;
