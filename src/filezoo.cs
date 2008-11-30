@@ -598,6 +598,11 @@ class Filezoo : DrawingArea
         Helpers.OpenTerminal (menu.Title); });
       menu.Append (term);
 
+      MenuItem create = new MenuItem ("Create file");
+      create.Activated += new EventHandler(delegate {
+        ShowCreateDialog (menu.Title); });
+      menu.Append (create);
+
     } else {
     // File menu items
 
@@ -616,6 +621,8 @@ class Filezoo : DrawingArea
 
     }
 
+    menu.Append (new SeparatorMenuItem ());
+
     /** DESTRUCTIVE */
     MenuItem rename = new MenuItem ("Rename");
     rename.Activated += new EventHandler(delegate {
@@ -626,7 +633,9 @@ class Filezoo : DrawingArea
     /** DESTRUCTIVE */
     MenuItem trash = new MenuItem ("Move to trash");
     trash.Activated += new EventHandler(delegate {
-      Helpers.Trash(menu.Title); });
+      Helpers.Trash(menu.Title);
+      FSCache.Invalidate (menu.Title);
+    });
     menu.Append (trash);
   }
 
@@ -636,14 +645,16 @@ class Filezoo : DrawingArea
     string basename = Helpers.Basename(path);
     Dialog d = new Dialog();
     d.Modal = true;
+    d.ActionArea.Layout = ButtonBoxStyle.Spread;
+    d.HasSeparator = false;
     d.BorderWidth = 10;
     d.Title = String.Format ("Renaming {0}", path);
     d.VBox.Add (new Label (d.Title));
     Entry e = new Entry (path);
+    e.WidthChars = Math.Min(100, e.Text.Length + 10);
     e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
     d.VBox.Add (e);
-    d.AddButton ("Ok", ResponseType.Ok);
-    d.AddButton ("Cancel", ResponseType.Cancel);
+    d.AddButton ("Rename", ResponseType.Ok);
 
     d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
       if (args.ResponseId == ResponseType.Ok) {
@@ -656,14 +667,43 @@ class Filezoo : DrawingArea
       } else {
         Console.WriteLine (args.ResponseId);
       }
+      d.Unrealize ();
       d.Destroy ();
     });
 
     d.ShowAll ();
     e.SelectRegion(path.Length-basename.Length, -1);
+  }
 
-//     d.Run ();
-//     d.Destroy ();
+
+  void ShowCreateDialog (string path)
+  {
+    Dialog d = new Dialog();
+    d.Modal = true;
+    d.ActionArea.Layout = ButtonBoxStyle.Spread;
+    d.HasSeparator = false;
+    d.BorderWidth = 10;
+    d.Title = "Create file";
+    d.VBox.Add (new Label (d.Title));
+    Entry e = new Entry (path + Helpers.DirSepS + "new_file");
+    e.WidthChars = Math.Min(100, e.Text.Length + 10);
+    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
+    d.VBox.Add (e);
+    d.AddButton ("Create", ResponseType.Ok);
+
+    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
+      if (args.ResponseId == ResponseType.Ok) {
+        Helpers.Touch (e.Text);
+        FSCache.Invalidate (e.Text);
+      } else {
+        Console.WriteLine (args.ResponseId);
+      }
+      d.Unrealize ();
+      d.Destroy ();
+    });
+
+    d.ShowAll ();
+    e.SelectRegion(e.Text.Length-Helpers.Basename(e.Text).Length, -1);
   }
 
 

@@ -223,6 +223,13 @@ public static class Helpers {
     }
   }
 
+  /** DESTRUCTIVE, BLOCKING */
+  public static void Touch (string path)
+  {
+    Process p = Process.Start("touch", EscapePath(path));
+    p.WaitForExit ();
+  }
+
   /** ASYNC, DESTRUCTIVE */
   public static ImageSurface GetThumbnail (string path)
   {
