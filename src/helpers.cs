@@ -284,6 +284,22 @@ public static class Helpers {
   }
 
   /** ASYNC, FAST-ish (~200 us if file in page cache) */
+  /*
+    The ThumbnailHash does MD5(mtime + size + read(16376)),
+    which works nicely for compressed files like jpegs and pngs.
+
+    As the hash only uses the first 16k of the file, it will have
+    collisions in some cases where whole-file MD5 would not.
+
+    Particularly collision-prone are uncompressed files extracted from
+    an archive / fetched from SVN (causing them all to have the same mtime.)
+    A likely real collision would be uncompressed images of the same dimensions
+    and the same first 16k. Think BMP and TGA textures and wallpapers.
+
+    Spreading the 16k read over the whole file would reduce collision
+    probability for uncompressed images, but require more seeks (and within one
+    seek time you can do 1MB of MD5.) SSDs are a different story though.
+  */
   public static string ThumbnailHash (string path)
   {
     byte[] buf = new byte[16384];
