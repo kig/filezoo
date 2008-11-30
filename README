@@ -18,3 +18,6 @@ Compile by:
 Usage:
   bin/filezoo.exe [directory]
 
+License:
+  GPL, except for the following MIT-licensed files:
+  helpers.cs, profiler.cs, priorityqueue.cs

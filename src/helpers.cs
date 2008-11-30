@@ -1,3 +1,30 @@
+/*
+    profiler.cs - simple profiler class for printing out execution times
+    Copyright (C) 2008  Ilmari Heikkinen
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Collections.Generic;
@@ -169,6 +196,7 @@ public static class Helpers {
   {
     try {
       Profiler pr = new Profiler ("GetThumbnail", 10);
+      ImageSurface thumb;
       string thumbPath;
       if (path.StartsWith(ThumbDir))
         thumbPath = path;
@@ -180,20 +208,14 @@ public static class Helpers {
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        ProcessStartInfo psi = new ProcessStartInfo ();
-        psi.FileName = "convert";
-        psi.Arguments = EscapePath(path) + "[0] -thumbnail 128x128 " + EscapePath(thumbPath);
-        psi.UseShellExecute = false;
-        Process p = Process.Start (psi);
-        p.WaitForExit ();
-      }
-      pr.Time ("create thumbnail");
-      ImageSurface thumb;
-      if (FileExists(thumbPath)) {
-        thumb = new ImageSurface (thumbPath);
+        pr.Time ("create thumbnail");
+        if (CreateThumbnail(path, thumbPath, 128))
+          thumb = new ImageSurface (thumbPath);
       } else {
-        throw new ArgumentException (String.Format("Failed to thumbnail {0}",path), "path");
+        thumb = new ImageSurface (thumbPath);
       }
+      if (thumb == null)
+        throw new ArgumentException (String.Format("Failed to thumbnail {0}",path), "path");
       pr.Time ("load as ImageSurface");
       return thumb;
     } catch (Exception e) {
@@ -208,6 +230,20 @@ public static class Helpers {
     }
   }
 
+  /** ASYNC */
+  public static bool CreateThumbnail (string path, string thumbPath, uint size)
+  {
+    string s = size.ToString ();
+    ProcessStartInfo psi = new ProcessStartInfo ();
+    psi.FileName = "convert";
+    psi.Arguments = EscapePath(path) + "[0] -thumbnail "+s+"x"+s+" " + EscapePath(thumbPath);
+    psi.UseShellExecute = false;
+    Process p = Process.Start (psi);
+    p.WaitForExit ();
+    return FileExists(thumbPath);
+  }
+
+  /** ASYNC, FAST-ish (~200 us if file in page cache) */
   public static string ThumbnailHash (string path)
   {
     byte[] buf = new byte[16384];
