@@ -278,7 +278,7 @@ class Filezoo : DrawingArea
 
   /** BLOCKING */
   void Draw (Context cr, uint width, uint height)
-  { lock (FSCache.Cache) {
+  {
     if (Helpers.StartupProfiler.Watch.IsRunning)
       Helpers.StartupProfiler.Time ("In draw");
     cr.Save ();
@@ -301,7 +301,7 @@ class Filezoo : DrawingArea
       Helpers.StartupProfiler.Stop ();
       if (QuitAfterFirstFrame) Application.Quit ();
     }
-  } }
+  }
 
   /** FAST */
   void DrawClear (Context cr, uint width, uint height)
@@ -335,8 +335,6 @@ class Filezoo : DrawingArea
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      FSCache.SortEntries(CurrentDirEntry);
-      FSCache.MeasureEntries(CurrentDirEntry);
       c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
