@@ -644,7 +644,7 @@ class Filezoo : DrawingArea
   {
     string basename = Helpers.Basename(path);
     Dialog d = new Dialog();
-    d.Modal = true;
+    d.Modal = false;
     d.ActionArea.Layout = ButtonBoxStyle.Spread;
     d.HasSeparator = false;
     d.BorderWidth = 10;
@@ -679,7 +679,7 @@ class Filezoo : DrawingArea
   void ShowCreateDialog (string path)
   {
     Dialog d = new Dialog();
-    d.Modal = true;
+    d.Modal = false;
     d.ActionArea.Layout = ButtonBoxStyle.Spread;
     d.HasSeparator = false;
     d.BorderWidth = 10;
