@@ -148,6 +148,11 @@ class Filezoo : DrawingArea
       | Gdk.EventMask.PointerMotionMask
     ));
 
+    ThreadStart ts = new ThreadStart (PreDrawCallback);
+    Thread t = new Thread(ts);
+    t.IsBackground = true;
+    t.Start ();
+
   }
 
 
@@ -190,8 +195,8 @@ class Filezoo : DrawingArea
 
     FSCache.CancelTraversal ();
 
-    CurrentDirEntry = FSCache.Get (CurrentDirPath);
     FSCache.FilePass (CurrentDirPath);
+    CurrentDirEntry = FSCache.Get (CurrentDirPath);
     FSCache.Watch (CurrentDirPath);
 
     ResetZoom ();
@@ -222,28 +227,32 @@ class Filezoo : DrawingArea
     FSCache.Measurer = SizeField.Measurer;
     FSCache.SortDirection = SortDirection;
     FSCache.Comparer = SortField.Comparer;
-    WaitCallback cb = new WaitCallback(PreDrawCallback);
-    ThreadPool.QueueUserWorkItem(cb);
   }
 
   /** ASYNC */
-  void PreDrawCallback (object state)
+  void PreDrawCallback ()
   {
-    try {
-      Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
-      if (!FSCache.Measurer.DependsOnTotals)
-        FSCache.CancelTraversal ();
-      FSCache.CancelThumbnailing ();
-      using (Context cr = new Context (PreDrawSurface)) {
-        cr.IdentityMatrix ();
-        Rectangle target = Transform (cr, Width, Height);
-        cr.Scale (1, Zoomer.Z);
-        cr.Translate (0.0, Zoomer.Y);
-        PreDrawComplete = FSDraw.PreDraw (CurrentDirEntry, cr, target, 0);
-        if (PreDrawComplete) NeedRedraw = true;
+    while (true) {
+      if (PreDrawInProgress) {
+        try {
+          Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+          if (!FSCache.Measurer.DependsOnTotals)
+            FSCache.CancelTraversal ();
+          FSCache.CancelThumbnailing ();
+          using (Context cr = new Context (PreDrawSurface)) {
+            cr.IdentityMatrix ();
+            Rectangle target = Transform (cr, Width, Height);
+            cr.Scale (1, Zoomer.Z);
+            cr.Translate (0.0, Zoomer.Y);
+            PreDrawComplete = FSDraw.PreDraw (CurrentDirEntry, cr, target, 0);
+            if (PreDrawComplete) NeedRedraw = true;
+          }
+        } finally {
+          PreDrawInProgress = false;
+        }
+      } else {
+        Thread.Sleep (10);
       }
-    } finally {
-      PreDrawInProgress = false;
     }
   }
 
@@ -269,7 +278,7 @@ class Filezoo : DrawingArea
 
   /** BLOCKING */
   void Draw (Context cr, uint width, uint height)
-  {
+  { lock (FSCache.Cache) {
     if (Helpers.StartupProfiler.Watch.IsRunning)
       Helpers.StartupProfiler.Time ("In draw");
     cr.Save ();
@@ -292,7 +301,7 @@ class Filezoo : DrawingArea
       Helpers.StartupProfiler.Stop ();
       if (QuitAfterFirstFrame) Application.Quit ();
     }
-  }
+  } }
 
   /** FAST */
   void DrawClear (Context cr, uint width, uint height)

@@ -97,7 +97,7 @@ public static class FSCache
       if (InvalidsTimer == null) {
         InvalidsTimer = new System.Timers.Timer ();
         InvalidsTimer.Elapsed += new ElapsedEventHandler(ProcessInvalids);
-        InvalidsTimer.Interval = 200;
+        InvalidsTimer.Interval = 100;
         InvalidsTimer.Enabled = true;
       }
     }
@@ -150,12 +150,10 @@ public static class FSCache
   public static void FilePass (string path)
   { FilePass (path, true); }
   public static void FilePass (string path, bool createFiles)
-  {
+  { lock (Cache) {
     FSEntry f = Get (path);
-    lock (Cache) {
-      if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
-      f.LastFileChange = Helpers.LastChange(path);
-    }
+    if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
+    f.LastFileChange = Helpers.LastChange(path);
     if (f.IsDirectory) {
       List<FSEntry> entries = new List<FSEntry> ();
       long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;
@@ -174,42 +172,37 @@ public static class FSCache
         }
         count++;
       }
-      lock (Cache) {
-        f.Entries = entries;
-        f.Size = size;
-        f.Count = count;
-        AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
-        f.FilePassDone = true;
-        if (AllChildrenComplete(path))
-          SetComplete (path);
-        if (!createFiles) // force FilePass on next time
-          f.LastFileChange = Helpers.DefaultTime;
-      }
+      f.Entries = entries;
+      f.Size = size;
+      f.Count = count;
+      AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
+      f.FilePassDone = true;
+      if (AllChildrenComplete(path))
+        SetComplete (path);
+      if (!createFiles) // force FilePass on next time
+        f.LastFileChange = Helpers.DefaultTime;
     }
-  }
+  } }
 
   /** ASYNC */
   public static void SortEntries (FSEntry f)
   {
     if (!f.IsDirectory) return;
-    lock (Cache) {
-      if (
-        f.Comparer == Comparer
-        && f.SortDirection == SortDirection
-        && f.LastSort == f.LastChange
-      ) return;
-      f.Comparer = Comparer;
-      f.SortDirection = SortDirection;
-    }
+    if (
+      f.Comparer == Comparer
+      && f.SortDirection == SortDirection
+      && f.LastSort == f.LastChange
+    ) return;
+    DateTime lc = f.LastChange;
+    f.Comparer = Comparer;
+    f.SortDirection = SortDirection;
     List<FSEntry> entries = new List<FSEntry> (f.Entries);
     entries.Sort(Comparer);
     if (SortDirection == SortingDirection.Descending)
       entries.Reverse();
-    lock (Cache) {
-      f.Entries = entries;
-      f.LastSort = f.LastChange;
-      f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
-    }
+    f.Entries = entries;
+    f.LastSort = lc;
+    f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
   }
 
   /** ASYNC */
