@@ -19,7 +19,8 @@ public static class Helpers {
   public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
   public static string TrashDir = HomeDir + DirSepS + ".Trash";
-  public static string ThumbDir = HomeDir + DirSepS + ".filezoo" + DirSepS + "Thumbs";
+  public static string ThumbDir = HomeDir + DirSepS + ".filezoo";
+  public static string NormalThumbDir = ThumbDir + DirSepS + "Thumbs";
 
   /* Text drawing helpers */
 
@@ -167,16 +168,18 @@ public static class Helpers {
   public static ImageSurface GetThumbnail (string path)
   {
     try {
-      HashAlgorithm hash = HashAlgorithm.Create ("MD5");
-      FileStream fs = File.OpenRead (path);
-      byte[] digest = hash.ComputeHash (fs);
-      fs.Close ();
-      string thumbPath = ThumbDir + DirSepS + BitConverter.ToString (digest) + ".png";
+      Profiler pr = new Profiler ("GetThumbnail", 10);
+      string thumbPath;
+      if (path.StartsWith(ThumbDir))
+        thumbPath = path;
+      else
+        thumbPath = NormalThumbDir + DirSepS + ThumbnailHash (path) + ".png";
+      pr.Time ("md5sum");
       if (!FileExists(thumbPath)) {
-        if (!FileExists(Dirname(ThumbDir)))
-          new UnixDirectoryInfo(Dirname(ThumbDir)).Create ();
         if (!FileExists(ThumbDir))
           new UnixDirectoryInfo(ThumbDir).Create ();
+        if (!FileExists(NormalThumbDir))
+          new UnixDirectoryInfo(NormalThumbDir).Create ();
         ProcessStartInfo psi = new ProcessStartInfo ();
         psi.FileName = "convert";
         psi.Arguments = EscapePath(path) + "[0] -thumbnail 128x128 " + EscapePath(thumbPath);
@@ -184,10 +187,15 @@ public static class Helpers {
         Process p = Process.Start (psi);
         p.WaitForExit ();
       }
-      if (FileExists(thumbPath))
-        return new ImageSurface (thumbPath);
-      else
+      pr.Time ("create thumbnail");
+      ImageSurface thumb;
+      if (FileExists(thumbPath)) {
+        thumb = new ImageSurface (thumbPath);
+      } else {
         throw new ArgumentException (String.Format("Failed to thumbnail {0}",path), "path");
+      }
+      pr.Time ("load as ImageSurface");
+      return thumb;
     } catch (Exception e) {
       Console.WriteLine ("Thumbnailing failed for {0}: {1}", path, e);
       ImageSurface thumb = new ImageSurface (Format.ARGB32, 1, 1);
@@ -200,6 +208,26 @@ public static class Helpers {
     }
   }
 
+  public static string ThumbnailHash (string path)
+  {
+    byte[] buf = new byte[16384];
+    UnixFileInfo u = new UnixFileInfo(path);
+    Int64 mtime = (Int64)(u.LastWriteTime.ToBinary ());
+    Int64 size = (Int64)u.Length;
+    for (int i=0; i<8; i++) {
+      buf[i] = (byte)(mtime >> (i*8));
+      buf[i+8] = (byte)(size >> (i*8));
+    }
+    UnixStream us = u.OpenRead();
+    us.Read(buf, 16, 16384-16);
+    us.Close ();
+
+    byte[] digest;
+    using (HashAlgorithm hash = HashAlgorithm.Create ("MD5"))
+      digest = hash.ComputeHash (buf);
+
+    return BitConverter.ToString (digest);
+  }
 
   /* String formatting helpers */
 
