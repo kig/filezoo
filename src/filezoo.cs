@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Timers;
 using System.IO;
 using Gtk;
 using Cairo;
@@ -123,8 +124,6 @@ class Filezoo : DrawingArea
   // modification monitor
   DateTime LastRedraw = DateTime.Now;
 
-  bool Active = true;
-
   bool PreDrawComplete = true;
 
   bool InitComplete = false;
@@ -140,7 +139,7 @@ class Filezoo : DrawingArea
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
 
-    BuildDirs (dirname);
+    CurrentDirPath = dirname;
 
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
@@ -152,7 +151,7 @@ class Filezoo : DrawingArea
   }
 
 
-  bool CheckUpdates ()
+  void CheckUpdates (object source, ElapsedEventArgs e)
   {
     if (LastRedraw != FSCache.LastChange) {
       LastRedraw = FSCache.LastChange;
@@ -162,11 +161,10 @@ class Filezoo : DrawingArea
       NeedRedraw = false;
       QueueDraw ();
     }
-    return Active;
   }
 
-  bool LongMonitor ()
-  { lock (FSCache.Cache) {
+  void LongMonitor (object source, ElapsedEventArgs ev)
+  {
     foreach (FSEntry e in CurrentDirEntry.Entries) {
       DateTime mtime = Helpers.LastChange(e.FullName);
       if (e.IsDirectory && !(e.LastFileChange == mtime)) {
@@ -174,8 +172,7 @@ class Filezoo : DrawingArea
         FSCache.Invalidate(e.FullName);
       }
     }
-    return Active;
-  } }
+  }
 
 
   /* Files model */
@@ -212,35 +209,31 @@ class Filezoo : DrawingArea
   }
 
   System.Object PreDrawLock = new System.Object ();
-  System.Object PreDrawProgressLock = new System.Object ();
   bool PreDrawInProgress = false;
   /** BLOCKING */
   void PreDraw ()
   {
+    FSDraw.CancelPreDraw();
     lock (PreDrawLock) {
-      FSDraw.CancelPreDraw();
-      lock (PreDrawProgressLock) {
-        if (PreDrawInProgress) return;
-        FSCache.Measurer = SizeField.Measurer;
-        FSCache.SortDirection = SortDirection;
-        FSCache.Comparer = SortField.Comparer;
-        PreDrawComplete = false;
-        WaitCallback cb = new WaitCallback(PreDrawCallback);
-        ThreadPool.QueueUserWorkItem(cb);
-      }
+      if (PreDrawInProgress) return;
+      PreDrawInProgress = true;
     }
+    PreDrawComplete = false;
+    FSCache.Measurer = SizeField.Measurer;
+    FSCache.SortDirection = SortDirection;
+    FSCache.Comparer = SortField.Comparer;
+    WaitCallback cb = new WaitCallback(PreDrawCallback);
+    ThreadPool.QueueUserWorkItem(cb);
   }
 
   /** ASYNC */
   void PreDrawCallback (object state)
   {
-    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
-    if (!FSCache.Measurer.DependsOnTotals)
-      FSCache.CancelTraversal ();
-    FSCache.CancelThumbnailing ();
-    lock (PreDrawProgressLock) {
-      if (PreDrawInProgress) return;
-      PreDrawInProgress = true;
+    try {
+      Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+      if (!FSCache.Measurer.DependsOnTotals)
+        FSCache.CancelTraversal ();
+      FSCache.CancelThumbnailing ();
       using (Context cr = new Context (PreDrawSurface)) {
         cr.IdentityMatrix ();
         Rectangle target = Transform (cr, Width, Height);
@@ -249,6 +242,7 @@ class Filezoo : DrawingArea
         PreDrawComplete = FSDraw.PreDraw (CurrentDirEntry, cr, target, 0);
         if (PreDrawComplete) NeedRedraw = true;
       }
+    } finally {
       PreDrawInProgress = false;
     }
   }
@@ -276,8 +270,12 @@ class Filezoo : DrawingArea
   /** BLOCKING */
   void Draw (Context cr, uint width, uint height)
   {
+    if (Helpers.StartupProfiler.Watch.IsRunning)
+      Helpers.StartupProfiler.Time ("In draw");
     cr.Save ();
       DrawClear (cr, width, height);
+      if (Helpers.StartupProfiler.Watch.IsRunning)
+        Helpers.StartupProfiler.Time ("Cleared");
       DrawToolbars (cr, width, height);
       Rectangle targetBox = Transform (cr, width, height);
       DrawCurrentDir(cr, targetBox);
@@ -309,11 +307,15 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     cr.Save ();
+    p.Time("Start toolbars");
       DrawBreadcrumb (cr, width);
+    p.Time("DrawBreadcrumb");
       DrawSortBar (cr);
+    p.Time("DrawSortBar");
       DrawSizeBar (cr);
+    p.Time("DrawSizeBar");
     cr.Restore ();
-    p.Time ("DrawToolbars");
+    p.Total ("DrawToolbars");
   }
 
   /** BLOCKING */
@@ -324,11 +326,9 @@ class Filezoo : DrawingArea
     cr.Save ();
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
-      lock (FSCache.Cache) {
-        FSCache.SortEntries(CurrentDirEntry);
-        FSCache.MeasureEntries(CurrentDirEntry);
-        c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
-      }
+      FSCache.SortEntries(CurrentDirEntry);
+      FSCache.MeasureEntries(CurrentDirEntry);
+      c = FSDraw.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
@@ -336,7 +336,10 @@ class Filezoo : DrawingArea
   /** FAST */
   void DrawBreadcrumb (Context cr, uint width)
   {
+    Profiler p = new Profiler ();
+    p.Time("In breadcrumb");
     TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontSize, CurrentDirPath);
+    p.Time("GetTextExtents");
     cr.Color = FSDraw.DirectoryColor;
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.Save ();
@@ -345,14 +348,15 @@ class Filezoo : DrawingArea
       cr.Clip ();
       cr.Translate (Math.Min(0,areaWidth-te.Width), 0);
       cr.MoveTo (0.0, 0.0);
-      FontSize = (BreadcrumbFontSize);
       if (CurrentDirPath == Helpers.RootDir) {
-        Helpers.DrawText (cr, FontSize, Helpers.RootDir);
+        Helpers.DrawText (cr, BreadcrumbFontSize, Helpers.RootDir);
       } else {
+    p.Time("start DrawText");
         foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
-          Helpers.DrawText (cr, FontSize, s);
-          Helpers.DrawText (cr, FontSize, Helpers.DirSepS);
+          Helpers.DrawText (cr, BreadcrumbFontSize, s);
+          Helpers.DrawText (cr, BreadcrumbFontSize, Helpers.DirSepS);
         }
+    p.Time("DrawText");
       }
     cr.Restore ();
   }
@@ -813,11 +817,6 @@ class Filezoo : DrawingArea
   */
   protected override bool OnExposeEvent (Gdk.EventExpose e)
   {
-    if (!InitComplete) {
-      GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
-      GLib.Timeout.Add (1030, new GLib.TimeoutHandler (LongMonitor));
-      InitComplete = true;
-    }
     using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
     {
       int w, h;
@@ -826,8 +825,17 @@ class Filezoo : DrawingArea
         Width = (uint) w;
         Height = (uint) h;
       }
-      if (Helpers.StartupProfiler.Watch.IsRunning) {
+      if (!InitComplete) {
         Helpers.StartupProfiler.Time ("First expose");
+        BuildDirs (CurrentDirPath);
+        Helpers.StartupProfiler.Time ("BuildDirs");
+        System.Timers.Timer t = new System.Timers.Timer(50);
+        t.Elapsed += new ElapsedEventHandler (CheckUpdates);
+        System.Timers.Timer t2 = new System.Timers.Timer(1000);
+        t2.Elapsed += new ElapsedEventHandler (LongMonitor);
+        t.Enabled = true;
+        t2.Enabled = true;
+        InitComplete = true;
         Helpers.StartupProfiler.Total ("Pre-drawing startup");
       }
       Draw (cr, Width, Height);

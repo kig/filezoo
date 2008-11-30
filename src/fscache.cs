@@ -150,43 +150,39 @@ public static class FSCache
   public static void FilePass (string path)
   { FilePass (path, true); }
   public static void FilePass (string path, bool createFiles)
-  {
+  { lock (Cache) {
     FSEntry f = Get (path);
-    lock (f) {
-      if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
-      f.LastFileChange = Helpers.LastChange(path);
-      if (f.IsDirectory) {
-        List<FSEntry> entries = new List<FSEntry> ();
-        long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;
-        foreach (UnixFileSystemInfo u in Helpers.EntriesMaybe (f.FullName)) {
-          if (Helpers.IsDir(u) || createFiles) {
-            FSEntry d = Get (u.FullName);
-            entries.Add (d);
-            size += d.Size;
-            subTreeSize += d.SubTreeSize;
-            subTreeCount += d.SubTreeCount;
-          } else {
-            long sz = Helpers.FileSize (u);
-            size += sz;
-            subTreeSize += sz;
-            subTreeCount++;
-          }
-          count++;
+    if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
+    f.LastFileChange = Helpers.LastChange(path);
+    if (f.IsDirectory) {
+      List<FSEntry> entries = new List<FSEntry> ();
+      long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;
+      foreach (UnixFileSystemInfo u in Helpers.EntriesMaybe (f.FullName)) {
+        if (Helpers.IsDir(u) || createFiles) {
+          FSEntry d = Get (u.FullName);
+          entries.Add (d);
+          size += d.Size;
+          subTreeSize += d.SubTreeSize;
+          subTreeCount += d.SubTreeCount;
+        } else {
+          long sz = Helpers.FileSize (u);
+          size += sz;
+          subTreeSize += sz;
+          subTreeCount++;
         }
-        lock (Cache) {
-          f.Entries = entries;
-          f.Size = size;
-          f.Count = count;
-          AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
-          f.FilePassDone = true;
-          if (AllChildrenComplete(path))
-            SetComplete (path);
-          if (!createFiles) // force FilePass on next time
-            f.LastFileChange = Helpers.DefaultTime;
-        }
+        count++;
       }
+      f.Entries = entries;
+      f.Size = size;
+      f.Count = count;
+      AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
+      f.FilePassDone = true;
+      if (AllChildrenComplete(path))
+        SetComplete (path);
+      if (!createFiles) // force FilePass on next time
+        f.LastFileChange = Helpers.DefaultTime;
     }
-  }
+  } }
 
   /** ASYNC */
   public static void SortEntries (FSEntry f)
@@ -196,13 +192,11 @@ public static class FSCache
                                || f.LastSort != f.LastChange) {
       f.Comparer = Comparer;
       f.SortDirection = SortDirection;
-      lock (f) {
-        List<FSEntry> entries = new List<FSEntry> (f.Entries);
-        entries.Sort(Comparer);
-        if (SortDirection == SortingDirection.Descending)
-          entries.Reverse();
-        f.Entries = entries;
-      }
+      List<FSEntry> entries = new List<FSEntry> (f.Entries);
+      entries.Sort(Comparer);
+      if (SortDirection == SortingDirection.Descending)
+        entries.Reverse();
+      f.Entries = entries;
       f.LastSort = f.LastChange;
       f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
     }
@@ -274,10 +268,12 @@ public static class FSCache
     {
         lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName, priority);
     }
-    if (ThumbnailThread == null) {
-      ThumbnailThread = new Thread(new ThreadStart(ThumbnailQueueProcessor));
-      ThumbnailThread.IsBackground = true;
-      ThumbnailThread.Start ();
+    lock (ThumbnailQueue) {
+      if (ThumbnailThread == null) {
+        ThumbnailThread = new Thread(new ThreadStart(ThumbnailQueueProcessor));
+        ThumbnailThread.IsBackground = true;
+        ThumbnailThread.Start ();
+      }
     }
   }
 

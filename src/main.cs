@@ -107,8 +107,11 @@ public static class FilezooApp {
 //     fz.QuitAfterFirstFrame = true;
     p.Time ("Created Filezoo");
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
+    p.Time ("Added delete handler");
     win.Add (fz);
+    p.Time ("Added fz");
     win.ShowAll ();
+    p.Time ("Gone ShowAll");
     p.Time ("Entering event loop");
     Application.Run ();
   }

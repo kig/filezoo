@@ -51,31 +51,42 @@ public static class Helpers {
 
   /* Text drawing helpers */
 
-  public static Pango.FontDescription UIFont = Pango.FontDescription.FromString ("Verdana");
-
-  static Hashtable FontCache = new Hashtable(21);
-  static Hashtable LayoutCache = new Hashtable(21);
+  static Dictionary<double,Pango.FontDescription> FontCache = new Dictionary<double,Pango.FontDescription> (21);
+//   static Dictionary<double,Pango.Layout> LayoutCache = new Dictionary<double,Pango.Layout> (21);
   static bool fontCacheInit = false;
+
+  static object FontCacheLock = new Object ();
 
   /** BLOCKING */
   static Pango.Layout GetFont(Context cr, double fontSize)
   {
-    if (!fontCacheInit) {
-      fontCacheInit = true;
-      GetFont (cr, 0.5);
-      for (int i=1; i<20; i++)
-        GetFont (cr, i);
-    }
-    if (!FontCache.Contains(fontSize)) {
-      Pango.FontDescription font = Pango.FontDescription.FromString ("Sans");
-      font.Size = (int)(fontSize * Pango.Scale.PangoScale);
-      FontCache.Add(fontSize, font);
+    Profiler p = new Profiler ("GetFont");
+    lock (FontCacheLock) {
+      p.Time ("Got FontCacheLock");
+      if (!fontCacheInit) {
+        fontCacheInit = true;
+        CreateFont (0.5);
+        for (int i=1; i<20; i++)
+          CreateFont (i);
+        p.Time ("FontCache init");
+      }
+      if (!FontCache.ContainsKey(fontSize)) {
+        CreateFont (fontSize);
+        p.Time ("Created font");
+      }
 
       Pango.Layout layout = Pango.CairoHelper.CreateLayout (cr);
-      layout.FontDescription = font;
-      LayoutCache.Add(fontSize, layout);
+      layout.FontDescription = FontCache[fontSize];
+      p.Time ("Created layout");
+      return layout;
     }
-    return (Pango.Layout)LayoutCache[fontSize];
+  }
+
+  static void CreateFont (double fontSize)
+  {
+    Pango.FontDescription font = Pango.FontDescription.FromString ("Sans");
+    font.Size = (int)(fontSize * Pango.Scale.PangoScale);
+    FontCache[fontSize] = font;
   }
 
   /** FAST */
@@ -84,37 +95,39 @@ public static class Helpers {
   /** BLOCKING */
   public static void DrawText (Context cr, double fontSize, string text)
   {
-  Stopwatch wa = new Stopwatch ();
-  wa.Start ();
+    Profiler p = new Profiler ("DrawText");
     Pango.Layout layout = GetFont (cr, QuantizeFontSize(fontSize));
-    layout.SetText (text);
-    Pango.Rectangle pe, le;
-    layout.GetExtents(out pe, out le);
-  wa.Stop ();
-//   Console.WriteLine ("DrawText GetExtents: {0}", wa.ElapsedTicks);
-  wa.Reset ();
-  wa.Start ();
-    double w = (double)le.Width / (double)Pango.Scale.PangoScale;
-    Pango.CairoHelper.ShowLayout (cr, layout);
-  wa.Stop ();
-//   Console.WriteLine ("DrawText ShowLayout: {0}", wa.ElapsedTicks);
-    cr.RelMoveTo (w, 0);
+    lock (layout) {
+      layout.SetText (text);
+      Pango.Rectangle pe, le;
+      layout.GetExtents(out pe, out le);
+      p.Time ("GetExtents");
+      double w = (double)le.Width / (double)Pango.Scale.PangoScale;
+      Pango.CairoHelper.ShowLayout (cr, layout);
+      p.Time ("ShowLayout");
+      cr.RelMoveTo (w, 0);
+    }
   }
 
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, double fontSize, string text)
   {
+    Profiler p = new Profiler ("TextExtents");
     TextExtents te = new TextExtents ();
       Pango.Layout layout = GetFont (cr, fontSize);
-      layout.SetText (text);
-      Pango.Rectangle pe, le;
-      layout.GetExtents(out pe, out le);
-      double w = (double)le.Width / (double)Pango.Scale.PangoScale,
-            h = (double)le.Height / (double)Pango.Scale.PangoScale;
-      te.Height = h;
-      te.Width = w;
-      te.XAdvance = w;
-      te.YAdvance = 0;
+    p.Time ("GetFont");
+      lock (layout) {
+        layout.SetText (text);
+        Pango.Rectangle pe, le;
+        layout.GetExtents(out pe, out le);
+    p.Time ("layout.GetExtents");
+        double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+              h = (double)le.Height / (double)Pango.Scale.PangoScale;
+        te.Height = h;
+        te.Width = w;
+        te.XAdvance = w;
+        te.YAdvance = 0;
+      }
     return te;
   }
 
@@ -227,9 +240,10 @@ public static class Helpers {
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        pr.Time ("create thumbnail");
-        if (CreateThumbnail(path, thumbPath, 128))
+        if (CreateThumbnail(path, thumbPath, 128)) {
+          pr.Time ("create thumbnail");
           thumb = new ImageSurface (thumbPath);
+        }
       } else {
         thumb = new ImageSurface (thumbPath);
       }
