@@ -184,11 +184,30 @@ public static class Helpers {
   }
 
   /** DESTRUCTIVE, BLOCKING */
-  public static void Delete (string path)
+  public static void Trash (string path)
   {
     if (!FileExists (TrashDir))
       new UnixDirectoryInfo(TrashDir).Create();
-    System.IO.File.Move (path, TrashDir + DirSepS + Basename(path));
+    Move (path, TrashDir + DirSepS + Basename(path));
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
+  public static void Move (string src, string dst)
+  {
+    for (int i=0; i<10; i++) {
+      if (FileExists(dst)) {
+        try {
+          if (IsDir(dst))
+            new UnixDirectoryInfo(dst).Delete(true);
+          else
+            new UnixFileInfo(dst).Delete();
+        } catch (Exception) {}
+      }
+      try {
+        System.IO.File.Move (src, dst);
+        break;
+      } catch (Exception) {}
+    }
   }
 
   /** ASYNC, DESTRUCTIVE */

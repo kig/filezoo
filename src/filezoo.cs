@@ -127,6 +127,8 @@ class Filezoo : DrawingArea
 
   bool PreDrawComplete = true;
 
+  bool InitComplete = false;
+
   Menu ContextMenu;
 
   /* Constructor */
@@ -140,16 +142,15 @@ class Filezoo : DrawingArea
 
     BuildDirs (dirname);
 
-    GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
-    GLib.Timeout.Add (1030, new GLib.TimeoutHandler (LongMonitor));
-
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
       | Gdk.EventMask.ButtonReleaseMask
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
     ));
+
   }
+
 
   bool CheckUpdates ()
   {
@@ -184,15 +185,18 @@ class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
+    FirstFrameOfDir = true;
+
     if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
     CurrentDirPath = d.FullName;
-    dirLatencyProfiler.Restart ();
-    FSCache.Watch (CurrentDirPath);
+
+    FSCache.CancelTraversal ();
+
     CurrentDirEntry = FSCache.Get (CurrentDirPath);
     FSCache.FilePass (CurrentDirPath);
-    FirstFrameOfDir = true;
-    FSCache.CancelTraversal ();
+    FSCache.Watch (CurrentDirPath);
+
     ResetZoom ();
     PreDraw ();
     p.Time("BuildDirs");
@@ -609,12 +613,54 @@ class Filezoo : DrawingArea
     }
 
     /** DESTRUCTIVE */
-    MenuItem trash = new MenuItem ("Delete");
+    MenuItem rename = new MenuItem ("Rename");
+    rename.Activated += new EventHandler(delegate {
+      ShowRenameDialog (menu.Title);
+    });
+    menu.Append (rename);
+
+    /** DESTRUCTIVE */
+    MenuItem trash = new MenuItem ("Move to trash");
     trash.Activated += new EventHandler(delegate {
-      Helpers.Delete(menu.Title); });
+      Helpers.Trash(menu.Title); });
     menu.Append (trash);
   }
 
+
+  void ShowRenameDialog (string path)
+  {
+    string basename = Helpers.Basename(path);
+    Dialog d = new Dialog();
+    d.Modal = true;
+    d.BorderWidth = 10;
+    d.Title = String.Format ("Renaming {0}", path);
+    d.VBox.Add (new Label (d.Title));
+    Entry e = new Entry (path);
+    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
+    d.VBox.Add (e);
+    d.AddButton ("Ok", ResponseType.Ok);
+    d.AddButton ("Cancel", ResponseType.Cancel);
+
+    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
+      if (args.ResponseId == ResponseType.Ok) {
+        Helpers.Move (path, e.Text);
+        FSCache.Invalidate (path);
+        FSCache.Invalidate (e.Text);
+        if (path == CurrentDirPath) {
+          BuildDirs (e.Text);
+        }
+      } else {
+        Console.WriteLine (args.ResponseId);
+      }
+      d.Destroy ();
+    });
+
+    d.ShowAll ();
+    e.SelectRegion(path.Length-basename.Length, -1);
+
+//     d.Run ();
+//     d.Destroy ();
+  }
 
 
   /* Zooming and panning */
@@ -767,6 +813,11 @@ class Filezoo : DrawingArea
   */
   protected override bool OnExposeEvent (Gdk.EventExpose e)
   {
+    if (!InitComplete) {
+      GLib.Timeout.Add (50, new GLib.TimeoutHandler (CheckUpdates));
+      GLib.Timeout.Add (1030, new GLib.TimeoutHandler (LongMonitor));
+      InitComplete = true;
+    }
     using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
     {
       int w, h;
