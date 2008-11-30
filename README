@@ -5,7 +5,7 @@ Filezoo's guiding principles are effective visualization and blinding speed.
 Most directories open in under 100ms (== time from clicking the directory to
 first frame drawn) on my 2GHz computer.
 
-Filezoo is written using Gtk# and Cairo.
+Filezoo is written in C# using Mono, Gtk# and Cairo.
 
 Requirements:
   mono
