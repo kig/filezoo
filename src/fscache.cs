@@ -297,6 +297,7 @@ public static class FSCache
 
   static void ThumbnailQueueProcessor ()
   {
+    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
       while (ThumbnailQueue.Count > 0)
         ProcessThumbnailQueue ();

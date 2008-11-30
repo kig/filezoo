@@ -232,10 +232,10 @@ class Filezoo : DrawingArea
   /** ASYNC */
   void PreDrawCallback ()
   {
+    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
       if (PreDrawInProgress) {
         try {
-          Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
           if (!FSCache.Measurer.DependsOnTotals)
             FSCache.CancelTraversal ();
           FSCache.CancelThumbnailing ();
