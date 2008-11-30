@@ -649,7 +649,9 @@ class Filezoo : DrawingArea
     d.HasSeparator = false;
     d.BorderWidth = 10;
     d.Title = String.Format ("Renaming {0}", path);
-    d.VBox.Add (new Label (d.Title));
+    Label label = new Label (d.Title);
+    label.UseUnderline = false;
+    d.VBox.Add (label);
     Entry e = new Entry (path);
     e.WidthChars = Math.Min(100, e.Text.Length + 10);
     e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
@@ -684,7 +686,9 @@ class Filezoo : DrawingArea
     d.HasSeparator = false;
     d.BorderWidth = 10;
     d.Title = "Create file";
-    d.VBox.Add (new Label (d.Title));
+    Label label = new Label (d.Title);
+    label.UseUnderline = false;
+    d.VBox.Add (label);
     Entry e = new Entry (path + Helpers.DirSepS + "new_file");
     e.WidthChars = Math.Min(100, e.Text.Length + 10);
     e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
