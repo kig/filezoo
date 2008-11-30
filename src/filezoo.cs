@@ -588,17 +588,18 @@ class Filezoo : DrawingArea
     if (c.Target.IsDirectory) {
     // Directory menu items
 
-      MenuItem goTo = new MenuItem ("Go to " + c.Target.Name);
+      MenuItem goTo = new MenuItem ("_Go to " + c.Target.Name);
       goTo.Activated += new EventHandler(delegate {
         BuildDirs (menu.Title); });
       menu.Append (goTo);
 
-      MenuItem term = new MenuItem ("Open terminal");
+      MenuItem term = new MenuItem ("Open _terminal");
       term.Activated += new EventHandler(delegate {
         Helpers.OpenTerminal (menu.Title); });
       menu.Append (term);
 
-      MenuItem create = new MenuItem ("Create file");
+      /** DESTRUCTIVE */
+      MenuItem create = new MenuItem ("_Create file");
       create.Activated += new EventHandler(delegate {
         ShowCreateDialog (menu.Title); });
       menu.Append (create);
@@ -606,14 +607,14 @@ class Filezoo : DrawingArea
     } else {
     // File menu items
 
-      MenuItem open = new MenuItem ("Open " + c.Target.Name);
+      MenuItem open = new MenuItem ("_Open " + c.Target.Name);
       open.Activated += new EventHandler(delegate {
         Helpers.OpenFile (menu.Title); });
       menu.Append (open);
 
       /** DESTRUCTIVE */
       if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
-        MenuItem ex = new MenuItem ("Extract");
+        MenuItem ex = new MenuItem ("_Extract");
         ex.Activated += new EventHandler(delegate {
           Helpers.ExtractFile (menu.Title); });
         menu.Append (ex);
@@ -624,7 +625,7 @@ class Filezoo : DrawingArea
     menu.Append (new SeparatorMenuItem ());
 
     /** DESTRUCTIVE */
-    MenuItem rename = new MenuItem ("Rename");
+    MenuItem rename = new MenuItem ("_Rename");
     rename.Activated += new EventHandler(delegate {
       ShowRenameDialog (menu.Title);
     });
@@ -648,8 +649,8 @@ class Filezoo : DrawingArea
     d.ActionArea.Layout = ButtonBoxStyle.Spread;
     d.HasSeparator = false;
     d.BorderWidth = 10;
-    d.Title = String.Format ("Renaming {0}", path);
-    Label label = new Label (d.Title);
+    d.Title = "Renaming " + basename;
+    Label label = new Label (String.Format ("Renaming {0}", path));
     label.UseUnderline = false;
     d.VBox.Add (label);
     Entry e = new Entry (path);
@@ -686,7 +687,7 @@ class Filezoo : DrawingArea
     d.HasSeparator = false;
     d.BorderWidth = 10;
     d.Title = "Create file";
-    Label label = new Label (d.Title);
+    Label label = new Label ("Create file");
     label.UseUnderline = false;
     d.VBox.Add (label);
     Entry e = new Entry (path + Helpers.DirSepS + "new_file");
