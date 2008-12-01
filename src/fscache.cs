@@ -290,7 +290,9 @@ public static class FSCache
   static void GetThumbnail (string path)
   {
     if (Get (path).Thumbnail == null) {
-      Get (path).Thumbnail = Helpers.GetThumbnail (path);
+      ImageSurface tn = Helpers.GetThumbnail (path);
+      FSEntry f = Get (path);
+      f.Thumbnail = tn;
       LastChange = DateTime.Now;
     }
   }
@@ -404,6 +406,7 @@ public static class FSCache
     // ditch path's children, ditch path, excise path from parent,
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
+    d.Thumbnail = null;
     DeleteChildren (path);
     List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
     e.Remove(d);
@@ -431,6 +434,7 @@ public static class FSCache
     // redo path's file pass
     // enter new data to parent
     FSEntry d = Get (path);
+    d.Thumbnail = null;
     if (d.IsDirectory) {
       d.FilePassDone = false;
       bool oc = d.Complete;

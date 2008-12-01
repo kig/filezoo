@@ -63,8 +63,10 @@ public class Profiler
       ((PrintProfile == Print.Global) && GlobalPrintProfile))
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      string bar = "".PadLeft((int)Math.Min(10, Math.Round(elapsedMilliseconds / 20)), '#');
-      Console.WriteLine (prefix + bar.PadLeft(10) + " " + time.PadLeft(10) + Prefix + "  " + message);
+      int barLength = Math.Max((int)Math.Min(10, Math.Round(elapsedMilliseconds / 20))-1, 0);
+      string barStart = (elapsedMilliseconds > 200 ? "─" : (elapsedMilliseconds < 20 ? "" : "╾"));
+      string bar = barStart.PadRight(barLength, '─');
+      Console.WriteLine (prefix + bar.PadLeft(10) + "╼" + time.PadLeft(10) + Prefix + "  " + message);
     }
   }
 
@@ -86,7 +88,7 @@ public class Profiler
   }
 
   public void Total (string message) {
-    PrintTime (message+"\n", TotalElapsed, "Total ".PadRight(50, '-')+"\n");
+    PrintTime (message+"\n", TotalElapsed, "\u001b[4mTotal".PadRight(80, ' ')+"\u001b[0m\n");
   }
 
   /** FAST */

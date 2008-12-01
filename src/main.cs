@@ -18,6 +18,7 @@
 
 using Gtk;
 using System.Collections.Generic;
+using Cairo;
 
 public static class FilezooApp {
 
@@ -104,15 +105,24 @@ public static class FilezooApp {
     System.Threading.ThreadPool.SetMinThreads (10, 20);
     Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
     fz.Prefixes = Prefixes;
+    fz.BreadcrumbFontFamily = "URW Gothic L";
+    fz.ToolbarTitleFontFamily = "Sans";
+    fz.ToolbarLabelFontFamily = "Sans";
+
+    fz.FileNameFontFamily = "URW Gothic L";
+    fz.FileInfoFontFamily = "Sans";
+    fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
+    fz.Renderer.RegularFileColor = new Color (0.188, 0.855, 1);
+    fz.Renderer.SymlinkColor = new Color (0.855, 0.188, 1);
+    fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
+    fz.Renderer.ExecutableColor = new Color (0.4, 1.0, 0.6);
+    fz.ActiveColor = new Color (0.188, 0.855, 1);
+    fz.InActiveColor = new Color (0.188, 0.855, 1,0.5);
 //     fz.QuitAfterFirstFrame = true;
     p.Time ("Created Filezoo");
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
-    p.Time ("Added delete handler");
     win.Add (fz);
-    p.Time ("Added fz");
     win.ShowAll ();
-    p.Time ("Gone ShowAll");
-    p.Time ("Entering event loop");
     Application.Run ();
   }
 

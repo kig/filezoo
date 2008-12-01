@@ -68,7 +68,7 @@ public class FSEntry
   public ImageSurface Thumbnail = null;
 
 
-  public FSEntry (string path) : this (new UnixDirectoryInfo(path)) {}
+  public FSEntry (string path) : this (new UnixFileInfo(path)) {}
 
   public FSEntry (UnixFileSystemInfo u)
   {

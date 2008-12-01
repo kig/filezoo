@@ -25,29 +25,36 @@ using Mono.Unix;
 using Cairo;
 
 
-public static class FSDraw
+public class FSDraw
 {
   // Colors for the different file types, quite like ls
-  public static Color DirectoryColor = new Color (0,0,1);
-  public static Color BlockDeviceColor = new Color (0.75,0.5,0);
-  public static Color CharacterDeviceColor = new Color (0.5,0.25,0);
-  public static Color FifoColor = new Color (0.75,0,0.22);
-  public static Color SocketColor = new Color (0.75,0,0.82);
-  public static Color SymlinkColor = new Color (0,0.75,0.93);
-  public static Color ExecutableColor = new Color (0.2,0.6,0);
-  public static Color RegularFileColor = new Color (0,0,0);
-  public static Color ParentDirectoryColor = new Color (0,0,1);
+  public Color DirectoryColor = new Color (0,0,1);
+  public Color BlockDeviceColor = new Color (0.75,0.5,0);
+  public Color CharacterDeviceColor = new Color (0.5,0.25,0);
+  public Color FifoColor = new Color (0.75,0,0.22);
+  public Color SocketColor = new Color (0.75,0,0.82);
+  public Color SymlinkColor = new Color (0,0.75,0.93);
+  public Color ExecutableColor = new Color (0.2,0.6,0);
+  public Color RegularFileColor = new Color (0,0,0);
+  public Color ParentDirectoryColor = new Color (0,0,1);
 
-  public static Color UnfinishedDirectoryColor = new Color (0.5, 0, 1);
-  public static Color BackgroundColor = new Color (1,1,1);
+  public Color UnfinishedDirectoryColor = new Color (0.5, 0, 1);
+  public Color BackgroundColor = new Color (1,1,1);
+
+  public string FileNameFontFamily = "Sans";
+  public string FileInfoFontFamily = "Sans";
 
   // Style for the entries
-  public static double BoxWidth = 0.1;
+  public double BoxWidth = 128.0;
 
-  public static double MinFontSize = 0.5;
-  public static double MaxFontSize = 12.0;
+  public double MinFontSize = 0.5;
+  public double MaxFontSize = 12.0;
 
-  static Profiler FrameProfiler = new Profiler ();
+  Profiler FrameProfiler = new Profiler ();
+
+  public double DefaultZoom = 2.0;
+  public double DefaultPan = -0.43;
+
 
   /* Subtitles */
 
@@ -58,16 +65,18 @@ public static class FSDraw
     bytes.
     For files, the subtitle contains the size of the file.
     */
-  public static string GetSubTitle (FSEntry d)
+  public string GetSubTitle (FSEntry d)
   {
     if (d.IsDirectory) {
       string extras = "";
       // entries sans parent dir
-      extras += String.Format("{0} ", d.Count.ToString("N0"));
-      extras += (d.Count == 1) ? "entry" : "entries";
       if (FSCache.Measurer.DependsOnTotals) {
-        extras += String.Format(", {0} files", d.SubTreeCount.ToString("N0"));
+        extras += String.Format("{0} ", d.SubTreeCount.ToString("N0"));
+        extras += d.SubTreeCount == 1 ? "file" : "files";
         extras += String.Format(", {0} total", Helpers.FormatSI(d.SubTreeSize, "B"));
+      } else {
+        extras += String.Format("{0} ", d.Count.ToString("N0"));
+        extras += (d.Count == 1) ? "entry" : "entries";
       }
       return extras;
     } else {
@@ -79,7 +88,7 @@ public static class FSDraw
   /**
     Returns a "rwxr-x--- owner group" string for the FSEntry.
     */
-  public static string PermissionString (FSEntry d)
+  public string PermissionString (FSEntry d)
   {
     string pstring = PermString (
       d.Permissions,
@@ -104,7 +113,7 @@ public static class FSDraw
   /**
     @returns The "rwx"-string for the given permission enums.
     */
-  static string PermString (FileAccessPermissions permissions, FileAccessPermissions r, FileAccessPermissions w, FileAccessPermissions x)
+  string PermString (FileAccessPermissions permissions, FileAccessPermissions r, FileAccessPermissions w, FileAccessPermissions x)
   {
     char[] chars = {'-', '-', '-'};
     if ((permissions & r) == r) chars[0] = 'r';
@@ -122,7 +131,7 @@ public static class FSDraw
     The scaled height is a float between 0 and 1 normalized
     so that the heights of the entries of a directory sum to 1.
     */
-  public static double GetScaledHeight (FSEntry d)
+  public double GetScaledHeight (FSEntry d)
   {
     return d.Height * d.Scale;
   }
@@ -131,7 +140,7 @@ public static class FSDraw
   /**
     Gets the font size for the given device-space height of the FSEntry.
     */
-  static double GetFontSize (FSEntry d, double h)
+  double GetFontSize (FSEntry d, double h)
   {
     return h * (d.IsDirectory ? 0.4 : 0.5);
   }
@@ -141,7 +150,7 @@ public static class FSDraw
     Get the Cairo Color for the given filetype and permissions (permissions used
     to color executables green.)
     */
-  public static Color GetColor (FileTypes filetype, FileAccessPermissions perm)
+  public Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
       case FileTypes.Directory: return DirectoryColor;
@@ -166,7 +175,7 @@ public static class FSDraw
     If either is true, returns false, otherwise reckons the DirStats would be
     visible and returns true.
     */
-  public static bool IsVisible (FSEntry d, Context cr, Rectangle target)
+  public bool IsVisible (FSEntry d, Context cr, Rectangle target)
   {
     double h = cr.Matrix.Yy * GetScaledHeight (d);
     double y = cr.Matrix.Y0 - target.Y;
@@ -175,9 +184,6 @@ public static class FSDraw
       return false;
     return ((y < target.Height) && ((y+h) > 0.0));
   }
-
-  public static double DefaultZoom = 2.0;
-  public static double DefaultPan = -0.43;
 
   /** BLOCKING */
   /**
@@ -197,11 +203,11 @@ public static class FSDraw
     @param firstFrame Whether this frame should be drawn as fast as possible.
     @returns The number of files instances drawn.
   */
-  public static uint Draw
+  public uint Draw
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target) {
     return Draw (d, prefixes, cr, target, 0);
   }
-  public static uint Draw
+  public uint Draw
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
     if (depth == 0) {
@@ -214,7 +220,8 @@ public static class FSDraw
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      Helpers.DrawRectangle(cr, -0.01*BoxWidth, 0.0, BoxWidth*1.02, 1.02, target);
+      double rBoxWidth = BoxWidth / target.Height;
+      Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
       cr.Color = BackgroundColor;
       cr.Fill ();
       Color co = GetColor (d.FileType, d.Permissions);
@@ -223,16 +230,16 @@ public static class FSDraw
       if (d.IsDirectory) // fade out dir based on size on screen
         co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
       cr.Color = co;
-      Helpers.DrawRectangle (cr, 0.0, 0.02, BoxWidth, 0.96, target);
+      Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
       if (d.Thumbnail != null)
-        DrawThumb (d, cr);
+        DrawThumb (d, cr, target);
       else
         cr.Fill ();
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1.0;
       cr.Color = co;
       if (cr.Matrix.Yy > 0.5 || depth < 2)
-        DrawTitle (d, prefixes, cr, depth);
+        DrawTitle (d, prefixes, cr, target, depth);
       if (d.IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
@@ -249,18 +256,24 @@ public static class FSDraw
   /**
     Draws the thumbnail of the FSEntry.
     */
-  static void DrawThumb (FSEntry d, Context cr) {
+  void DrawThumb (FSEntry d, Context cr, Rectangle target) {
     ImageSurface thumb = d.Thumbnail;
+    double rBoxWidth = BoxWidth / target.Height;
     using (Pattern p = new Pattern (thumb)) {
       cr.Save ();
-        double wr = cr.Matrix.Xx * BoxWidth;
-        double hr = cr.Matrix.Yy * 0.96;
-        double wscale = wr / thumb.Width;
-        double hscale = hr / thumb.Height;
-        double scale = Math.Max (wscale, hscale);
-        cr.Translate (       0.5*BoxWidth*(1 - (scale/wscale)),
-                      0.02 + 0.5*0.48*(1 - (scale/hscale)));
-        cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
+          double wr = cr.Matrix.Xx * rBoxWidth;
+          double hr = cr.Matrix.Yy * 0.96;
+          double wscale = wr / thumb.Width;
+          double hscale = hr / thumb.Height;
+          double scale = Math.Max (wscale, hscale);
+          double x = 0.5*rBoxWidth*(1 - (scale/wscale));
+          double y = 0.02 + 0.5*0.48*(1 - (scale/hscale));
+          cr.Translate (x, y);
+          cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
+          p.Matrix.X0 = Math.Floor(p.Matrix.X0);
+          p.Matrix.Y0 = Math.Floor(p.Matrix.Y0);
+          p.Matrix.Xx = Math.Max(1, p.Matrix.Xx);
+          p.Matrix.Yy = Math.Max(1, p.Matrix.Yy);
         cr.Pattern = p;
         cr.Fill ();
       cr.Restore ();
@@ -271,10 +284,11 @@ public static class FSDraw
   /**
     Sets up child area transform for the FSEntry.
     */
-  static void ChildTransform (FSEntry d, Context cr, Rectangle target)
+  void ChildTransform (FSEntry d, Context cr, Rectangle target)
   {
+    double rBoxWidth = BoxWidth / target.Height;
     double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
-    cr.Translate (fac*BoxWidth, 0.48);
+    cr.Translate (0.5*fac*rBoxWidth, 0.48);
     cr.Scale (1.0-fac, 0.44);
   }
 
@@ -288,14 +302,15 @@ public static class FSDraw
 
     If the FSEntry is very small, draws a rectangle instead of text for speed.
     */
-  static void DrawTitle
-  (FSEntry d, Dictionary<string, string> prefixes, Context cr, uint depth)
+  void DrawTitle
+  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
+    double rBoxWidth = BoxWidth / target.Height;
     double h = cr.Matrix.Yy;
     double rfs = GetFontSize(d, h);
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
-      cr.Translate(BoxWidth * 1.1, 0.02);
+      cr.Translate(rBoxWidth * 1.1, 0.02);
       if (d.IsDirectory && rfs > 60)
         cr.Translate(0.0, 0.46);
       double x = cr.Matrix.X0;
@@ -312,26 +327,26 @@ public static class FSDraw
         if (depth == 0)
           cr.Translate (0, -fs*0.5);
         cr.MoveTo (0, -fs*0.2);
-        Helpers.DrawText (cr, fs, name);
-        cr.RelMoveTo(0, fs*0.35);
-        Helpers.DrawText (cr, fs * 0.7, "  " + GetSubTitle (d));
+        Helpers.DrawText (cr, FileNameFontFamily, fs, name);
 
         double sfs = Helpers.Clamp(
           d.IsDirectory ? rfs*0.05 : rfs*0.28,
           MinFontSize, MaxFontSize*0.6);
         if (sfs > 1) {
           double a = sfs / (MaxFontSize*0.6);
-          cr.Color = new Color (0,0,0, a*a);
-          cr.MoveTo (0, fs*1.1+sfs*0.8);
-          Helpers.DrawText (cr, sfs, "Modified " + d.LastModified.ToString());
+          Color co = GetColor (d.FileType, d.Permissions);
+          co.A = a*a;
+          cr.Color = co;
+          cr.MoveTo (0, fs*1.1+sfs*0.6);
+          Helpers.DrawText (cr, FileInfoFontFamily, sfs, d.LastModified.ToString() + " - " + GetSubTitle (d));
           cr.MoveTo (0, fs*1.1+sfs*2.0);
-          Helpers.DrawText (cr, sfs, PermissionString (d));
+          Helpers.DrawText (cr, FileInfoFontFamily, sfs, PermissionString (d));
         }
       } else if (fs > 1) {
         cr.MoveTo (0, fs*0.1);
-        Helpers.DrawText (cr, fs, name + "  " + GetSubTitle (d));
+        Helpers.DrawText (cr, FileNameFontFamily, fs, name);
       } else {
-        cr.Rectangle (0.0, 0.0, fs / 2 * (name.Length+15), fs/3);
+        cr.Rectangle (0.0, 0.0, fs / 2 * name.Length, fs/3);
         cr.Fill ();
       }
     cr.Restore ();
@@ -346,7 +361,7 @@ public static class FSDraw
 
     @returns The total amount of subtree files drawn.
     */
-  static uint DrawChildren
+  uint DrawChildren
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
     cr.Save ();
@@ -364,12 +379,12 @@ public static class FSDraw
 
   /* Visibility */
 
-  static System.Object PreDrawCancelLock = new System.Object ();
-  static System.Object PreDrawLock = new System.Object ();
-  static int PreDrawInProgress = 0;
-  static bool PreDrawCancelled = false;
+  System.Object PreDrawCancelLock = new System.Object ();
+  System.Object PreDrawLock = new System.Object ();
+  int PreDrawInProgress = 0;
+  bool PreDrawCancelled = false;
 
-  public static void CancelPreDraw ()
+  public void CancelPreDraw ()
   {
     lock (PreDrawCancelLock) {
       PreDrawCancelled = true;
@@ -380,7 +395,7 @@ public static class FSDraw
   }
 
   /** ASYNC */
-  public static bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
+  public bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     if (depth > 0 && !IsVisible(d, cr, target)) return true;
     lock (PreDrawLock) PreDrawInProgress ++;
@@ -405,7 +420,7 @@ public static class FSDraw
   }
 
   /** ASYNC */
-  static bool PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
+  bool PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     ChildTransform (d, cr, target);
     FSCache.FilePass(d.FullName);
@@ -421,7 +436,7 @@ public static class FSDraw
   }
 
   /** ASYNC */
-  static void RequestThumbnail (string path, int priority)
+  void RequestThumbnail (string path, int priority)
   {
     FSCache.FetchThumbnail (path, priority);
   }
@@ -443,10 +458,10 @@ public static class FSDraw
     @param mouseY The Y coordinate of the mouse pointer, Y grows down from top.
     @returns A List<ClickHit> of the hit entries.
     */
-  public static List<ClickHit> Click
+  public List<ClickHit> Click
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY)
   { return Click (d, cr, target, mouseX, mouseY, 0); }
-  public static List<ClickHit> Click
+  public List<ClickHit> Click
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     // return empty list if click outside target or if non-root d is not visible
@@ -463,6 +478,7 @@ public static class FSDraw
     double advance = 0.0;
     cr.Save ();
       cr.Scale (1, h);
+      double rBoxWidth = BoxWidth / target.Height;
       if (d.IsDirectory && (cr.Matrix.Yy > 2) && d.ReadyToDraw)
         retval.AddRange( ClickChildren (d, cr, target, mouseX, mouseY, depth) );
       cr.NewPath ();
@@ -471,10 +487,10 @@ public static class FSDraw
       if (fs < 10) {
         advance += fs / 2 * (d.Name.Length+15);
       } else {
-        advance += Helpers.GetTextExtents (cr, fs, d.Name).XAdvance;
-        advance += Helpers.GetTextExtents (cr, fs*0.7, "  " + GetSubTitle (d)).XAdvance;
+        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, d.Name).XAdvance;
+        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs*0.7, "  " + GetSubTitle (d)).XAdvance;
       }
-      cr.Rectangle (0.0, 0.0, BoxWidth * 1.1 + advance, 1.0);
+      cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);
       double ys = cr.Matrix.Yy;
       cr.IdentityMatrix ();
       if (cr.InFill(mouseX,mouseY))
@@ -490,7 +506,7 @@ public static class FSDraw
     Returns the first Click return value with one or more entries.
     If nothing was hit, returns an empty List.
     */
-  static List<ClickHit> ClickChildren
+  List<ClickHit> ClickChildren
   (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     List<ClickHit> retval = new List<ClickHit> ();
@@ -516,7 +532,7 @@ public static class FSDraw
 
     Returns the Covering with the FSEntry, the relative zoom and the relative pan.
     */
-  public static Covering FindCovering
+  public Covering FindCovering
   (FSEntry d, Context cr, Rectangle target, uint depth)
   {
     Covering retval = (depth == 0 ? GetCovering(d, cr, target) : null);
@@ -560,7 +576,7 @@ public static class FSDraw
     return retval;
   }
 
-  static Covering GetCovering (FSEntry d, Context cr, Rectangle target)
+  Covering GetCovering (FSEntry d, Context cr, Rectangle target)
   {
     double z = cr.Matrix.Yy / target.Height;
     double pan = (cr.Matrix.Y0-target.Y) / (target.Height*z);

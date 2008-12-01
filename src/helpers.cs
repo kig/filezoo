@@ -51,83 +51,70 @@ public static class Helpers {
 
   /* Text drawing helpers */
 
-  static Dictionary<double,Pango.FontDescription> FontCache = new Dictionary<double,Pango.FontDescription> (21);
-//   static Dictionary<double,Pango.Layout> LayoutCache = new Dictionary<double,Pango.Layout> (21);
-  static bool fontCacheInit = false;
+  static Dictionary<string,Pango.FontDescription> FontCache = new Dictionary<string,Pango.FontDescription> (21);
 
   static object FontCacheLock = new Object ();
 
   /** BLOCKING */
-  static Pango.Layout GetFont(Context cr, double fontSize)
+  static Pango.Layout GetLayout(Context cr, string family, double fontSize)
   {
     Profiler p = new Profiler ("GetFont");
     lock (FontCacheLock) {
       p.Time ("Got FontCacheLock");
-      if (!fontCacheInit) {
-        fontCacheInit = true;
-        CreateFont (0.5);
-        for (int i=1; i<20; i++)
-          CreateFont (i);
-        p.Time ("FontCache init");
-      }
-      if (!FontCache.ContainsKey(fontSize)) {
-        CreateFont (fontSize);
-        p.Time ("Created font");
-      }
-
       Pango.Layout layout = Pango.CairoHelper.CreateLayout (cr);
-      layout.FontDescription = FontCache[fontSize];
-      p.Time ("Created layout");
+      layout.FontDescription = CreateFont (family, fontSize);
+      p.Time ("Got font and created layout");
       return layout;
     }
   }
 
-  static void CreateFont (double fontSize)
+  static Pango.FontDescription CreateFont (string family, double fontSize)
   {
-    Pango.FontDescription font = Pango.FontDescription.FromString ("Sans");
-    font.Size = (int)(fontSize * Pango.Scale.PangoScale);
-    FontCache[fontSize] = font;
+    string key = family+fontSize.ToString();
+    if (!FontCache.ContainsKey(key)) {
+      Pango.FontDescription font = Pango.FontDescription.FromString (family);
+      font.Size = (int)(fontSize * Pango.Scale.PangoScale);
+      FontCache[key] = font;
+      return font;
+    } else {
+      return FontCache[key];
+    }
   }
 
   /** FAST */
   static double QuantizeFontSize (double fs) { return Math.Max(0.5, Math.Floor(fs)); }
 
   /** BLOCKING */
-  public static void DrawText (Context cr, double fontSize, string text)
+  public static void DrawText (Context cr, string family, double fontSize, string text)
   {
     Profiler p = new Profiler ("DrawText");
-    Pango.Layout layout = GetFont (cr, QuantizeFontSize(fontSize));
+    Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
+    layout.SetText (text);
+    Pango.Rectangle pe, le;
+    layout.GetExtents(out pe, out le);
+    p.Time ("GetExtents");
+    double w = (double)le.Width / (double)Pango.Scale.PangoScale;
+    Pango.CairoHelper.ShowLayout (cr, layout);
+    p.Time ("ShowLayout");
+    cr.RelMoveTo (w, 0);
+  }
+
+  /** BLOCKING */
+  public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
+  {
+    TextExtents te = new TextExtents ();
+    Pango.Layout layout = GetLayout (cr, family, fontSize);
     lock (layout) {
       layout.SetText (text);
       Pango.Rectangle pe, le;
       layout.GetExtents(out pe, out le);
-      p.Time ("GetExtents");
-      double w = (double)le.Width / (double)Pango.Scale.PangoScale;
-      Pango.CairoHelper.ShowLayout (cr, layout);
-      p.Time ("ShowLayout");
-      cr.RelMoveTo (w, 0);
+      double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+            h = (double)le.Height / (double)Pango.Scale.PangoScale;
+      te.Height = h;
+      te.Width = w;
+      te.XAdvance = w;
+      te.YAdvance = 0;
     }
-  }
-
-  /** BLOCKING */
-  public static TextExtents GetTextExtents (Context cr, double fontSize, string text)
-  {
-    Profiler p = new Profiler ("TextExtents");
-    TextExtents te = new TextExtents ();
-      Pango.Layout layout = GetFont (cr, fontSize);
-    p.Time ("GetFont");
-      lock (layout) {
-        layout.SetText (text);
-        Pango.Rectangle pe, le;
-        layout.GetExtents(out pe, out le);
-    p.Time ("layout.GetExtents");
-        double w = (double)le.Width / (double)Pango.Scale.PangoScale,
-              h = (double)le.Height / (double)Pango.Scale.PangoScale;
-        te.Height = h;
-        te.Width = w;
-        te.XAdvance = w;
-        te.YAdvance = 0;
-      }
     return te;
   }
 
@@ -201,19 +188,24 @@ public static class Helpers {
   {
     if (!FileExists (TrashDir))
       new UnixDirectoryInfo(TrashDir).Create();
-    Move (path, TrashDir + DirSepS + Basename(path));
+    Move (path, TrashDir + DirSepS + Basename(path), true);
   }
 
   /** DESTRUCTIVE, BLOCKING */
-  public static void Move (string src, string dst)
+  public static void Move (string src, string dst) { Move (src,dst,false); }
+  public static void Move (string src, string dst, bool deleteOverwrite)
   {
     for (int i=0; i<10; i++) {
       if (FileExists(dst)) {
         try {
-          if (IsDir(dst))
-            new UnixDirectoryInfo(dst).Delete(true);
-          else
-            new UnixFileInfo(dst).Delete();
+          if (deleteOverwrite) {
+            if (IsDir(dst))
+              new UnixDirectoryInfo(dst).Delete(true);
+            else
+              new UnixFileInfo(dst).Delete();
+          } else {
+            Trash(dst);
+          }
         } catch (Exception) {}
       }
       try {
@@ -221,6 +213,13 @@ public static class Helpers {
         break;
       } catch (Exception) {}
     }
+  }
+
+  public static void Copy (string src, string dst)
+  {
+    try {
+      System.IO.File.Copy (src, dst);
+    } catch (Exception) {}
   }
 
   /** DESTRUCTIVE, BLOCKING */
@@ -241,21 +240,23 @@ public static class Helpers {
         thumbPath = path;
       else
         thumbPath = NormalThumbDir + DirSepS + ThumbnailHash (path) + ".png";
-      pr.Time ("md5sum");
+      pr.Time ("ThumbnailHash");
       if (!FileExists(thumbPath)) {
         if (!FileExists(ThumbDir))
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        if (CreateThumbnail(path, thumbPath, 128)) {
+        if (CreateThumbnail(path, thumbPath, 128, 256)) {
           pr.Time ("create thumbnail");
           thumb = new ImageSurface (thumbPath);
         }
       } else {
         thumb = new ImageSurface (thumbPath);
       }
-      if (thumb == null)
+      if (thumb == null || thumb.Width < 1 || thumb.Height < 1) {
+        if (FileExists(thumbPath)) Trash(thumbPath);
         throw new ArgumentException (String.Format("Failed to thumbnail {0}",path), "path");
+      }
       pr.Time ("load as ImageSurface");
       return thumb;
     } catch (Exception e) {
@@ -271,15 +272,16 @@ public static class Helpers {
   }
 
   /** ASYNC */
-  public static bool CreateThumbnail (string path, string thumbPath, uint size)
+  public static bool CreateThumbnail (string path, string thumbPath, uint width, uint height)
   {
-    string s = size.ToString ();
+    string s = width.ToString () + "x" + height.ToString();
     ProcessStartInfo psi = new ProcessStartInfo ();
     psi.FileName = "convert";
-    psi.Arguments = EscapePath(path) + "[0] -thumbnail "+s+"x"+s+" " + EscapePath(thumbPath);
+    psi.Arguments = EscapePath(path) + "[0] -thumbnail "+s+" " + EscapePath(thumbPath+".tmp.png");
     psi.UseShellExecute = false;
     Process p = Process.Start (psi);
     p.WaitForExit ();
+    Move (thumbPath+".tmp.png", thumbPath);
     return FileExists(thumbPath);
   }
 
@@ -359,7 +361,10 @@ public static class Helpers {
 
   /** BLOCKING */
   public static FileTypes FileType (UnixFileSystemInfo f) {
-    try { return f.FileType; }
+    try {
+      if (f.IsSymbolicLink) return FileTypes.SymbolicLink;
+      else return f.FileType;
+    }
     catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
   }
 
