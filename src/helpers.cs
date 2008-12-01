@@ -33,6 +33,7 @@ using System.Diagnostics;
 using System.IO;
 using System;
 using Mono.Unix;
+using Gtk;
 using Cairo;
 
 public static class Helpers {
@@ -53,7 +54,7 @@ public static class Helpers {
 
   static Dictionary<string,Pango.FontDescription> FontCache = new Dictionary<string,Pango.FontDescription> (21);
 
-  static object FontCacheLock = new Object ();
+  static object FontCacheLock = new System.Object ();
 
   /** BLOCKING */
   static Pango.Layout GetLayout(Context cr, string family, double fontSize)
@@ -537,6 +538,46 @@ public static class Helpers {
     }
     return Math.Max(min, Math.Min(max, v));
   }
+
+
+  /* Gtk helpers */
+
+  public delegate void TextPromptHandler (string s);
+
+  public static void TextPrompt
+  (string title, string labelText, string entryText, string buttonText,
+   int position, int selectStart, int selectEnd, TextPromptHandler onOk)
+  {
+    Dialog d = new Dialog();
+    d.Modal = false;
+    d.ActionArea.Layout = ButtonBoxStyle.Spread;
+    d.HasSeparator = false;
+    d.BorderWidth = 10;
+    d.Title = title;
+    Label label = new Label (labelText);
+    label.UseUnderline = false;
+    d.VBox.Add (label);
+    Entry e = new Entry (entryText);
+    e.WidthChars = Math.Min(100, e.Text.Length + 10);
+    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
+    d.VBox.Add (e);
+    d.AddButton (buttonText, ResponseType.Ok);
+
+    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
+      if (args.ResponseId == ResponseType.Ok) {
+        onOk(e.Text);
+      } else {
+        Console.WriteLine (args.ResponseId);
+      }
+      d.Unrealize ();
+      d.Destroy ();
+    });
+
+    d.ShowAll ();
+    e.Position = position;
+    e.SelectRegion(selectStart, selectEnd);
+  }
+
 }
 
 

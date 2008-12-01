@@ -593,13 +593,20 @@ class Filezoo : DrawingArea
         BuildDirs (menu.Title); });
       menu.Append (goTo);
 
+      if (menu.Title != Helpers.RootDir) {
+        MenuItem goToP = new MenuItem ("Go to _parent");
+        goToP.Activated += new EventHandler(delegate {
+          BuildDirs (Helpers.Dirname(menu.Title)); });
+        menu.Append (goToP);
+      }
+
       MenuItem term = new MenuItem ("Open _terminal");
       term.Activated += new EventHandler(delegate {
         Helpers.OpenTerminal (menu.Title); });
       menu.Append (term);
 
       /** DESTRUCTIVE */
-      MenuItem create = new MenuItem ("Create _file");
+      MenuItem create = new MenuItem ("Create _file...");
       create.Activated += new EventHandler(delegate {
         ShowCreateDialog (menu.Title); });
       menu.Append (create);
@@ -620,19 +627,31 @@ class Filezoo : DrawingArea
         menu.Append (ex);
       }
 
+      MenuItem fterm = new MenuItem ("Open _terminal");
+      fterm.Activated += new EventHandler(delegate {
+        Helpers.OpenTerminal (Helpers.Dirname(menu.Title)); });
+      menu.Append (fterm);
+
     }
 
     menu.Append (new SeparatorMenuItem ());
 
     /** DESTRUCTIVE */
-    MenuItem copy = new MenuItem ("_Copy to");
+    MenuItem run = new MenuItem ("_Run command...");
+    run.Activated += new EventHandler(delegate {
+      ShowRunDialog (menu.Title);
+    });
+    menu.Append (run);
+
+    /** DESTRUCTIVE */
+    MenuItem copy = new MenuItem ("_Copy to...");
     copy.Activated += new EventHandler(delegate {
       ShowCopyDialog (menu.Title);
     });
     menu.Append (copy);
 
     /** DESTRUCTIVE */
-    MenuItem rename = new MenuItem ("_Rename");
+    MenuItem rename = new MenuItem ("Re_name...");
     rename.Activated += new EventHandler(delegate {
       ShowRenameDialog (menu.Title);
     });
@@ -647,108 +666,64 @@ class Filezoo : DrawingArea
     menu.Append (trash);
   }
 
-
   void ShowRenameDialog (string path)
   {
     string basename = Helpers.Basename(path);
-    Dialog d = new Dialog();
-    d.Modal = false;
-    d.ActionArea.Layout = ButtonBoxStyle.Spread;
-    d.HasSeparator = false;
-    d.BorderWidth = 10;
-    d.Title = "Renaming " + basename;
-    Label label = new Label (String.Format ("Renaming {0}", path));
-    label.UseUnderline = false;
-    d.VBox.Add (label);
-    Entry e = new Entry (path);
-    e.WidthChars = Math.Min(100, e.Text.Length + 10);
-    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
-    d.VBox.Add (e);
-    d.AddButton ("Rename", ResponseType.Ok);
-
-    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
-      if (args.ResponseId == ResponseType.Ok) {
-        Helpers.Move (path, e.Text);
-        FSCache.Invalidate (path);
-        FSCache.Invalidate (e.Text);
-        if (path == CurrentDirPath) {
-          BuildDirs (e.Text);
+    Helpers.TextPrompt (
+      "Renaming " + basename, String.Format ("Renaming {0}", path),
+      path, "Rename",
+      0, path.Length+Helpers.DirSepS.Length, -1,
+      new Helpers.TextPromptHandler(delegate (string newPath) {
+        if (path != newPath) {
+          Helpers.Move (path, newPath);
+          FSCache.Invalidate (path);
+          FSCache.Invalidate (newPath);
+          if (path == CurrentDirPath || newPath == CurrentDirPath) {
+            BuildDirs (newPath);
+          }
         }
-      } else {
-        Console.WriteLine (args.ResponseId);
-      }
-      d.Unrealize ();
-      d.Destroy ();
-    });
-
-    d.ShowAll ();
-    e.SelectRegion(path.Length-basename.Length, -1);
+      })
+    );
   }
-
 
   void ShowCopyDialog (string path)
   {
     string basename = Helpers.Basename(path);
-    Dialog d = new Dialog();
-    d.Modal = false;
-    d.ActionArea.Layout = ButtonBoxStyle.Spread;
-    d.HasSeparator = false;
-    d.BorderWidth = 10;
-    d.Title = "Copying " + basename;
-    Label label = new Label (String.Format ("Copying {0}", path));
-    label.UseUnderline = false;
-    d.VBox.Add (label);
-    Entry e = new Entry (path);
-    e.WidthChars = Math.Min(100, e.Text.Length + 10);
-    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
-    d.VBox.Add (e);
-    d.AddButton ("Copy", ResponseType.Ok);
-
-    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
-      if (args.ResponseId == ResponseType.Ok) {
-        Helpers.Copy (path, e.Text);
-        FSCache.Invalidate (e.Text);
-      } else {
-        Console.WriteLine (args.ResponseId);
-      }
-      d.Unrealize ();
-      d.Destroy ();
-    });
-
-    d.ShowAll ();
+    Helpers.TextPrompt (
+      "Copying " + basename, String.Format ("Copying {0}", path),
+      path, "Copy",
+      0, 0, -1,
+      new Helpers.TextPromptHandler(delegate (string newPath) {
+        if (path != newPath) {
+          Helpers.Copy (path, newPath);
+          FSCache.Invalidate (newPath);
+        }
+      })
+    );
   }
 
+  void ShowRunDialog (string path)
+  {
+    Helpers.TextPrompt (
+      "Run command", "Enter command to run",
+      " " + Helpers.EscapePath(path), "Run",
+      0, 0, 0,
+      new Helpers.TextPromptHandler(delegate (string newPath) {
+        Process.Start(newPath);
+      })
+    );
+  }
 
   void ShowCreateDialog (string path)
   {
-    Dialog d = new Dialog();
-    d.Modal = false;
-    d.ActionArea.Layout = ButtonBoxStyle.Spread;
-    d.HasSeparator = false;
-    d.BorderWidth = 10;
-    d.Title = "Create file";
-    Label label = new Label ("Create file");
-    label.UseUnderline = false;
-    d.VBox.Add (label);
-    Entry e = new Entry (path + Helpers.DirSepS + "new_file");
-    e.WidthChars = Math.Min(100, e.Text.Length + 10);
-    e.Activated += new EventHandler (delegate { d.Respond(ResponseType.Ok); });
-    d.VBox.Add (e);
-    d.AddButton ("Create", ResponseType.Ok);
-
-    d.Response += new ResponseHandler(delegate (object obj, ResponseArgs args) {
-      if (args.ResponseId == ResponseType.Ok) {
-        Helpers.Touch (e.Text);
-        FSCache.Invalidate (e.Text);
-      } else {
-        Console.WriteLine (args.ResponseId);
-      }
-      d.Unrealize ();
-      d.Destroy ();
-    });
-
-    d.ShowAll ();
-    e.SelectRegion(e.Text.Length-Helpers.Basename(e.Text).Length, -1);
+    Helpers.TextPrompt (
+      "Create file", "Create file",
+      path + Helpers.DirSepS + "new_file", "Create",
+      0, path.Length+Helpers.DirSepS.Length, -1,
+      new Helpers.TextPromptHandler(delegate (string newPath) {
+        Helpers.Touch (newPath);
+        FSCache.Invalidate (newPath);
+      }));
   }
 
 
