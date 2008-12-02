@@ -16,6 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using Gtk;
 using Mono.Unix;
 
@@ -32,6 +33,8 @@ public static class FilezooApp {
     p.MinTime = 0;
     Profiler.GlobalPrintProfile = true;
 
+    bool panelMode = (Array.IndexOf (args, "--panel") > -1);
+
     Catalog.Init("i18n","./locale");
     System.Threading.ThreadPool.SetMinThreads (10, 20);
     Application.Init ();
@@ -45,8 +48,11 @@ public static class FilezooApp {
 
     p.Time ("Created Filezoo");
 
-    win.DeleteEvent += new DeleteEventHandler (OnQuit);
     win.Add (fz);
+    if (panelMode)
+      win = new FilezooPanel (win, fz);
+
+    win.DeleteEvent += new DeleteEventHandler (OnQuit);
     win.ShowAll ();
 
     Application.Run ();

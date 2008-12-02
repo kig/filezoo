@@ -50,6 +50,9 @@ public static class Helpers {
   public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
   public static string NormalThumbDir = ThumbDir + DirSepS + "large";
 
+  public static uint thumbWidth = 256;
+  public static uint thumbHeight = 256;
+
   /* Text drawing helpers */
 
   static Dictionary<string,Pango.FontDescription> FontCache = new Dictionary<string,Pango.FontDescription> (21);
@@ -178,6 +181,15 @@ public static class Helpers {
     Process.Start ("gnome-open", EscapePath(path));
   }
 
+  public static void OpenURL (string url) {
+    Process.Start("firefox", "-new-tab " + Helpers.EscapePath(url));
+  }
+
+  public static void Search (string query) {
+    OpenURL("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
+  }
+
+
   /** DESTRUCTIVE, ASYNC */
   public static void ExtractFile (string path)
   {
@@ -250,7 +262,7 @@ public static class Helpers {
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        if (CreateThumbnail(path, thumbPath, 256, 256)) {
+        if (CreateThumbnail(path, thumbPath, thumbWidth, thumbHeight)) {
           pr.Time ("create thumbnail");
           thumb = new ImageSurface (thumbPath);
         }
@@ -289,14 +301,18 @@ public static class Helpers {
     return FileExists(thumbPath);
   }
 
-  /** ASYNC, FAST-ish */
-  public static string ThumbnailHash (string path)
-  {
-    byte[] digest;
-    using (HashAlgorithm hash = HashAlgorithm.Create ("MD5"))
-      digest = hash.ComputeHash (new System.Text.ASCIIEncoding().GetBytes(path));
+  /** FAST */
+  public static string ThumbnailHash (string path) {
+    return BitConverter.ToString(MD5(path)).Replace("-", "");
+  }
 
-    return BitConverter.ToString (digest).Replace("-", "");
+  public static byte[] MD5 (string s) {
+    return MD5 (new System.Text.ASCIIEncoding().GetBytes(s));
+  }
+
+  public static byte[] MD5 (byte[] b) {
+    using (HashAlgorithm h = HashAlgorithm.Create ("MD5"))
+      return h.ComputeHash (b);
   }
 
   /* String formatting helpers */
