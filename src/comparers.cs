@@ -19,7 +19,7 @@
 using System;
 using System.Collections.Generic;
 
-class SortHandler {
+public class SortHandler {
   public string Name;
   public IComparer<FSEntry> Comparer;
   public SortHandler (string name, IComparer<FSEntry> comparer) {

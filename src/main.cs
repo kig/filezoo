@@ -17,76 +17,9 @@
 */
 
 using Gtk;
-using System.Collections.Generic;
-using Cairo;
+using Mono.Unix;
 
 public static class FilezooApp {
-
-  static Dictionary<string, string> _Prefixes = null;
-  public static Dictionary<string, string> Prefixes
-  { get {
-    if (_Prefixes == null) {
-      _Prefixes = new Dictionary<string, string> ();
-      _Prefixes[".."] = "⇱";
-      _Prefixes["/dev"] = "⚠";
-      _Prefixes["/etc"] = "✦";
-      _Prefixes["/boot"] = "◉";
-      _Prefixes["/proc"] = _Prefixes["/sys"] = "◎";
-      _Prefixes["/usr"] = _Prefixes["/usr/local"] = "⬢";
-      _Prefixes["/usr/X11R6"] = "▤";
-      _Prefixes["/usr/src"] = _Prefixes["/usr/local/src"] = "⚒";
-      _Prefixes["/bin"] = _Prefixes["/usr/bin"] = _Prefixes["/usr/local/bin"] = "⌬";
-      _Prefixes["/sbin"] = _Prefixes["/usr/sbin"] = _Prefixes["/usr/local/sbin"] = "⏣";
-      _Prefixes["/lib"] = _Prefixes["/usr/lib"] = _Prefixes["/usr/local/lib"] =
-      _Prefixes["/lib"] = _Prefixes["/usr/X11R6/lib"] = _Prefixes["/usr/X11R6/lib32"] =
-      _Prefixes["/lib32"] = _Prefixes["/usr/lib32"] = _Prefixes["/usr/local/lib32"] = "⬡";
-      _Prefixes["/include"] = _Prefixes["/usr/include"] = _Prefixes["/usr/local/include"] = "◌";
-      _Prefixes["/tmp"] = "⌚";
-      _Prefixes["/home"] = "⌂";
-      _Prefixes["/root"] = "♔";
-      _Prefixes["/usr/share"] = _Prefixes["/usr/local/share"] = "✧";
-      _Prefixes["/var"] = "⚡";
-      _Prefixes["/var/run"] = "⚡";
-      _Prefixes["/var/backups"] = "❄";
-      _Prefixes["/var/cache"] = "♨";
-      _Prefixes["/var/crash"] = "☹";
-      _Prefixes["/var/games"] = "☺";
-      _Prefixes["/var/lock"] = "⚔";
-      _Prefixes["/var/mail"] = "✉";
-      _Prefixes["/var/spool"] = "✈";
-      _Prefixes["/var/tmp"] = "⌚";
-      _Prefixes["/var/lib"] = "✦";
-      _Prefixes["/var/log"] = "✇";
-      _Prefixes["/var/www"] = "⚓";
-      _Prefixes["/usr/games"] = _Prefixes["/usr/local/games"] = "☺";
-      _Prefixes[Helpers.HomeDir] = "♜";
-      _Prefixes[Helpers.HomeDir+"/bin"] = "⌬";
-      _Prefixes[Helpers.HomeDir+"/code"] = "◌";
-      _Prefixes[Helpers.HomeDir+"/Trash"] =
-      _Prefixes[Helpers.HomeDir+"/.Trash"] = "♻";
-      _Prefixes[Helpers.HomeDir+"/downloads"] =
-      _Prefixes[Helpers.HomeDir+"/Downloads"] = "↴";
-      _Prefixes[Helpers.HomeDir+"/music"] =
-      _Prefixes[Helpers.HomeDir+"/Music"] = "♬";
-      _Prefixes[Helpers.HomeDir+"/Desktop"] = "▰";
-      _Prefixes[Helpers.HomeDir+"/documents"] =
-      _Prefixes[Helpers.HomeDir+"/Documents"] = "✎";
-      _Prefixes[Helpers.HomeDir+"/photos"] =
-      _Prefixes[Helpers.HomeDir+"/Photos"] =
-      _Prefixes[Helpers.HomeDir+"/pictures"] =
-      _Prefixes[Helpers.HomeDir+"/Pictures"] = "❏";
-      _Prefixes[Helpers.HomeDir+"/reading"] = "♾";
-      _Prefixes[Helpers.HomeDir+"/writing"] = "✍";
-      _Prefixes[Helpers.HomeDir+"/movies"] =
-      _Prefixes[Helpers.HomeDir+"/Movies"] =
-      _Prefixes[Helpers.HomeDir+"/logs"] = "✇";
-      _Prefixes[Helpers.HomeDir+"/video"] =
-      _Prefixes[Helpers.HomeDir+"/Video"] = "►";
-      _Prefixes[Helpers.HomeDir+"/public_html"] = "⚓";
-    }
-    return _Prefixes;
-  } }
-
 
   /**
     The Main method inits the Gtk application and creates a Filezoo instance
@@ -98,31 +31,24 @@ public static class FilezooApp {
     p.Restart ();
     p.MinTime = 0;
     Profiler.GlobalPrintProfile = true;
+
+    Catalog.Init("i18n","./locale");
+    System.Threading.ThreadPool.SetMinThreads (10, 20);
     Application.Init ();
     Window win = new Window ("Filezoo");
     win.SetDefaultSize (420, 800);
-    p.Time ("Init done");
-    System.Threading.ThreadPool.SetMinThreads (10, 20);
-    Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
-    fz.Prefixes = Prefixes;
-    fz.BreadcrumbFontFamily = "URW Gothic L";
-    fz.ToolbarTitleFontFamily = "Sans";
-    fz.ToolbarLabelFontFamily = "Sans";
 
-    fz.FileNameFontFamily = "URW Gothic L";
-    fz.FileInfoFontFamily = "Sans";
-    fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
-    fz.Renderer.RegularFileColor = new Color (0.188, 0.855, 1);
-    fz.Renderer.SymlinkColor = new Color (0.855, 0.188, 1);
-    fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
-    fz.Renderer.ExecutableColor = new Color (0.4, 1.0, 0.6);
-    fz.ActiveColor = new Color (0.188, 0.855, 1);
-    fz.InActiveColor = new Color (0.188, 0.855, 1,0.5);
-//     fz.QuitAfterFirstFrame = true;
+    p.Time ("Init done");
+
+    Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
+    new FilezooConfig ().Apply(fz);
+
     p.Time ("Created Filezoo");
+
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     win.Add (fz);
     win.ShowAll ();
+
     Application.Run ();
   }
 

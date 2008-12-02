@@ -18,7 +18,7 @@
 
 using System;
 
-class SizeHandler {
+public class SizeHandler {
   public string Name;
   public IMeasurer Measurer;
   public SizeHandler (string name, IMeasurer measurer) {

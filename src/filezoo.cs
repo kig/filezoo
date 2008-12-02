@@ -26,7 +26,7 @@ using Gtk;
 using Cairo;
 using Mono.Unix;
 
-class Filezoo : DrawingArea
+public class Filezoo : DrawingArea
 {
   // Filename Unicode icons
   public Dictionary<string, string> Prefixes = null;
@@ -91,8 +91,8 @@ class Filezoo : DrawingArea
   public IZoomer Zoomer;
 
   // current directory
-  private string CurrentDirPath = null;
-  private FSEntry CurrentDirEntry;
+  public string CurrentDirPath = null;
+  public FSEntry CurrentDirEntry;
 
   // Do we need to redraw?
   bool NeedRedraw = true;
@@ -189,7 +189,7 @@ class Filezoo : DrawingArea
   /* Files model */
 
   /** BLOCKING */
-  void BuildDirs (string dirname)
+  public void SetCurrentDir (string dirname)
   {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
@@ -207,7 +207,7 @@ class Filezoo : DrawingArea
 
     ResetZoom ();
     PreDraw ();
-    p.Time("BuildDirs");
+    p.Time("SetCurrentDir");
   }
 
 
@@ -447,7 +447,7 @@ class Filezoo : DrawingArea
       } else {
         if (c.Target.IsDirectory) {
           Console.WriteLine("Navigate {0}", c.Target.FullName);
-          BuildDirs (c.Target.FullName);
+          SetCurrentDir (c.Target.FullName);
           ResetZoom ();
           UpdateLayout ();
         } else {
@@ -480,7 +480,7 @@ class Filezoo : DrawingArea
             string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
             if (newDir == "") newDir = Helpers.RootDir;
             if (newDir != CurrentDirPath) {
-              BuildDirs (newDir);
+              SetCurrentDir (newDir);
             } else {
               ResetZoom ();
               UpdateLayout ();
@@ -557,173 +557,30 @@ class Filezoo : DrawingArea
 
 
 
-  /* Context menu code duplication, banzai */
+  /* Context menu */
 
-  string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
 
   /** BLOCKING */
-  void ContextClick (Menu menu, Context cr, uint width, uint height, double x, double y)
+  void ContextClick (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save();
       Rectangle box = Transform (cr, width, height);
       cr.Scale (1, Zoomer.Z);
       cr.Translate (0.0, Zoomer.Y);
       List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
-      if (hits.Count == 0) {
-        FillMenu (menu, new ClickHit(CurrentDirEntry, cr.Matrix.Yy));
-      } else {
-        foreach (ClickHit c in hits) {
-          if (c.Height > 8) {
-            FillMenu (menu, c);
-            break;
-          }
+      ClickHit ch = new ClickHit(CurrentDirEntry, cr.Matrix.Yy);
+      foreach (ClickHit c in hits) {
+        if (c.Height > 8) {
+          ch = c;
+          break;
         }
       }
     cr.Restore ();
-  }
 
-  void FillMenu (Menu menu, ClickHit c)
-  {
-    menu.Title = c.Target.FullName;
-    if (c.Target.IsDirectory) {
-    // Directory menu items
-
-      MenuItem goTo = new MenuItem ("_Go to " + c.Target.Name);
-      goTo.Activated += new EventHandler(delegate {
-        BuildDirs (menu.Title); });
-      menu.Append (goTo);
-
-      if (menu.Title != Helpers.RootDir) {
-        MenuItem goToP = new MenuItem ("Go to _parent");
-        goToP.Activated += new EventHandler(delegate {
-          BuildDirs (Helpers.Dirname(menu.Title)); });
-        menu.Append (goToP);
-      }
-
-      MenuItem term = new MenuItem ("Open _terminal");
-      term.Activated += new EventHandler(delegate {
-        Helpers.OpenTerminal (menu.Title); });
-      menu.Append (term);
-
-      /** DESTRUCTIVE */
-      MenuItem create = new MenuItem ("Create _file...");
-      create.Activated += new EventHandler(delegate {
-        ShowCreateDialog (menu.Title); });
-      menu.Append (create);
-
-    } else {
-    // File menu items
-
-      MenuItem open = new MenuItem ("_Open " + c.Target.Name);
-      open.Activated += new EventHandler(delegate {
-        Helpers.OpenFile (menu.Title); });
-      menu.Append (open);
-
-      /** DESTRUCTIVE */
-      if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
-        MenuItem ex = new MenuItem ("_Extract");
-        ex.Activated += new EventHandler(delegate {
-          Helpers.ExtractFile (menu.Title); });
-        menu.Append (ex);
-      }
-
-      MenuItem fterm = new MenuItem ("Open _terminal");
-      fterm.Activated += new EventHandler(delegate {
-        Helpers.OpenTerminal (Helpers.Dirname(menu.Title)); });
-      menu.Append (fterm);
-
-    }
-
-    menu.Append (new SeparatorMenuItem ());
-
-    /** DESTRUCTIVE */
-    MenuItem run = new MenuItem ("_Run command...");
-    run.Activated += new EventHandler(delegate {
-      ShowRunDialog (menu.Title);
-    });
-    menu.Append (run);
-
-    /** DESTRUCTIVE */
-    MenuItem copy = new MenuItem ("_Copy to...");
-    copy.Activated += new EventHandler(delegate {
-      ShowCopyDialog (menu.Title);
-    });
-    menu.Append (copy);
-
-    /** DESTRUCTIVE */
-    MenuItem rename = new MenuItem ("Re_name...");
-    rename.Activated += new EventHandler(delegate {
-      ShowRenameDialog (menu.Title);
-    });
-    menu.Append (rename);
-
-    /** DESTRUCTIVE */
-    MenuItem trash = new MenuItem ("Move to trash");
-    trash.Activated += new EventHandler(delegate {
-      Helpers.Trash(menu.Title);
-      FSCache.Invalidate (menu.Title);
-    });
-    menu.Append (trash);
-  }
-
-  void ShowRenameDialog (string path)
-  {
-    string basename = Helpers.Basename(path);
-    Helpers.TextPrompt (
-      "Renaming " + basename, String.Format ("Renaming {0}", path),
-      path, "Rename",
-      0, path.Length+Helpers.DirSepS.Length, -1,
-      new Helpers.TextPromptHandler(delegate (string newPath) {
-        if (path != newPath) {
-          Helpers.Move (path, newPath);
-          FSCache.Invalidate (path);
-          FSCache.Invalidate (newPath);
-          if (path == CurrentDirPath || newPath == CurrentDirPath) {
-            BuildDirs (newPath);
-          }
-        }
-      })
-    );
-  }
-
-  void ShowCopyDialog (string path)
-  {
-    string basename = Helpers.Basename(path);
-    Helpers.TextPrompt (
-      "Copying " + basename, String.Format ("Copying {0}", path),
-      path, "Copy",
-      0, 0, -1,
-      new Helpers.TextPromptHandler(delegate (string newPath) {
-        if (path != newPath) {
-          Helpers.Copy (path, newPath);
-          FSCache.Invalidate (newPath);
-        }
-      })
-    );
-  }
-
-  void ShowRunDialog (string path)
-  {
-    Helpers.TextPrompt (
-      "Run command", "Enter command to run",
-      " " + Helpers.EscapePath(path), "Run",
-      0, 0, 0,
-      new Helpers.TextPromptHandler(delegate (string newPath) {
-        Process.Start(newPath);
-      })
-    );
-  }
-
-  void ShowCreateDialog (string path)
-  {
-    Helpers.TextPrompt (
-      "Create file", "Create file",
-      path + Helpers.DirSepS + "new_file", "Create",
-      0, path.Length+Helpers.DirSepS.Length, -1,
-      new Helpers.TextPromptHandler(delegate (string newPath) {
-        Helpers.Touch (newPath);
-        FSCache.Invalidate (newPath);
-      }));
+    if (ContextMenu != null) ContextMenu.Dispose ();
+    ContextMenu = new FilezooContextMenu (this, ch);
+    ContextMenu.ShowAll ();
+    ContextMenu.Popup ();
   }
 
 
@@ -753,7 +610,7 @@ class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Covering c = Renderer.FindCovering(CurrentDirEntry, cr, r, 0);
       if (c.Directory.FullName != CurrentDirPath) {
-        BuildDirs(c.Directory.FullName);
+        SetCurrentDir(c.Directory.FullName);
         Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
       }
     cr.Restore ();
@@ -792,16 +649,12 @@ class Filezoo : DrawingArea
     dragStartY = dragY = e.Y;
     dragging = false;
     if (e.Button == 3) {
-      if (ContextMenu != null) ContextMenu.Dispose ();
-      ContextMenu = new Menu ();
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
       {
         int w, h;
         e.Window.GetSize (out w, out h);
-        ContextClick (ContextMenu, cr, (uint)w, (uint)h, e.X, e.Y);
+        ContextClick (cr, (uint)w, (uint)h, e.X, e.Y);
       }
-      ContextMenu.ShowAll ();
-      ContextMenu.Popup ();
     }
     return true;
   }
@@ -887,8 +740,8 @@ class Filezoo : DrawingArea
       }
       if (!InitComplete) {
         Helpers.StartupProfiler.Time ("First expose");
-        BuildDirs (CurrentDirPath);
-        Helpers.StartupProfiler.Time ("BuildDirs");
+        SetCurrentDir (CurrentDirPath);
+        Helpers.StartupProfiler.Time ("SetCurrentDir");
         System.Timers.Timer t = new System.Timers.Timer(50);
         t.Elapsed += new ElapsedEventHandler (CheckUpdates);
         System.Timers.Timer t2 = new System.Timers.Timer(1000);

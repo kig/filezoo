@@ -47,8 +47,8 @@ public static class Helpers {
   public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
   public static string TrashDir = HomeDir + DirSepS + ".Trash";
-  public static string ThumbDir = HomeDir + DirSepS + ".filezoo";
-  public static string NormalThumbDir = ThumbDir + DirSepS + "Thumbs";
+  public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
+  public static string NormalThumbDir = ThumbDir + DirSepS + "large";
 
   /* Text drawing helpers */
 
@@ -239,15 +239,18 @@ public static class Helpers {
       string thumbPath;
       if (path.StartsWith(ThumbDir))
         thumbPath = path;
-      else
+      else {
         thumbPath = NormalThumbDir + DirSepS + ThumbnailHash (path) + ".png";
+        if (FileExists (thumbPath) && (LastModified(path) >= LastModified(thumbPath)))
+          Trash(thumbPath);
+      }
       pr.Time ("ThumbnailHash");
       if (!FileExists(thumbPath)) {
         if (!FileExists(ThumbDir))
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        if (CreateThumbnail(path, thumbPath, 128, 256)) {
+        if (CreateThumbnail(path, thumbPath, 256, 256)) {
           pr.Time ("create thumbnail");
           thumb = new ImageSurface (thumbPath);
         }
@@ -286,42 +289,14 @@ public static class Helpers {
     return FileExists(thumbPath);
   }
 
-  /** ASYNC, FAST-ish (~200 us if file in page cache) */
-  /*
-    The ThumbnailHash does MD5(mtime + size + read(16376)),
-    which works nicely for compressed files like jpegs and pngs.
-
-    As the hash only uses the first 16k of the file, it will have
-    collisions in some cases where whole-file MD5 would not.
-
-    Particularly collision-prone are uncompressed files extracted from
-    an archive / fetched from SVN (causing them all to have the same mtime.)
-    A likely real collision would be uncompressed images of the same dimensions
-    and the same first 16k. Think BMP and TGA textures and wallpapers.
-
-    Spreading the 16k read over the whole file would reduce collision
-    probability for uncompressed images, but require more seeks (and within one
-    seek time you can do 1MB of MD5.) SSDs are a different story though.
-  */
+  /** ASYNC, FAST-ish */
   public static string ThumbnailHash (string path)
   {
-    byte[] buf = new byte[16384];
-    UnixFileInfo u = new UnixFileInfo(path);
-    Int64 mtime = (Int64)(u.LastWriteTime.ToBinary ());
-    Int64 size = (Int64)u.Length;
-    for (int i=0; i<8; i++) {
-      buf[i] = (byte)(mtime >> (i*8));
-      buf[i+8] = (byte)(size >> (i*8));
-    }
-    UnixStream us = u.OpenRead();
-    us.Read(buf, 16, 16384-16);
-    us.Close ();
-
     byte[] digest;
     using (HashAlgorithm hash = HashAlgorithm.Create ("MD5"))
-      digest = hash.ComputeHash (buf);
+      digest = hash.ComputeHash (new System.Text.ASCIIEncoding().GetBytes(path));
 
-    return BitConverter.ToString (digest);
+    return BitConverter.ToString (digest).Replace("-", "");
   }
 
   /* String formatting helpers */
