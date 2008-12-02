@@ -17,13 +17,15 @@ public class FilezooPanel : Window
     SkipPagerHint = true;
     SkipTaskbarHint = true;
 
-    Button homeButton = new Button ("Home");
+    Button homeButton = new Button ("<span size=\"small\">Home</span>");
 //     homeButton.Relief = ReliefStyle.None;
+    ((Label)(homeButton.Children[0])).UseMarkup = true;
     homeButton.Clicked += new EventHandler (delegate {
       Go(Helpers.HomeDir); });
 
-    Button dlButton = new Button ("Downloads");
+    Button dlButton = new Button ("<span size=\"small\">Downloads</span>");
 //     dlButton.Relief = ReliefStyle.None;
+    ((Label)(dlButton.Children[0])).UseMarkup = true;
     dlButton.Clicked += new EventHandler (delegate {
       Go(Helpers.HomeDir + Helpers.DirSepS + "downloads"); });
 
@@ -85,10 +87,12 @@ public class FilezooPanel : Window
       GetPosition(out x, out y);
       GetSize (out mw, out mh);
       FilezooWindow.GetSize (out w, out h);
-      FilezooWindow.ShowAll ();
+      w = Math.Max(w, mw);
       x = Math.Min (Screen.Width-w, x);
+      x = Screen.Width-w;
+      FilezooWindow.ShowAll ();
       FilezooWindow.Move (x, 0);
-      FilezooWindow.Resize (Math.Max(w, mw), y);
+      FilezooWindow.Resize (w, y);
       FilezooWindow.Stick ();
     }
   }
