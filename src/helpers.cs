@@ -50,8 +50,7 @@ public static class Helpers {
   public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
   public static string NormalThumbDir = ThumbDir + DirSepS + "large";
 
-  public static uint thumbWidth = 256;
-  public static uint thumbHeight = 256;
+  public static uint thumbSize = 256;
 
   /* Text drawing helpers */
 
@@ -169,9 +168,15 @@ public static class Helpers {
   /** ASYNC */
   public static void OpenTerminal (string path)
   {
+    RunCommandInDir ("urxvt", "", path);
+  }
+
+  /** ASYNC */
+  public static void RunCommandInDir (string cmd, string args, string path)
+  {
     string cd = UnixDirectoryInfo.GetCurrentDirectory ();
     UnixDirectoryInfo.SetCurrentDirectory (path);
-    Process.Start ("urxvt");
+    Process.Start (cmd, args);
     UnixDirectoryInfo.SetCurrentDirectory (cd);
   }
 
@@ -262,7 +267,7 @@ public static class Helpers {
           new UnixDirectoryInfo(ThumbDir).Create ();
         if (!FileExists(NormalThumbDir))
           new UnixDirectoryInfo(NormalThumbDir).Create ();
-        if (CreateThumbnail(path, thumbPath, thumbWidth, thumbHeight)) {
+        if (CreateThumbnail(path, thumbPath, thumbSize)) {
           pr.Time ("create thumbnail");
           thumb = new ImageSurface (thumbPath);
         }
@@ -288,12 +293,12 @@ public static class Helpers {
   }
 
   /** ASYNC */
-  public static bool CreateThumbnail (string path, string thumbPath, uint width, uint height)
+  public static bool CreateThumbnail (string path, string thumbPath, uint size)
   {
-    string s = width.ToString () + "x" + height.ToString();
+    string s = size.ToString ();
     ProcessStartInfo psi = new ProcessStartInfo ();
     psi.FileName = "convert";
-    psi.Arguments = EscapePath(path) + "[0] -thumbnail "+s+" " + EscapePath(thumbPath+".tmp.png");
+    psi.Arguments = EscapePath(path) + "[0] -thumbnail " +s+"x"+s+" " + EscapePath(thumbPath+".tmp.png");
     psi.UseShellExecute = false;
     Process p = Process.Start (psi);
     p.WaitForExit ();
@@ -477,6 +482,10 @@ public static class Helpers {
   }
 
 
+  public static string GetHomeDir (string username) {
+    return new UnixUserInfo(username).HomeDirectory;
+  }
+
   /* Path helpers */
 
   /** FAST */
@@ -502,6 +511,21 @@ public static class Helpers {
     string p = srev(srev(path).TrimEnd(sa).Split(sa, 2)[0]);
     if (p == bn) return "";
     return p;
+  }
+
+  public static string TildeExpand (string path) {
+    if (path[0] == '~') {
+      string[] split = path.Split(DirSepS.ToCharArray(), 2);
+      string tildeExpr = split[0];
+      try {
+        string baseDir = HomeDir;
+        if (tildeExpr != "~")
+          baseDir = GetHomeDir(tildeExpr.Substring(1));
+        return baseDir + (split.Length > 1 ? DirSepS + split[1] : "");
+      } catch (Exception) { return path; }
+    } else {
+      return path;
+    }
   }
 
   static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");

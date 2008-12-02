@@ -43,7 +43,10 @@ public static class FilezooApp {
 
     p.Time ("Init done");
 
-    Filezoo fz = new Filezoo (args.Length > 0 ? args[0] : ".");
+    string dir = panelMode ? Helpers.HomeDir : ".";
+    if (!panelMode && args.Length > 0) dir = args[0];
+
+    Filezoo fz = new Filezoo (dir);
     new FilezooConfig ().Apply(fz);
 
     p.Time ("Created Filezoo");

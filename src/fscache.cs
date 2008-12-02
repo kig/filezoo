@@ -269,6 +269,7 @@ public static class FSCache
   {
     FSEntry f = Get (path);
     if (f.Thumbnail != null) return;
+    if (f.IsDirectory) return;
     if (Array.IndexOf (thumbnailable, f.Suffix) > -1)
     {
         lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName, priority);
