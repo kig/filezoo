@@ -55,6 +55,7 @@ public class FSDraw
   public double DefaultZoom = 2.0;
   public double DefaultPan = -0.43;
 
+  public static Int64 frame = 0;
 
   /* Subtitles */
 
@@ -216,6 +217,7 @@ public class FSDraw
     if (depth > 0 && !IsVisible(d, cr, target)) {
       return 0;
     }
+    d.LastDraw = frame;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     uint c = 1;
     cr.Save ();
@@ -250,7 +252,10 @@ public class FSDraw
         }
       }
     cr.Restore ();
-    if (depth == 0) FrameProfiler.Stop ();
+    if (depth == 0) {
+      FrameProfiler.Stop ();
+      frame++;
+    }
     return c;
   }
 
@@ -260,6 +265,7 @@ public class FSDraw
     */
   void DrawThumb (FSEntry d, Context cr, Rectangle target) {
     ImageSurface thumb = d.Thumbnail;
+    if (thumb == null) return;
     double rBoxWidth = BoxWidth / target.Height;
     using (Pattern p = new Pattern (thumb)) {
       cr.Save ();

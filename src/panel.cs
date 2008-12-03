@@ -39,7 +39,9 @@ public class FilezooPanel : Window
 
     Entry entry = new Entry ();
     entry.Activated += new EventHandler (delegate {
-      Go (entry.Text); });
+      Go (entry.Text);
+      entry.Text = "";
+    });
     entry.WidthChars = 50;
 
     HBox hb = new HBox ();
@@ -51,6 +53,12 @@ public class FilezooPanel : Window
 
     Add (hb);
     Stick ();
+
+    KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
+      if (args.Event.Key == Gdk.Key.Escape) {
+        Toggle.Active = false;
+      }
+    };
 
     FilezooWindow = new Window ("Filezoo");
     FilezooWindow.DeleteEvent += delegate (object o, DeleteEventArgs e) {
@@ -72,21 +80,28 @@ public class FilezooPanel : Window
     } else if (url.StartsWith("?")) {
       Helpers.Search(url.Substring(1));
     } else if (url.StartsWith("!")) {
-      Helpers.RunCommandInDir (url.Substring(1), "", Fz.CurrentDirPath);
+      Helpers.RunCommandInDir ("sh", "-c "+Helpers.EscapePath(url.Substring(1)), Fz.CurrentDirPath);
     } else if (url.Contains(".") && !url.Contains(" ")) {
       Helpers.OpenURL(url);
+    } else if (Helpers.IsPlausibleCommandLine(url, Fz.CurrentDirPath)) {
+      Helpers.RunCommandInDir ("sh", "-c "+ Helpers.EscapePath(url), Fz.CurrentDirPath);
     } else {
       Helpers.Search(url);
     }
   }
 
   void Go (string newDir) {
+    if (newDir.Length == 0) return;
     if (newDir.StartsWith("~")) // tilde expansion
       newDir = Helpers.TildeExpand(newDir);
+    if (newDir.Trim(' ') == "..") {
+      if (Fz.CurrentDirPath == Helpers.RootDir) return;
+      newDir = Helpers.Dirname(Fz.CurrentDirPath);
+    }
     if (newDir[0] != Helpers.DirSepC) { // relative path or fancy wacky stuff
-      string hfd = Helpers.HomeDir + Helpers.DirSepS + newDir;
-      if (!Helpers.FileExists(hfd))
-        hfd = Fz.CurrentDirPath + Helpers.DirSepS + newDir;
+      string hfd = Fz.CurrentDirPath + Helpers.DirSepS + newDir;
+//       if (!Helpers.FileExists(hfd))
+//         hfd = Helpers.HomeDir + Helpers.DirSepS + newDir;
       if (!Helpers.FileExists(hfd)) {
         openUrl (newDir);
         return;
@@ -98,10 +113,11 @@ public class FilezooPanel : Window
       Helpers.OpenFile (newDir);
       return;
     }
-    string oldDir = Fz.CurrentDirPath;
     Fz.SetCurrentDir (newDir);
-    if (!FilezooWindow.IsMapped || oldDir == newDir)
+    if (!FilezooWindow.IsMapped)
       ToggleFilezoo ();
+    else
+      FilezooWindow.Present ();
   }
 
   void ToggleFilezoo ()

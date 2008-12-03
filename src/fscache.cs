@@ -288,12 +288,42 @@ public static class FSCache
     ThumbnailQueue.Clear ();
   } }
 
+  static Dictionary<string,FSEntry> ThumbnailCache = new Dictionary<string,FSEntry> ();
   static void GetThumbnail (string path)
   {
     if (Get (path).Thumbnail == null) {
       ImageSurface tn = Helpers.GetThumbnail (path);
       FSEntry f = Get (path);
       f.Thumbnail = tn;
+      lock (ThumbnailCache) {
+        ThumbnailCache[f.FullName] = f;
+        bool checkForOld = true;
+        int deletecount = 0;
+        if (ThumbnailCache.Count > 4000) {
+          FSEntry oldest = f;
+          foreach (FSEntry e in ThumbnailCache.Values) {
+            if (e.LastDraw < f.LastDraw) oldest = e;
+          }
+          ThumbnailCache.Remove(oldest.FullName);
+          oldest.Thumbnail = null;
+          deletecount++;
+          checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
+        }
+        if (checkForOld && ThumbnailCache.Count > 2000) {
+          List<FSEntry> old = new List<FSEntry> ();
+          foreach (FSEntry e in ThumbnailCache.Values) {
+            if (e.LastDraw < FSDraw.frame - 1000) old.Add(e);
+          }
+          foreach (FSEntry e in old) {
+            ThumbnailCache.Remove(e.FullName);
+            e.Thumbnail = null;
+            deletecount++;
+          }
+        }
+        if (deletecount > 1) {
+          Console.WriteLine("Expired {0} entries from ThumbnailCache", deletecount);
+        }
+      }
       LastChange = DateTime.Now;
     }
   }

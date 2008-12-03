@@ -48,9 +48,11 @@ public static class Helpers {
 
   public static string TrashDir = HomeDir + DirSepS + ".Trash";
   public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
-  public static string NormalThumbDir = ThumbDir + DirSepS + "large";
+  public static string NormalThumbDir = ThumbDir + DirSepS + "normal";
+  public static string LargeThumbDir = ThumbDir + DirSepS + "large";
 
-  public static uint thumbSize = 256;
+  public static uint thumbSize = 128;
+  public static uint largeThumbSize = 128;
 
   /* Text drawing helpers */
 
@@ -165,6 +167,19 @@ public static class Helpers {
 
   /* File opening helpers */
 
+  public static string ReadCmd (string cmd, string args)
+  {
+    ProcessStartInfo psi = new ProcessStartInfo ();
+    psi.FileName = cmd;
+    psi.Arguments = args;
+    psi.UseShellExecute = false;
+    psi.RedirectStandardOutput = true;
+    Process p = Process.Start (psi);
+    string rv = p.StandardOutput.ReadToEnd ();
+    p.WaitForExit ();
+    return rv;
+  }
+
   /** ASYNC */
   public static void OpenTerminal (string path)
   {
@@ -183,15 +198,49 @@ public static class Helpers {
   /** ASYNC */
   public static void OpenFile (string path)
   {
-    Process.Start ("gnome-open", EscapePath(path));
+    Process.Start ("kfmclient exec", EscapePath(path));
   }
 
+  /** ASYNC */
   public static void OpenURL (string url) {
-    Process.Start("firefox", "-new-tab " + Helpers.EscapePath(url));
+    Process.Start ("firefox", "-new-tab " + Helpers.EscapePath(url));
   }
 
+  /** ASYNC */
   public static void Search (string query) {
-    OpenURL("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
+    OpenURL ("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
+  }
+
+  /** BLOCKING */
+  public static bool IsValidCommand (string cmd) {
+    int l = ReadCmd ("which", EscapePath (cmd)).Length;
+    return (l > 0 && l >= cmd.Length);
+  }
+
+  /** BLOCKING */
+  public static bool IsPlausibleCommandLine (string cmdline, string dir)
+  {
+    if (cmdline.Length == 0) return false;
+    string[] split = cmdline.Trim(' ').Split(' ');
+    string cmd = split[0];
+    if (!IsValidCommand(cmd)) return false;
+    bool first = true;
+    string cd = UnixDirectoryInfo.GetCurrentDirectory ();
+    UnixDirectoryInfo.SetCurrentDirectory (dir);
+    bool retval = true;
+    foreach (string arg in split) {
+      if (first) first = false;
+      else {
+        if (arg[0] == '-' || arg.Contains("*") || arg.Contains("?") || FileExists(arg)) {
+          retval = true;
+          break;
+        } else {
+          retval = false;
+        }
+      }
+    }
+    UnixDirectoryInfo.SetCurrentDirectory (cd);
+    return retval;
   }
 
 
@@ -251,12 +300,12 @@ public static class Helpers {
   public static ImageSurface GetThumbnail (string path)
   {
     try {
-      Profiler pr = new Profiler ("GetThumbnail", 10);
+      Profiler pr = new Profiler ("GetThumbnail", 500);
       ImageSurface thumb = null;
       string thumbPath;
-      if (path.StartsWith(ThumbDir))
+      if (path.StartsWith(ThumbDir)) {
         thumbPath = path;
-      else {
+      } else {
         thumbPath = NormalThumbDir + DirSepS + ThumbnailHash (path) + ".png";
         if (FileExists (thumbPath) && (LastModified(path) >= LastModified(thumbPath)))
           Trash(thumbPath);
@@ -273,6 +322,11 @@ public static class Helpers {
         }
       } else {
         thumb = new ImageSurface (thumbPath);
+        if (thumb.Width > thumbSize || thumb.Height > thumbSize) {
+          ImageSurface nthumb = ScaleDownSurface (thumb, thumbSize);
+          thumb.Destroy ();
+          thumb = nthumb;
+        }
       }
       if (thumb == null || thumb.Width < 1 || thumb.Height < 1) {
         if (FileExists(thumbPath)) Trash(thumbPath);
@@ -292,17 +346,33 @@ public static class Helpers {
     }
   }
 
+  public static ImageSurface ScaleDownSurface (ImageSurface s, uint size)
+  {
+    double scale = (double)size / (double)Math.Max(s.Width, s.Height);
+    int nw = Math.Max(1, (int)(s.Width * scale));
+    int nh = Math.Max(1, (int)(s.Height * scale));
+    ImageSurface rv = new ImageSurface (Format.ARGB32, nw, nh);
+    using (Context cr = new Context(rv)) {
+      using (Pattern p = new Pattern(s)) {
+        cr.Rectangle (0,0, rv.Width, rv.Height);
+        cr.Scale (scale, scale);
+        cr.Pattern = p;
+        cr.Fill ();
+      }
+    }
+    return rv;
+  }
+
   /** ASYNC */
   public static bool CreateThumbnail (string path, string thumbPath, uint size)
   {
     string s = size.ToString ();
-    ProcessStartInfo psi = new ProcessStartInfo ();
-    psi.FileName = "convert";
-    psi.Arguments = EscapePath(path) + "[0] -thumbnail " +s+"x"+s+" " + EscapePath(thumbPath+".tmp.png");
-    psi.UseShellExecute = false;
-    Process p = Process.Start (psi);
-    p.WaitForExit ();
-    Move (thumbPath+".tmp.png", thumbPath);
+    string tmp = thumbPath+".tmp.png";
+    string cmd = "convert";
+    string args = EscapePath(path) + "[0] -thumbnail " +s+"x"+s+" " + EscapePath(tmp);
+    ReadCmd(cmd, args);
+    if (FileExists(tmp))
+      Move (tmp, thumbPath);
     return FileExists(thumbPath);
   }
 
@@ -534,7 +604,7 @@ public static class Helpers {
     }
   }
 
-  static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,-])");
+  static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,/-])");
   /** FAST */
   public static string EscapePath (string path) {
     return specialChars.Replace(path, @"\");

@@ -37,6 +37,11 @@ public class FSEntry
   public DateTime LastChange;
   public DateTime LastFileChange;
 
+  // rolling 32-bit frame counter in 497 days at 100fps
+  // rolling 64-bit frame counter around the time the sun burns out at 100fps
+  // 63-bit like we have here takes just 3 billion years
+  public Int64 LastDraw = 0;
+
   public bool ReadyToDraw = false;
 
   public string Name;
