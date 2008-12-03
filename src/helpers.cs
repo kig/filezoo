@@ -359,10 +359,16 @@ public static class Helpers {
   /** BLOCKING */
   public static FileTypes FileType (UnixFileSystemInfo f) {
     try {
-      if (f.IsSymbolicLink) return FileTypes.SymbolicLink;
-      else return f.FileType;
+      return (new UnixSymbolicLinkInfo(f.FullName)).FileType;
     }
     catch (System.InvalidOperationException) { return FileTypes.RegularFile; }
+  }
+
+  /** BLOCKING */
+  public static string ReadLink (string path) {
+    try {
+      return (new UnixSymbolicLinkInfo(path)).ContentsPath;
+    } catch (Exception) { return ""; }
   }
 
   /** BLOCKING */

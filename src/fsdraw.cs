@@ -227,8 +227,10 @@ public class FSDraw
       Color co = GetColor (d.FileType, d.Permissions);
       if (!d.Complete && FSCache.Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
-      if (d.IsDirectory) // fade out dir based on size on screen
-        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 1.0);
+       if (d.IsDirectory) // fade out dir based on size on screen
+        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 0.2);
+       else
+        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 0.8);
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
       if (d.Thumbnail != null)
@@ -321,6 +323,7 @@ public class FSDraw
       cr.Translate (x, y);
       cr.NewPath ();
       string name = d.Name;
+      if (d.LinkTarget != "") name += " ➞ " + d.LinkTarget;
       if (prefixes != null && prefixes.ContainsKey(d.FullName))
         name = prefixes[d.FullName] + " " + name;
       if (fs > 4) {

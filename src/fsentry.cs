@@ -43,6 +43,7 @@ public class FSEntry
   public string LCName;
   public string Suffix;
   public string FullName;
+  public string LinkTarget = "";
 
   public string Owner;
   public string Group;
@@ -68,7 +69,7 @@ public class FSEntry
   public ImageSurface Thumbnail = null;
 
 
-  public FSEntry (string path) : this (new UnixFileInfo(path)) {}
+  public FSEntry (string path) : this (new UnixSymbolicLinkInfo(path)) {}
 
   public FSEntry (UnixFileSystemInfo u)
   {
@@ -90,6 +91,9 @@ public class FSEntry
     FileType = Helpers.FileType(u);
 
     IsDirectory = FileType == FileTypes.Directory;
+    if (FileType == FileTypes.SymbolicLink) {
+      LinkTarget = Helpers.ReadLink(FullName);
+    }
 
     Suffix = IsDirectory ? "" : Helpers.Extname(Name).ToLower();
 
