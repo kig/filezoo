@@ -30,6 +30,7 @@ public class FilezooConfig
     fz.Renderer.RegularFileColor = new Color (0.188, 0.855, 1);
     fz.Renderer.SymlinkColor = new Color (0.855, 0.188, 1);
     fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
+    fz.Renderer.UnfinishedDirectoryColor = new Color (0.855, 0.4, 1);
     fz.Renderer.ExecutableColor = new Color (0.4, 1.0, 0.6);
   }
 
