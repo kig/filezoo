@@ -60,6 +60,10 @@ public class FilezooPanel : Window
     FilezooWindow.Decorated = false;
     FilezooWindow.Add (Fz);
 
+    Fz.Width = 400;
+    Fz.Height = 1000;
+    Fz.CompleteInit ();
+
   }
 
   void openUrl (string url) {

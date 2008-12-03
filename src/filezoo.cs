@@ -110,8 +110,8 @@ public class Filezoo : DrawingArea
   double dragX = 0.0;
   double dragY = 0.0;
 
-  uint Width = 1;
-  uint Height = 1;
+  public uint Width = 1;
+  public uint Height = 1;
 
   // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ("----", 100);
@@ -161,6 +161,29 @@ public class Filezoo : DrawingArea
 
   }
 
+  public void CompleteInit ()
+  {
+    Helpers.StartupProfiler.Time ("First expose");
+    SetCurrentDir (CurrentDirPath);
+    Helpers.StartupProfiler.Time ("SetCurrentDir");
+    System.Timers.Timer t = new System.Timers.Timer(50);
+    t.Elapsed += new ElapsedEventHandler (CheckUpdates);
+    System.Timers.Timer t2 = new System.Timers.Timer(1000);
+    t2.Elapsed += new ElapsedEventHandler (LongMonitor);
+    t.Enabled = true;
+    t2.Enabled = true;
+    InitComplete = true;
+    Helpers.StartupProfiler.Total ("Pre-drawing startup");
+  }
+
+  public void MockDraw (uint w, uint h)
+  {
+    using (ImageSurface s = new ImageSurface (Format.ARGB32, 1, 1)) {
+      using (Context cr = new Context (s)) {
+        Draw (cr, w, h);
+      }
+    }
+  }
 
   void CheckUpdates (object source, ElapsedEventArgs e)
   {
@@ -739,17 +762,7 @@ public class Filezoo : DrawingArea
         Height = (uint) h;
       }
       if (!InitComplete) {
-        Helpers.StartupProfiler.Time ("First expose");
-        SetCurrentDir (CurrentDirPath);
-        Helpers.StartupProfiler.Time ("SetCurrentDir");
-        System.Timers.Timer t = new System.Timers.Timer(50);
-        t.Elapsed += new ElapsedEventHandler (CheckUpdates);
-        System.Timers.Timer t2 = new System.Timers.Timer(1000);
-        t2.Elapsed += new ElapsedEventHandler (LongMonitor);
-        t.Enabled = true;
-        t2.Enabled = true;
-        InitComplete = true;
-        Helpers.StartupProfiler.Total ("Pre-drawing startup");
+        CompleteInit ();
       }
       Draw (cr, Width, Height);
     }
