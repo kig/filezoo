@@ -28,32 +28,33 @@ public static class FilezooApp {
   */
   static void Main (string[] args)
   {
+    Window win;
     Profiler p = Helpers.StartupProfiler;
     p.Restart ();
     p.MinTime = 0;
     Profiler.GlobalPrintProfile = true;
 
-    bool panelMode = (Array.IndexOf (args, "--panel") > -1);
-
     Catalog.Init("i18n","./locale");
     System.Threading.ThreadPool.SetMinThreads (10, 20);
     Application.Init ();
-    Window win = new Window ("Filezoo");
-    win.SetDefaultSize (420, 800);
 
     p.Time ("Init done");
 
-    string dir = panelMode ? Helpers.HomeDir : ".";
-    if (!panelMode && args.Length > 0) dir = args[0];
+    bool panelMode = (Array.IndexOf (args, "--panel") > -1);
 
+    string dir = panelMode ? Helpers.HomeDir : ((args.Length > 0) ? args[0] : ".");
     Filezoo fz = new Filezoo (dir);
     new FilezooConfig ().Apply(fz);
 
     p.Time ("Created Filezoo");
 
-    win.Add (fz);
-    if (panelMode)
-      win = new FilezooPanel (win, fz);
+    if (panelMode) {
+      win = new FilezooPanel (fz);
+    } else {
+      win = new Window ("Filezoo");
+      win.SetDefaultSize (420, 800);
+      win.Add (fz);
+    }
 
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
     win.ShowAll ();

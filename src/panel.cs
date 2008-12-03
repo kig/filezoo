@@ -12,11 +12,9 @@ public class FilezooPanel : Window
   string ToggleUp = "<span size=\"small\">∆</span>";
 //   string ToggleDown = "<span size=\"small\">∇</span>";
 
-  public FilezooPanel (Window fzwin, Filezoo fz) : base ("Filezoo Panel")
+  public FilezooPanel (Filezoo fz) : base ("Filezoo Panel")
   {
-    FilezooWindow = fzwin;
     Fz = fz;
-    FilezooWindow.Decorated = false;
     Decorated = false;
     Resizable = false;
     SkipPagerHint = true;
@@ -53,6 +51,15 @@ public class FilezooPanel : Window
 
     Add (hb);
     Stick ();
+
+    FilezooWindow = new Window ("Filezoo");
+    FilezooWindow.DeleteEvent += delegate (object o, DeleteEventArgs e) {
+      Toggle.Active = false;
+      e.RetVal = true;
+    };
+    FilezooWindow.Decorated = false;
+    FilezooWindow.Add (Fz);
+
   }
 
   void openUrl (string url) {
@@ -89,7 +96,7 @@ public class FilezooPanel : Window
     }
     string oldDir = Fz.CurrentDirPath;
     Fz.SetCurrentDir (newDir);
-    if (!(FilezooWindow.IsMapped && oldDir != newDir))
+    if (!FilezooWindow.IsMapped || oldDir == newDir)
       ToggleFilezoo ();
   }
 
@@ -100,14 +107,12 @@ public class FilezooPanel : Window
       FilezooWindow.Hide ();
     } else {
       Toggle.Active = true;
-      int x,y,w,h,mw,mh;
+      int x,y,mw,mh;
       GetPosition(out x, out y);
       GetSize (out mw, out mh);
-      FilezooWindow.GetSize (out w, out h);
-      w = Math.Max(w, mw);
-      x = Math.Min (Screen.Width-w, x);
-      x = Screen.Width-w;
-      FilezooWindow.Resize (w, y);
+//       x = Math.Min (Screen.Width-mw, x);
+      x = Screen.Width-mw;
+      FilezooWindow.Resize (mw, y);
       FilezooWindow.ShowAll ();
       FilezooWindow.Move (x, 0);
       FilezooWindow.Stick ();
