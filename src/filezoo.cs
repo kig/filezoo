@@ -461,10 +461,11 @@ public class Filezoo : DrawingArea
     List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
     foreach (ClickHit c in hits) {
       if (c.Height < 16) {
-        Console.WriteLine("ZoomIn {0}x", 18 / c.Height);
+        double nz = (c.Target.IsDirectory ? 20 : 18) / c.Height;
+        Console.WriteLine("ZoomIn {0}x", nz);
         cr.Save ();
           cr.IdentityMatrix ();
-          ZoomBy(cr, width, height, x, y, 18 / c.Height);
+          ZoomBy(cr, width, height, x, y, nz);
         cr.Restore ();
         break;
       } else {

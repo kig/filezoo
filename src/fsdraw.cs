@@ -482,7 +482,7 @@ public class FSDraw
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
-      if (d.IsDirectory && (cr.Matrix.Yy > 2) && d.ReadyToDraw)
+      if (d.IsDirectory && (cr.Matrix.Yy > 16) && d.ReadyToDraw)
         retval.AddRange( ClickChildren (d, cr, target, mouseX, mouseY, depth) );
       cr.NewPath ();
       double rfs = GetFontSize(d, h);
