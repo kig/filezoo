@@ -53,6 +53,10 @@ public class NameComparer : IComparer<FSEntry> {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
+    if (a.LCName[0] != b.LCName[0]) {
+      if (a.LCName[0] == '.') return 1;
+      if (b.LCName[0] == '.') return -1;
+    }
     return String.CompareOrdinal(a.LCName, b.LCName);
   }
 }
