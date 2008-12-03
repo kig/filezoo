@@ -19,6 +19,7 @@
 using System.Diagnostics;
 using System;
 using Gtk;
+using Mono.Unix;
 
 public class FilezooContextMenu : Menu {
 
@@ -42,23 +43,24 @@ public class FilezooContextMenu : Menu {
         App.SetCurrentDir (targetPath); });
       menu.Append (goTo);
 
-      if (targetPath != Helpers.RootDir) {
-        MenuItem goToP = new MenuItem ("Go to _parent");
-        goToP.Activated += new EventHandler(delegate {
-          App.SetCurrentDir (Helpers.Dirname(targetPath)); });
-        menu.Append (goToP);
-      }
-
       MenuItem term = new MenuItem ("Open _terminal");
       term.Activated += new EventHandler(delegate {
         Helpers.OpenTerminal (targetPath); });
       menu.Append (term);
 
       /** DESTRUCTIVE */
-      MenuItem create = new MenuItem ("Create _file...");
+      MenuItem create = new MenuItem ("Create _file…");
       create.Activated += new EventHandler(delegate {
         ShowCreateDialog (targetPath); });
       menu.Append (create);
+
+      UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
+      if (u.GetEntries(@"^\.git$").Length > 0) {
+        MenuItem gitk = new MenuItem ("Gitk");
+        gitk.Activated += new EventHandler(delegate {
+          Helpers.RunCommandInDir ("gitk", "", targetPath); });
+        menu.Append (gitk);
+      }
 
     } else {
     // File menu items
@@ -68,6 +70,11 @@ public class FilezooContextMenu : Menu {
         Helpers.OpenFile (targetPath); });
       menu.Append (open);
 
+      MenuItem fterm = new MenuItem ("Open _terminal");
+      fterm.Activated += new EventHandler(delegate {
+        Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
+      menu.Append (fterm);
+
       /** DESTRUCTIVE */
       if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
         MenuItem ex = new MenuItem ("_Extract");
@@ -76,31 +83,34 @@ public class FilezooContextMenu : Menu {
         menu.Append (ex);
       }
 
-      MenuItem fterm = new MenuItem ("Open _terminal");
-      fterm.Activated += new EventHandler(delegate {
-        Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
-      menu.Append (fterm);
+      if ((c.Target.Permissions & FileAccessPermissions.UserExecute) != 0) {
+        MenuItem runf = new MenuItem ("Run");
+        runf.Activated += new EventHandler(delegate {
+          Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath)); });
+        menu.Append (runf);
+      }
+
 
     }
 
     menu.Append (new SeparatorMenuItem ());
 
     /** DESTRUCTIVE */
-    MenuItem run = new MenuItem ("_Run command...");
+    MenuItem run = new MenuItem ("_Run command…");
     run.Activated += new EventHandler(delegate {
       ShowRunDialog (targetPath);
     });
     menu.Append (run);
 
     /** DESTRUCTIVE */
-    MenuItem copy = new MenuItem ("_Copy to...");
+    MenuItem copy = new MenuItem ("_Copy to…");
     copy.Activated += new EventHandler(delegate {
       ShowCopyDialog (targetPath);
     });
     menu.Append (copy);
 
     /** DESTRUCTIVE */
-    MenuItem rename = new MenuItem ("Re_name...");
+    MenuItem rename = new MenuItem ("Re_name…");
     rename.Activated += new EventHandler(delegate {
       ShowRenameDialog (targetPath);
     });
