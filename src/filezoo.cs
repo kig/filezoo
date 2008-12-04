@@ -618,7 +618,7 @@ public class Filezoo : DrawingArea
     ContextMenu.UnmapEvent += delegate {
       flareTargetX = Width/2;
       flareTargetY = -100;
-      UpdateLayout ();
+      QueueDraw ();
     };
     ContextMenu.ShowAll ();
     ContextMenu.Popup ();
@@ -697,7 +697,7 @@ public class Filezoo : DrawingArea
         ContextClick (cr, (uint)w, (uint)h, e.X, e.Y);
         flareTargetX = e.X;
         flareTargetY = e.Y;
-        UpdateLayout ();
+        QueueDraw ();
       }
     }
     return true;
@@ -828,7 +828,7 @@ public class Filezoo : DrawingArea
   double flareTargetX = 200;
   double flareTargetY = -200;
 
-  bool SillyFlare = true;
+  bool SillyFlare = false;
 
   bool DrawEffects  (Context cr, uint w, uint h)
   {
@@ -846,8 +846,8 @@ public class Filezoo : DrawingArea
 //       double t = DateTime.Now.ToFileTime() / 1e7;
       double dx = flareTargetX - flareX;
       double dy = flareTargetY - flareY;
-      flareX += dx / 10;
-      flareY += dy / 10;
+      flareX += dx / 20;
+      flareY += dy / 20;
       double s = Math.Min(1, Math.Max(0.02, 0.35 / (1 + 0.002*(dx*dx + dy*dy))));
       if (s < 0.03)
         s *= 1 + rng.NextDouble();
