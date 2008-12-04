@@ -363,6 +363,37 @@ public static class Helpers {
     return rv;
   }
 
+  public static int ImageWidth (string path)
+  {
+    using (ImageSurface s = new ImageSurface (path))
+      return s.Width;
+  }
+
+  public static RadialGradient RadialGradientFromImage (string path)
+  {
+    using (ImageSurface s = new ImageSurface (path)) {
+      RadialGradient g = new RadialGradient(0,0,0, 0,0,s.Width);
+      for (int i=0; i<s.Width; i++)
+        g.AddColorStop((double)i / ((double)s.Width-1), Sample(s, i, 0));
+      return g;
+    }
+  }
+
+  public static Color Sample (ImageSurface s, int x, int y)
+  {
+    int i = s.Stride * y, j;
+    switch (s.Format) {
+      case Format.ARGB32:
+        j = i + x*4;
+        return new Color (s.Data[j+2]/255.0, s.Data[j+1]/255.0, s.Data[j+0]/255.0, s.Data[j+3]/255.0);
+      case Format.RGB24:
+        j = i + x*4;
+        return new Color (s.Data[j+2]/255.0, s.Data[j+1]/255.0, s.Data[j]/255.0);
+      default:
+        throw new ArgumentException (String.Format("{0} not supported", s.Format), "s.Format");
+    }
+  }
+
   /** ASYNC */
   public static bool CreateThumbnail (string path, string thumbPath, uint size)
   {

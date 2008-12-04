@@ -97,6 +97,9 @@ public class Filezoo : DrawingArea
   // Do we need to redraw?
   bool NeedRedraw = true;
 
+  // Do we need to redraw the filesystem view?
+  bool FSNeedRedraw = true;
+
   // Whether to quit after startup
   public bool QuitAfterFirstFrame = false;
 
@@ -107,8 +110,8 @@ public class Filezoo : DrawingArea
   bool dragging = false;
   double dragStartX = 0.0;
   double dragStartY = 0.0;
-  double dragX = 0.0;
-  double dragY = 0.0;
+  double dragX = 200.0;
+  double dragY = -200.0;
 
   public uint Width = 1;
   public uint Height = 1;
@@ -152,6 +155,7 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.ButtonReleaseMask
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
+      | Gdk.EventMask.LeaveNotifyMask
     ));
 
     ThreadStart ts = new ThreadStart (PreDrawCallback);
@@ -193,6 +197,7 @@ public class Filezoo : DrawingArea
     }
     if (!PreDrawComplete || NeedRedraw) {
       NeedRedraw = false;
+      FSNeedRedraw = true;
       QueueDraw ();
     }
   }
@@ -758,14 +763,30 @@ public class Filezoo : DrawingArea
     {
       int w, h;
       e.Window.GetSize (out w, out h);
-      if (Width != (uint)w || Height != (uint)h) {
+      if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
+        if (CachedSurface != null) CachedSurface.Destroy ();
+        CachedSurface = new ImageSurface(Format.ARGB32, w, h);
         Width = (uint) w;
         Height = (uint) h;
       }
       if (!InitComplete) {
         CompleteInit ();
       }
-      Draw (cr, Width, Height);
+      if (!EffectInProgress && FSNeedRedraw) {
+        FSNeedRedraw = false;
+        using (Context scr = new Context (CachedSurface)) {
+          Draw (scr, Width, Height);
+        }
+      }
+      cr.Save ();
+        using (Pattern p = new Pattern (CachedSurface)) {
+          cr.Operator = Operator.Source;
+          cr.Source = p;
+          cr.Paint ();
+          cr.Operator = Operator.Over;
+          if (DrawEffects (cr, Width, Height)) QueueDraw ();
+        }
+      cr.Restore ();
     }
     if (InteractionProfiler.Watch.IsRunning) {
       InteractionProfiler.Time ("Interaction latency");
@@ -773,6 +794,66 @@ public class Filezoo : DrawingArea
     }
     return true;
   }
+
+  protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing e)
+  {
+    dragX = 200;
+    dragY = -200;
+    return true;
+  }
+
+  Random rng = new Random ();
+
+  double flareX = 200;
+  double flareY = -200;
+
+  bool DrawEffects  (Context cr, uint w, uint h)
+  {
+    if (FlareGradient == null) {
+      FGRadius = Helpers.ImageWidth(FlareGradientImage);
+      FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
+      FlareSpike = new ImageSurface(FlareSpikeImage);
+    }
+    cr.Save ();
+//       double t = DateTime.Now.ToFileTime() / 1e7;
+      double dx = dragX - flareX;
+      double dy = dragY - flareY;
+      flareX += dx / 10;
+      flareY += dy / 10;
+      double s = Math.Min(1, Math.Max(0.02, 0.35 / (1 + 0.002*(dx*dx + dy*dy))));
+      if (s < 0.03)
+        s *= 1 + rng.NextDouble();
+      cr.Translate(flareX, flareY);
+      cr.Save ();
+        cr.Scale (s, s);
+        cr.Source = FlareGradient;
+        cr.Operator = Operator.Add;
+        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
+        cr.Fill ();
+      cr.Restore ();
+      cr.Save ();
+        cr.Scale (Math.Sqrt(s), Math.Sqrt(s));
+        using (Pattern p = new Pattern(FlareSpike)) {
+          cr.Translate (-FlareSpike.Width/2.0, -FlareSpike.Height/2.0);
+          cr.Rectangle (0, 0, FlareSpike.Width, FlareSpike.Height);
+          cr.Operator = Operator.Add;
+          cr.Source = p;
+          cr.Fill ();
+        }
+      cr.Restore ();
+    cr.Restore ();
+    return true;
+  }
+
+  string FlareGradientImage = "flare_gradient.png";
+  string FlareSpikeImage = "flare_spike.png";
+  RadialGradient FlareGradient = null;
+  int FGRadius;
+  ImageSurface FlareSpike;
+
+  bool EffectInProgress = false;
+
+  ImageSurface CachedSurface;
 
 }
 

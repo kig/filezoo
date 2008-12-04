@@ -27,6 +27,7 @@ public class FilezooConfig
     fz.InActiveColor = new Color (0.188, 0.855, 1,0.5);
 
     fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
+    fz.Renderer.BackgroundColor = new Color (0.1, 0.1, 0.1);
     fz.Renderer.RegularFileColor = new Color (0.188, 0.855, 1);
     fz.Renderer.SymlinkColor = new Color (0.855, 0.188, 1);
     fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
