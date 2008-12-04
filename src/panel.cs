@@ -23,26 +23,24 @@ public class FilezooPanel : Window
     Button homeButton = new Button ("<span size=\"small\">Home</span>");
 //     homeButton.Relief = ReliefStyle.None;
     ((Label)(homeButton.Children[0])).UseMarkup = true;
-    homeButton.Clicked += new EventHandler (delegate {
-      Go(Helpers.HomeDir); });
+    homeButton.Clicked += delegate { Go(Helpers.HomeDir); };
 
     Button dlButton = new Button ("<span size=\"small\">Downloads</span>");
 //     dlButton.Relief = ReliefStyle.None;
     ((Label)(dlButton.Children[0])).UseMarkup = true;
-    dlButton.Clicked += new EventHandler (delegate {
-      Go(Helpers.HomeDir + Helpers.DirSepS + "downloads"); });
+    dlButton.Clicked += delegate {
+      Go(Helpers.HomeDir + Helpers.DirSepS + "downloads"); };
 
     Toggle = new ToggleButton (ToggleUp);
     ((Label)(Toggle.Children[0])).UseMarkup = true;
-    Toggle.Clicked += new EventHandler (delegate {
-      ToggleFilezoo (); });
+    Toggle.Clicked += delegate { ToggleFilezoo (); };
 
     Entry entry = new Entry ();
-    entry.Activated += new EventHandler (delegate {
+    entry.WidthChars = 50;
+    entry.Activated += delegate {
       Go (entry.Text);
       entry.Text = "";
-    });
-    entry.WidthChars = 50;
+    };
 
     HBox hb = new HBox ();
     hb.Add (entry);
@@ -90,12 +88,12 @@ public class FilezooPanel : Window
     }
   }
 
-  void Go (string newDir) {
-    if (newDir.Length == 0) return;
+  bool HandleEntry (string newDir) {
+    if (newDir.Length == 0) return true;
     if (newDir.StartsWith("~")) // tilde expansion
       newDir = Helpers.TildeExpand(newDir);
     if (newDir.Trim(' ') == "..") {
-      if (Fz.CurrentDirPath == Helpers.RootDir) return;
+      if (Fz.CurrentDirPath == Helpers.RootDir) return true;
       newDir = Helpers.Dirname(Fz.CurrentDirPath);
     }
     if (newDir[0] != Helpers.DirSepC) { // relative path or fancy wacky stuff
@@ -104,20 +102,26 @@ public class FilezooPanel : Window
 //         hfd = Helpers.HomeDir + Helpers.DirSepS + newDir;
       if (!Helpers.FileExists(hfd)) {
         openUrl (newDir);
-        return;
+        return false;
       }
       newDir = hfd;
     }
-    if (!Helpers.FileExists(newDir)) return;
+    if (!Helpers.FileExists(newDir)) return true;
     if (!Helpers.IsDir (newDir)) {
       Helpers.OpenFile (newDir);
-      return;
+      return false;
     }
     Fz.SetCurrentDir (newDir);
-    if (!FilezooWindow.IsMapped)
-      ToggleFilezoo ();
-    else
-      FilezooWindow.Present ();
+    return true;
+  }
+
+  void Go (string entry) {
+    if (HandleEntry(entry)) {
+      if (!FilezooWindow.IsMapped)
+        ToggleFilezoo ();
+      else
+        FilezooWindow.GdkWindow.Raise ();
+    }
   }
 
   void ToggleFilezoo ()
