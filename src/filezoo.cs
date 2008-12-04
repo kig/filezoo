@@ -184,6 +184,7 @@ public class Filezoo : DrawingArea
     t.Enabled = true;
     t2.Enabled = true;
     InitComplete = true;
+    GLib.Timeout.Add (16, new GLib.TimeoutHandler(CheckRedraw));
     Helpers.StartupProfiler.Total ("Pre-drawing startup");
   }
 
@@ -196,16 +197,21 @@ public class Filezoo : DrawingArea
     }
   }
 
+  bool CheckRedraw ()
+  {
+    if (!PreDrawComplete || NeedRedraw) {
+      NeedRedraw = false;
+      FSNeedRedraw = true;
+      QueueDraw ();
+    }
+    return true;
+  }
+
   void CheckUpdates (object source, ElapsedEventArgs e)
   {
     if (LastRedraw != FSCache.LastChange) {
       LastRedraw = FSCache.LastChange;
       PreDraw ();
-    }
-    if (!PreDrawComplete || NeedRedraw) {
-      NeedRedraw = false;
-      FSNeedRedraw = true;
-      QueueDraw ();
     }
   }
 
