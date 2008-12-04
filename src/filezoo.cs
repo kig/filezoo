@@ -159,11 +159,11 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.LeaveNotifyMask
     ));
 
-    LeaveNotifyEvent += delegate (object sender, LeaveNotifyEventArgs e)
-    {
-      dragX = 200;
-      dragY = -200;
-    };
+//     LeaveNotifyEvent += delegate (object sender, LeaveNotifyEventArgs e)
+//     {
+//       flareTargetX = dragX;
+//       flareTargetY = -dragY;
+//     };
 
     ThreadStart ts = new ThreadStart (PreDrawCallback);
     Thread t = new Thread(ts);
@@ -615,6 +615,11 @@ public class Filezoo : DrawingArea
 
     if (ContextMenu != null) ContextMenu.Dispose ();
     ContextMenu = new FilezooContextMenu (this, ch);
+    ContextMenu.UnmapEvent += delegate {
+      flareTargetX = Width/2;
+      flareTargetY = -100;
+      UpdateLayout ();
+    };
     ContextMenu.ShowAll ();
     ContextMenu.Popup ();
   }
@@ -690,6 +695,9 @@ public class Filezoo : DrawingArea
         int w, h;
         e.Window.GetSize (out w, out h);
         ContextClick (cr, (uint)w, (uint)h, e.X, e.Y);
+        flareTargetX = e.X;
+        flareTargetY = e.Y;
+        UpdateLayout ();
       }
     }
     return true;
@@ -734,6 +742,8 @@ public class Filezoo : DrawingArea
     }
     dragX = e.X;
     dragY = e.Y;
+    flareTargetX = Width/2;
+    flareTargetY = -100;
     return true;
   }
 
@@ -815,6 +825,9 @@ public class Filezoo : DrawingArea
   double flareX = 200;
   double flareY = -200;
 
+  double flareTargetX = 200;
+  double flareTargetY = -200;
+
   bool SillyFlare = true;
 
   bool DrawEffects  (Context cr, uint w, uint h)
@@ -823,13 +836,16 @@ public class Filezoo : DrawingArea
     if (FlareGradient == null) {
       FGRadius = Helpers.ImageWidth(FlareGradientImage);
       FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
+      BlackGradient = new RadialGradient(0,0,0, 0,0,FGRadius);
+      BlackGradient.AddColorStop(0, new Color(0,0,0,1));
+      BlackGradient.AddColorStop(1, new Color(0,0,0,0));
       FlareSpike = new ImageSurface(FlareSpikeImage);
       RainbowSprite = new ImageSurface(RainbowSpriteImage);
     }
     cr.Save ();
 //       double t = DateTime.Now.ToFileTime() / 1e7;
-      double dx = dragX - flareX;
-      double dy = dragY - flareY;
+      double dx = flareTargetX - flareX;
+      double dy = flareTargetY - flareY;
       flareX += dx / 10;
       flareY += dy / 10;
       double s = Math.Min(1, Math.Max(0.02, 0.35 / (1 + 0.002*(dx*dx + dy*dy))));
@@ -838,9 +854,12 @@ public class Filezoo : DrawingArea
       cr.Translate(flareX, flareY);
       cr.Save ();
         cr.Scale (s, s);
+        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
+/*        cr.Source = BlackGradient;
+        cr.Operator = Operator.Over;
+        cr.FillPreserve ();*/
         cr.Source = FlareGradient;
         cr.Operator = Operator.Add;
-        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
         cr.Fill ();
       cr.Restore ();
       cr.Save ();
@@ -881,6 +900,7 @@ public class Filezoo : DrawingArea
   string FlareSpikeImage = "flare_spike.png";
   string RainbowSpriteImage = "rainbow_sprite.png";
   RadialGradient FlareGradient = null;
+  RadialGradient BlackGradient;
   int FGRadius;
   ImageSurface FlareSpike;
   ImageSurface RainbowSprite;
