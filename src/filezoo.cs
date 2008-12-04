@@ -155,10 +155,12 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.ButtonReleaseMask
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
-//       | Gdk.EventMask.LeaveNotifyMask
+      | Gdk.EventMask.EnterNotifyMask
+      | Gdk.EventMask.LeaveNotifyMask
     ));
 
-    LeaveNotifyEvent += delegate {
+    LeaveNotifyEvent += delegate (object sender, LeaveNotifyEventArgs e)
+    {
       dragX = 200;
       dragY = -200;
     };
@@ -726,6 +728,10 @@ public class Filezoo : DrawingArea
         PanBy (cr, (uint)w, (uint)h, dx, dy);
       }
     }
+    if (SillyFlare && !DrawQueued) {
+      DrawQueued = true;
+      QueueDraw();
+    }
     dragX = e.X;
     dragY = e.Y;
     return true;
@@ -754,6 +760,8 @@ public class Filezoo : DrawingArea
     return true;
   }
 
+  bool DrawQueued = false;
+
   /** BLOCKING */
   /**
     The expose event handler. Gets the Cairo.Context for the
@@ -767,6 +775,7 @@ public class Filezoo : DrawingArea
     using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
     {
       int w, h;
+      DrawQueued = false;
       e.Window.GetSize (out w, out h);
       if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
         if (CachedSurface != null) CachedSurface.Destroy ();
@@ -789,7 +798,8 @@ public class Filezoo : DrawingArea
           cr.Source = p;
           cr.Paint ();
           cr.Operator = Operator.Over;
-          if (DrawEffects (cr, Width, Height)) QueueDraw ();
+          if (DrawEffects (cr, Width, Height))
+            QueueDraw ();
         }
       cr.Restore ();
     }
@@ -805,7 +815,7 @@ public class Filezoo : DrawingArea
   double flareX = 200;
   double flareY = -200;
 
-  bool SillyFlare = false;
+  bool SillyFlare = true;
 
   bool DrawEffects  (Context cr, uint w, uint h)
   {
@@ -814,6 +824,7 @@ public class Filezoo : DrawingArea
       FGRadius = Helpers.ImageWidth(FlareGradientImage);
       FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
       FlareSpike = new ImageSurface(FlareSpikeImage);
+      RainbowSprite = new ImageSurface(RainbowSpriteImage);
     }
     cr.Save ();
 //       double t = DateTime.Now.ToFileTime() / 1e7;
@@ -833,6 +844,25 @@ public class Filezoo : DrawingArea
         cr.Fill ();
       cr.Restore ();
       cr.Save ();
+        cr.Scale (s, s);
+        cr.Operator = Operator.Add;
+        using (Pattern p = new Pattern(RainbowSprite)) {
+          cr.Save ();
+          cr.Translate (10, -RainbowSprite.Height/2);
+          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
+          cr.Source = p;
+          cr.Fill ();
+          cr.Restore ();
+          cr.Save ();
+          cr.Scale(-1, 1);
+          cr.Translate (10, -RainbowSprite.Height/2);
+          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
+          cr.Source = p;
+          cr.Fill ();
+          cr.Restore ();
+        }
+      cr.Restore ();
+      cr.Save ();
         cr.Scale (Math.Sqrt(s), Math.Sqrt(s));
         using (Pattern p = new Pattern(FlareSpike)) {
           cr.Translate (-FlareSpike.Width/2.0, -FlareSpike.Height/2.0);
@@ -843,14 +873,17 @@ public class Filezoo : DrawingArea
         }
       cr.Restore ();
     cr.Restore ();
+    if (dx*dx < 1 && dy*dy < 1) return false;
     return true;
   }
 
   string FlareGradientImage = "flare_gradient.png";
   string FlareSpikeImage = "flare_spike.png";
+  string RainbowSpriteImage = "rainbow_sprite.png";
   RadialGradient FlareGradient = null;
   int FGRadius;
   ImageSurface FlareSpike;
+  ImageSurface RainbowSprite;
 
   bool EffectInProgress = false;
 
