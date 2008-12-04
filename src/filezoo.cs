@@ -155,8 +155,13 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.ButtonReleaseMask
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
-      | Gdk.EventMask.LeaveNotifyMask
+//       | Gdk.EventMask.LeaveNotifyMask
     ));
+
+    LeaveNotifyEvent += delegate {
+      dragX = 200;
+      dragY = -200;
+    };
 
     ThreadStart ts = new ThreadStart (PreDrawCallback);
     Thread t = new Thread(ts);
@@ -795,20 +800,16 @@ public class Filezoo : DrawingArea
     return true;
   }
 
-  protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing e)
-  {
-    dragX = 200;
-    dragY = -200;
-    return true;
-  }
-
   Random rng = new Random ();
 
   double flareX = 200;
   double flareY = -200;
 
+  bool SillyFlare = false;
+
   bool DrawEffects  (Context cr, uint w, uint h)
   {
+    if (!SillyFlare) return false;
     if (FlareGradient == null) {
       FGRadius = Helpers.ImageWidth(FlareGradientImage);
       FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
