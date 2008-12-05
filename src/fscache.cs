@@ -305,6 +305,7 @@ public static class FSCache
             if (e.LastDraw < f.LastDraw) oldest = e;
           }
           ThumbnailCache.Remove(oldest.FullName);
+          oldest.Thumbnail.Destroy ();
           oldest.Thumbnail = null;
           deletecount++;
           checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
@@ -316,6 +317,7 @@ public static class FSCache
           }
           foreach (FSEntry e in old) {
             ThumbnailCache.Remove(e.FullName);
+            e.Thumbnail.Destroy ();
             e.Thumbnail = null;
             deletecount++;
           }
