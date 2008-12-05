@@ -87,6 +87,12 @@ public class Profiler
     Time (String.Format(format, o1, o2));
   }
 
+  public void Total (string format, object o1) {
+    Total (String.Format(format, o1));
+  }
+  public void Total (string format, object o1, object o2) {
+    Total (String.Format(format, o1, o2));
+  }
   public void Total (string message) {
     PrintTime (message+"\n", TotalElapsed, "\u001b[4mTotal".PadRight(80, ' ')+"\u001b[0m\n");
   }
