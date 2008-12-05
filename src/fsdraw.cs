@@ -329,7 +329,7 @@ public class FSDraw
       cr.Translate (x, y);
       cr.NewPath ();
       string name = d.Name;
-      if (d.LinkTarget != "") name += " ➞ " + d.LinkTarget;
+      if (d.LinkTarget != null) name += " ➞ " + d.LinkTarget;
       if (prefixes != null && prefixes.ContainsKey(d.FullName))
         name = prefixes[d.FullName] + " " + name;
       if (fs > 4) {
@@ -411,7 +411,7 @@ public class FSDraw
     bool rv = true;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     if (!PreDrawCancelled) {
-      if (depth < 2  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
+      if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
         FSCache.RequestTraversal(d.FullName);
       cr.Save ();
         cr.Scale (1, h);
