@@ -44,7 +44,7 @@ public static class FilezooApp {
 
     string dir = panelMode ? Helpers.HomeDir : ((args.Length > 0) ? args[0] : ".");
     Filezoo fz = new Filezoo (dir);
-    new FilezooConfig ().Apply(fz);
+    new FilezooConfig (args).Apply(fz);
 
     p.Time ("Created Filezoo");
 

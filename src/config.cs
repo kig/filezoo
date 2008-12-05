@@ -6,14 +6,16 @@ public class FilezooConfig
 {
 
   static Dictionary<string, string> Prefixes;
+  string[] Args;
 
-  public FilezooConfig () {
+  public FilezooConfig (string[] args) {
+    Args = args;
     Prefixes = new Dictionary<string, string> ();
     FillPrefixes ();
   }
 
   public void Apply (Filezoo fz) {
-//     fz.QuitAfterFirstFrame = true;
+    fz.QuitAfterFirstFrame = (System.Array.IndexOf(Args, "--quit") > -1);
     fz.Prefixes = Prefixes;
 
     fz.BreadcrumbFontFamily = "URW Gothic L";
