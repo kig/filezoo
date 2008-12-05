@@ -1,3 +1,21 @@
+/*
+    Filezoo - a small and fast file manager
+    Copyright (C) 2008  Ilmari Heikkinen
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 using System;
 using Gtk;
 using Mono.Unix;
@@ -91,11 +109,19 @@ public class FilezooPanel : Window
     } else if (url.StartsWith("?")) {
       Helpers.Search(url.Substring(1));
     } else if (url.StartsWith("!")) {
-      Helpers.RunCommandInDir ("sh", "-c "+Helpers.EscapePath(url.Substring(1)), Fz.CurrentDirPath);
+    /** DESTRUCTIVE */
+      try { Helpers.RunCommandInDir ("sh", "-c "+Helpers.EscapePath(url.Substring(1)), Fz.CurrentDirPath); }
+      catch (Exception) {} // Possibly fails if current dir doesn't exist,
+                           // and doing something destructive in a random dir
+                           // is not a good idea.
     } else if (url.Contains(".") && !url.Contains(" ")) {
       Helpers.OpenURL(url);
     } else if (Helpers.IsPlausibleCommandLine(url, Fz.CurrentDirPath)) {
-      Helpers.RunCommandInDir ("sh", "-c "+ Helpers.EscapePath(url), Fz.CurrentDirPath);
+    /** DESTRUCTIVE */
+      try { Helpers.RunCommandInDir ("sh", "-c "+ Helpers.EscapePath(url), Fz.CurrentDirPath); }
+      catch (Exception) {} // Possibly fails if current dir doesn't exist,
+                           // and doing something destructive in a random dir
+                           // is not a good idea.
     } else {
       Helpers.Search(url);
     }
@@ -111,8 +137,8 @@ public class FilezooPanel : Window
     }
     if (newDir[0] != Helpers.DirSepC) { // relative path or fancy wacky stuff
       string hfd = Fz.CurrentDirPath + Helpers.DirSepS + newDir;
-//       if (!Helpers.FileExists(hfd))
-//         hfd = Helpers.HomeDir + Helpers.DirSepS + newDir;
+      if (!Helpers.FileExists(hfd))
+        hfd = Helpers.HomeDir + Helpers.DirSepS + newDir;
       if (!Helpers.FileExists(hfd)) {
         openUrl (newDir);
         return false;
