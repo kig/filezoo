@@ -7,6 +7,8 @@ public class FilezooPanel : Window
   Window FilezooWindow;
   Filezoo Fz;
 
+  Entry entry;
+
   ToggleButton Toggle;
 
   string ToggleUp = "<span size=\"small\">∆</span>";
@@ -35,11 +37,22 @@ public class FilezooPanel : Window
     ((Label)(Toggle.Children[0])).UseMarkup = true;
     Toggle.Clicked += delegate { ToggleFilezoo (); };
 
-    Entry entry = new Entry ();
+    entry = new Entry ();
     entry.WidthChars = 50;
     entry.Activated += delegate {
       Go (entry.Text);
       entry.Text = "";
+    };
+    EntryCompletion ec = new EntryCompletion ();
+    ec.InlineCompletion = true;
+    ec.InlineSelection = true;
+    ec.PopupSetWidth = true;
+    ec.PopupSingleMatch = true;
+    ec.TextColumn = 0;
+    entry.Completion = ec;
+    entry.Completion.Model = CreateCompletionModel ();
+    entry.Focused += delegate {
+      RecreateEntryCompletion ();
     };
 
     HBox hb = new HBox ();
@@ -112,6 +125,7 @@ public class FilezooPanel : Window
       return false;
     }
     Fz.SetCurrentDir (newDir);
+    RecreateEntryCompletion ();
     return true;
   }
 
@@ -141,5 +155,22 @@ public class FilezooPanel : Window
       FilezooWindow.Move (x, 0);
       FilezooWindow.Stick ();
     }
+  }
+
+  void RecreateEntryCompletion ()
+  {
+    ListStore om = (ListStore)entry.Completion.Model;
+    entry.Completion.Model = CreateCompletionModel ();
+    Console.WriteLine("Created completion model");
+    om.Dispose ();
+  }
+
+  TreeModel CreateCompletionModel ()
+  {
+    ListStore store = new ListStore (typeof (string));
+    if (Fz.CurrentDirPath != null)
+      foreach (UnixFileSystemInfo f in Helpers.EntriesMaybe(Fz.CurrentDirPath))
+        store.AppendValues (f.Name);
+    return store;
   }
 }
