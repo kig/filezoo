@@ -25,9 +25,8 @@ using Cairo;
 
 public class FSEntry
 {
-
   public FSEntry ParentDir;
-  public List<FSEntry> Entries = new List<FSEntry> ();
+  public List<FSEntry> Entries;
 
   public IMeasurer Measurer;
   public IComparer<FSEntry> Comparer;
@@ -48,7 +47,7 @@ public class FSEntry
   public string LCName;
   public string Suffix;
   public string FullName;
-  public string LinkTarget = "";
+  public string LinkTarget;
 
   public string Owner;
   public string Group;
@@ -102,8 +101,8 @@ public class FSEntry
 
     Suffix = IsDirectory ? "" : Helpers.Extname(Name).ToLower();
 
-    Count = IsDirectory ? 0 : 1;
-    Size = IsDirectory ? 0 : Helpers.FileSize(u);
+    Count = 1;
+    Size = Helpers.FileSize(u);
 
     if (!IsDirectory) {
       SubTreeSize = Size;
@@ -111,6 +110,8 @@ public class FSEntry
       Complete = true;
       FilePassDone = true;
       ReadyToDraw = true;
+    } else {
+      Entries = new List<FSEntry> ();
     }
   }
 
