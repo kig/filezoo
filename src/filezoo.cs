@@ -798,16 +798,19 @@ public class Filezoo : DrawingArea
       int w, h;
       DrawQueued = false;
       e.Window.GetSize (out w, out h);
+      bool sizeChanged = false;
       if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
         if (CachedSurface != null) CachedSurface.Destroy ();
         CachedSurface = new ImageSurface(Format.ARGB32, w, h);
+        sizeChanged = true;
         Width = (uint) w;
         Height = (uint) h;
+        if (InitComplete) UpdateLayout ();
       }
       if (!InitComplete) {
         CompleteInit ();
       }
-      if (!EffectInProgress && FSNeedRedraw) {
+      if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
         FSNeedRedraw = false;
         using (Context scr = new Context (CachedSurface)) {
           Draw (scr, Width, Height);
