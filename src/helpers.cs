@@ -409,7 +409,7 @@ public static class Helpers {
 
   /** FAST */
   public static string ThumbnailHash (string path) {
-    return BitConverter.ToString(MD5(path)).Replace("-", "");
+    return BitConverter.ToString(MD5("file://"+path)).Replace("-", "").ToLower();
   }
 
   public static byte[] MD5 (string s) {
