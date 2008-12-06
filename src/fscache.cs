@@ -17,6 +17,7 @@
 */
 
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Timers;
 using System.IO;
@@ -120,6 +121,16 @@ public static class FSCache
     FSEntry f = new FSEntry (path);
     Cache[path] = f;
     CreateParents (f);
+    TraversalInfo i = new TraversalInfo(0,0,DateTime.Now);
+    bool hasInfo = false;
+    lock (TraversalCache) {
+      if (TraversalCache.ContainsKey(path)) {
+        i = TraversalCache[path];
+        hasInfo = true;
+      }
+    }
+    if (hasInfo)
+      SetCountAndSize(path, i.count, i.size);
     return f;
   } }
 
@@ -148,44 +159,28 @@ public static class FSCache
   }
 
   /** BLOCKING */
-  public static void FilePass (string path)
-  { FilePass (path, true); }
-  public static void FilePass (string path, bool createFiles)
-  { FilePass (Get(path), createFiles); }
-  public static void FilePass (FSEntry f, bool createFiles)
+  public static void FilePass (string path) { FilePass (Get(path)); }
+  public static void FilePass (FSEntry f)
   {
     string path = f.FullName;
     if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
     f.LastFileChange = Helpers.LastChange(path);
     if (f.IsDirectory) {
       List<FSEntry> entries = new List<FSEntry> ();
-      long size = 0, count = 0, subTreeSize = 0, subTreeCount = 0;
+      long size = 0, count = 0;
       foreach (UnixFileSystemInfo u in Helpers.EntriesMaybe (f.FullName)) {
-        if (Helpers.IsDir(u) || createFiles) {
-          FSEntry d = Get (u.FullName);
-          entries.Add (d);
-          size += d.Size;
-          subTreeSize += d.SubTreeSize;
-          subTreeCount += d.SubTreeCount;
-        } else {
-          long sz = 0;
-          try { sz=u.Length; } catch (Exception) {}
-          size += sz;
-          subTreeSize += sz;
-          subTreeCount++;
-        }
+        FSEntry d = Get (u.FullName);
+        entries.Add (d);
+        size += d.Size;
         count++;
       }
       lock (Cache) {
         f.Entries = entries;
         f.Size = size;
         f.Count = count;
-        AddCountAndSize (path, subTreeCount-f.SubTreeCount, subTreeSize-f.SubTreeSize);
         f.FilePassDone = true;
         if (AllChildrenComplete(path))
           SetComplete (path);
-        if (!createFiles) // force FilePass on next time
-          f.LastFileChange = Helpers.DefaultTime;
       }
     }
   }
@@ -220,6 +215,8 @@ public static class FSCache
     f.Measurer = Measurer;
     double totalHeight = 0.0;
     foreach (FSEntry e in f.Entries) {
+      if (Measurer.DependsOnEntries && !e.FilePassDone)
+        FilePass (e);
       e.Height = Measurer.Measure(e);
       totalHeight += e.Height;
     }
@@ -325,6 +322,25 @@ public static class FSCache
   } }
 
   /** ASYNC */
+  static void SetCountAndSize (string path, long count, long size)
+  { lock (Cache) {
+    FSEntry d = Get (path);
+    long oldCount = d.SubTreeCount, oldSize = d.SubTreeSize;
+    d.SubTreeCount = count;
+    d.SubTreeSize = size;
+    d.Complete = true;
+    d.InProgress = false;
+    d.LastChange = LastChange = DateTime.Now;
+    foreach (FSEntry a in GetAncestors (path)) {
+      if (!a.Complete) {
+        a.SubTreeCount += count-oldCount;
+        a.SubTreeSize += size-oldSize;
+        a.LastChange = LastChange;
+      }
+    }
+  } }
+
+  /** ASYNC */
   static void SetComplete (string path)
   { lock (Cache) {
     FSEntry d = Get (path);
@@ -403,6 +419,9 @@ public static class FSCache
     if (Cache.ContainsKey(path)) {
       FSEntry d = Cache[path];
       Cache.Remove (path);
+      lock (TraversalCache)
+        if (TraversalCache.ContainsKey(path))
+          TraversalCache.Remove(path);
       if (d.Entries != null)
         foreach (FSEntry c in d.Entries)
           DeleteChildren (c.FullName);
@@ -519,15 +538,6 @@ public static class FSCache
   }
 
   /** ASYNC */
-  static void TraverseSub (string dirname)
-  {
-    bool useThread;
-    useThread = TraverseThreadCount < OptimalTraverseThreads;
-    if (useThread) ThreadTraverse (dirname);
-    else Traverse (dirname);
-  }
-
-  /** ASYNC */
   static void Traverse (string dirname)
   {
     lock (TCLock) TraversalCounter++;
@@ -543,15 +553,68 @@ public static class FSCache
     if (TraversalCancelled) return;
     FSEntry d = Get (dirname);
     if (!StartTraversal (d)) return;
-    if (NeedFilePass (d)) {
-      FilePass (d, false);
+    ProcessStartInfo psi = new ProcessStartInfo ();
+    psi.FileName = "du";
+    psi.Arguments = "-0 -P -b --apparent-size "+Helpers.EscapePath(dirname);
+    psi.UseShellExecute = false;
+    psi.RedirectStandardOutput = true;
+    Process p = Process.Start (psi);
+    using (BinaryReader b = new BinaryReader(p.StandardOutput.BaseStream)) {
+      while (true) {
+        string l = ReadNullTerminatedLine(b);
+        if (l.Length == 0) break;
+        ApplyDuString (l);
+        if (TraversalCancelled) {
+          p.Kill ();
+          return;
+        }
+      }
     }
-    if (TraversalCancelled) return;
-    foreach (FSEntry f in d.Entries) {
-      if (f.IsDirectory) TraverseDir(f.FullName);
-      if (TraversalCancelled) return;
+    p.WaitForExit ();
+  }
+
+  static string ReadNullTerminatedLine(BinaryReader s)
+  {
+    byte[] buf = new byte[4096];
+    int i=0;
+    byte j;
+    try {
+      while ((j=s.ReadByte()) > 0) {
+        if (i > buf.Length) Array.Resize<byte>(ref buf, buf.Length*2);
+        buf[i] = j;
+        ++i;
+      }
+    } catch (Exception) {}
+    Array.Resize<byte>(ref buf, i);
+    return new String(Array.ConvertAll<byte,char>(buf, Convert.ToChar));
+  }
+
+  static void ApplyDuString (string l)
+  {
+    char[] tab = {'\t'};
+    string[] size_date_path = l.Split(tab, 2);
+    Int64 size = Int64.Parse(size_date_path[0]);
+    string path = size_date_path[1];
+    lock (TraversalCache) {
+      TraversalCache[path] = new TraversalInfo(size, 1, DateTime.Now);
+    }
+    lock (Cache) {
+      if (Cache.ContainsKey(path))
+        SetCountAndSize(path, 0, size);
+      LastChange = DateTime.Now;
     }
   }
+
+  static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
+
+  struct TraversalInfo {
+    public Int64 size;
+    public Int64 count;
+    public DateTime time;
+    public TraversalInfo(Int64 sz, Int64 c, DateTime t)
+    { size = sz; count = c; time = t; }
+  }
+
 
 
 

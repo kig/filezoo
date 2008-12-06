@@ -25,16 +25,20 @@ public class FilezooConfig
     fz.FileNameFontFamily = "URW Gothic L";
     fz.FileInfoFontFamily = "Sans";
 
-    fz.ActiveColor = new Color (0.188, 0.855, 1);
-    fz.InActiveColor = new Color (0.188, 0.855, 1,0.5);
+    fz.ActiveColor = new Color (0.188, 0.755, 1, 1);
+    fz.InActiveColor = new Color (0.188, 0.755, 1, 0.5);
 
     fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
 //     fz.Renderer.BackgroundColor = new Color (0.1, 0.1, 0.1);
-    fz.Renderer.RegularFileColor = new Color (0.188, 0.855, 1);
-    fz.Renderer.SymlinkColor = new Color (0.855, 0.188, 1);
+    fz.Renderer.RegularFileColor = new Color (0.188, 0.755, 1);
+    fz.Renderer.SymlinkColor = new Color (0.655, 0.588, 0.855);
     fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
-    fz.Renderer.UnfinishedDirectoryColor = new Color (0.855, 0.4, 1);
-    fz.Renderer.ExecutableColor = new Color (0.4, 1.0, 0.6);
+    fz.Renderer.UnfinishedDirectoryColor = new Color (0.455, 0.4, 1);
+    fz.Renderer.ExecutableColor = new Color (0.4, 0.855, 0.3);
+    fz.Renderer.BlockDeviceColor = new Color (0.855,0.655,0);
+    fz.Renderer.CharacterDeviceColor = new Color (0.75,0.5,0);
+    fz.Renderer.FifoColor = new Color (0.75,0.1,0.32);
+    fz.Renderer.SocketColor = new Color (0.95,0.2,0.52);
   }
 
   void FillPrefixes () {
@@ -85,7 +89,7 @@ public class FilezooConfig
     Prefixes[Helpers.HomeDir+"/photos"] =
     Prefixes[Helpers.HomeDir+"/Photos"] =
     Prefixes[Helpers.HomeDir+"/pictures"] =
-    Prefixes[Helpers.HomeDir+"/Pictures"] = "❏";
+    Prefixes[Helpers.HomeDir+"/Pictures"] = "☐";
     Prefixes[Helpers.HomeDir+"/reading"] = "♾";
     Prefixes[Helpers.HomeDir+"/writing"] = "✍";
     Prefixes[Helpers.HomeDir+"/movies"] =

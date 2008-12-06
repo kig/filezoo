@@ -71,13 +71,12 @@ public class FSDraw
     if (d.IsDirectory) {
       string extras = "";
       // entries sans parent dir
+      extras += String.Format("{0} ", d.Count.ToString("N0"));
+      extras += (d.Count == 1) ? "entry" : "entries";
       if (FSCache.Measurer.DependsOnTotals) {
-        extras += String.Format("{0} ", d.SubTreeCount.ToString("N0"));
-        extras += d.SubTreeCount == 1 ? "file" : "files";
+/*        extras += String.Format(", {0} ", d.SubTreeCount.ToString("N0"));
+        extras += d.SubTreeCount == 1 ? "file" : "files";*/
         extras += String.Format(", {0} total", Helpers.FormatSI(d.SubTreeSize, "B"));
-      } else {
-        extras += String.Format("{0} ", d.Count.ToString("N0"));
-        extras += (d.Count == 1) ? "entry" : "entries";
       }
       return extras;
     } else {
@@ -223,8 +222,10 @@ public class FSDraw
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
+      cr.Color = new Color (0,0,0,0.3);
+      if (depth == 0)
+        cr.Translate (0.005*rBoxWidth, 0);
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
-      cr.Color = BackgroundColor;
       cr.Fill ();
       Color co = GetColor (d.FileType, d.Permissions);
       if (!d.Complete && FSCache.Measurer.DependsOnTotals)
@@ -239,6 +240,30 @@ public class FSDraw
         DrawThumb (d, cr, target);
       else
         cr.Fill ();
+      if (d.IsDirectory) {
+        cr.Save ();
+          if (cr.Matrix.Yy > 8) {
+            Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
+            LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96);
+            g.AddColorStop (0, new Color (0,0,0,0));
+            g.AddColorStop (0.75, new Color (0,0,0,co.A));
+            g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
+            cr.Pattern = g;
+            cr.Fill ();
+            Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / cr.Matrix.Yy), target);
+            cr.Color = new Color (0,0,0,0.8);
+            cr.Fill ();
+          }
+          if (cr.Matrix.Yy > 2) {
+            cr.Color = RegularFileColor;
+            double lh = (cr.Matrix.Yy * 0.02 > 3) ? (3 / cr.Matrix.Yy) : 0.02;
+            Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
+            cr.Fill ();
+            Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
+            cr.Fill ();
+          }
+        cr.Restore ();
+      }
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1.0;
       cr.Color = co;
@@ -247,7 +272,7 @@ public class FSDraw
       if (d.IsDirectory) {
         bool childrenVisible = cr.Matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
-        if (shouldDrawChildren && d.ReadyToDraw) {
+        if (shouldDrawChildren && (d.ReadyToDraw || depth == 0)) {
           c += DrawChildren(d, prefixes, cr, target, depth);
         }
       }
@@ -318,7 +343,9 @@ public class FSDraw
     double rfs = GetFontSize(d, h);
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
-      cr.Translate(rBoxWidth * 1.1, 0.02);
+      cr.Translate(rBoxWidth * 1, 0.02);
+      double be = cr.Matrix.X0;
+      cr.Translate(rBoxWidth * 0.1, 0.0);
       if (d.IsDirectory && rfs > 60)
         cr.Translate(0.0, 0.46);
       double x = cr.Matrix.X0;
@@ -335,20 +362,22 @@ public class FSDraw
       if (fs > 4) {
         if (depth == 0)
           cr.Translate (0, -fs*0.5);
+        if (d.IsDirectory && depth < 2)
+          DrawTitleLine (cr, fs, h, be, x, depth);
         cr.MoveTo (0, -fs*0.2);
         Helpers.DrawText (cr, FileNameFontFamily, fs, name);
 
         double sfs = Helpers.Clamp(
-          d.IsDirectory ? rfs*0.05 : rfs*0.28,
+          d.IsDirectory ? rfs*0.18 : rfs*0.28,
           MinFontSize, MaxFontSize*0.6);
         if (sfs > 1) {
           double a = sfs / (MaxFontSize*0.6);
           Color co = GetColor (d.FileType, d.Permissions);
           co.A = a*a;
           cr.Color = co;
-          cr.MoveTo (0, fs*1.1+sfs*0.6);
-          Helpers.DrawText (cr, FileInfoFontFamily, sfs, d.LastModified.ToString() + " - " + GetSubTitle (d));
-          cr.MoveTo (0, fs*1.1+sfs*2.0);
+          cr.MoveTo (0, fs*1.1+sfs*0.7);
+          Helpers.DrawText (cr, FileInfoFontFamily, sfs*1.1, d.LastModified.ToString() + " - " + GetSubTitle (d));
+          cr.MoveTo (0, fs*1.1+sfs*2.1);
           Helpers.DrawText (cr, FileInfoFontFamily, sfs, PermissionString (d));
         }
       } else if (fs > 1) {
@@ -358,6 +387,24 @@ public class FSDraw
         cr.Rectangle (0.0, 0.0, fs / 2 * name.Length, fs/3);
         cr.Fill ();
       }
+    cr.Restore ();
+  }
+
+  void DrawTitleLine (Context cr, double fs, double h, double be, double x, uint depth)
+  {
+    cr.Save ();
+      cr.Rectangle (20, 0, be-x+2-22, 50);
+      cr.Clip ();
+      cr.MoveTo (-3, fs*1.3);
+      double cw = be-x, ch = (h > 50 ? 1 : (h/50)*(h/50)) * (x-be);
+      cr.RelLineTo (cw+6,0);
+      cr.RelLineTo (cw,ch);
+      Color c = RegularFileColor;
+//       c.A = Math.Min(1, h / 50);
+      cr.Color = c;
+      cr.LineCap = LineCap.Square;
+      cr.LineWidth = 2 - depth;
+      cr.Stroke ();
     cr.Restore ();
   }
 
@@ -406,13 +453,13 @@ public class FSDraw
   /** ASYNC */
   public bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
   {
+    if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
+        FSCache.RequestTraversal(d.FullName);
     if (depth > 0 && !IsVisible(d, cr, target)) return true;
     lock (PreDrawLock) PreDrawInProgress ++;
     bool rv = true;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     if (!PreDrawCancelled) {
-      if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
-        FSCache.RequestTraversal(d.FullName);
       cr.Save ();
         cr.Scale (1, h);
         RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);

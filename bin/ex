@@ -23,6 +23,7 @@ extractors = {
 
 fails = []
 ARGV.each{|fn|
+  fn = File.expand_path(fn)
   mt = `file -ib '#{fn.gsub(/'/,"\\\\'")}'`.strip.split(',')[0]
   ex = extractors[mt]
   if ex

@@ -81,7 +81,8 @@ public class Filezoo : DrawingArea
     new SizeHandler("Flat", new FlatMeasurer()),
     new SizeHandler("Size", new SizeMeasurer()),
     new SizeHandler("Date", new DateMeasurer()),
-    new SizeHandler("Count", new CountMeasurer()),
+    new SizeHandler("Entries", new EntriesMeasurer()),
+//     new SizeHandler("Count", new CountMeasurer()),
     new SizeHandler("Total", new TotalMeasurer())
   };
   // current file sizer
@@ -327,7 +328,6 @@ public class Filezoo : DrawingArea
   void Draw (Context cr, uint width, uint height)
   {
     cr.Save ();
-      DrawClear (cr, width, height);
       DrawToolbars (cr, width, height);
       Rectangle targetBox = Transform (cr, width, height);
       DrawCurrentDir(cr, targetBox);
@@ -352,6 +352,72 @@ public class Filezoo : DrawingArea
     cr.Color = Renderer.BackgroundColor;
     cr.Rectangle (0,0, width, height);
     cr.Fill ();
+  }
+
+  double FirstProgress = 0;
+  double LastProgress = 0;
+  void DrawBackground (Context cr, uint width, uint height)
+  {
+    cr.Save ();
+      DrawClear (cr, width, height);
+      double t = DateTime.Now.ToFileTime() / 1e7;
+      cr.Save ();
+        Color ca = Renderer.DirectoryColor;
+        ca.A = 0.3;
+        cr.Color = ca;
+        cr.LineWidth = 1;
+        cr.Translate (80, -50);
+        for (double i=0; i<10; i++) {
+        for (double y=0; y<10; y++) {
+          cr.Save ();
+            double hr = 45;
+            double iscale = Math.Sin(i/20 * Math.PI*2 + t);
+            double xscale = Math.Cos(i/20 * Math.PI*2 + t);
+            cr.Translate (iscale * hr * 3, -100 + y*hr*(2*1.732) + hr*(i%2)*1.732);
+            cr.Scale (xscale, 1);
+            cr.NewPath ();
+            cr.MoveTo (0, -hr);
+            cr.LineTo (0.866*hr, -0.5*hr);
+            cr.LineTo (0.866*hr, 0.5*hr);
+            cr.LineTo (0, hr);
+            cr.LineTo (-0.866*hr, 0.5*hr);
+            cr.LineTo (-0.866*hr, -0.5*hr);
+            cr.ClosePath ();
+            cr.Stroke ();
+          cr.Restore ();
+        }
+        }
+      cr.Restore ();
+      if (CurrentDirEntry.InProgress || (t - LastProgress < 3)) {
+        if (FirstProgress == 0) { FirstProgress = LastProgress = t; }
+        if (CurrentDirEntry.InProgress) LastProgress = t;
+        double opacity = Math.Min(3, t-FirstProgress) - Math.Max(0, t-LastProgress);
+        t = (t * 0.1) % Math.PI*2;
+        Color c = Renderer.RegularFileColor;
+        c.A = 0.1*opacity;
+        cr.Color = c;
+        cr.LineWidth = 1;
+        double n = 6;
+        double af = Math.PI*2/n;
+        double r = width*(4.4+0.3*cosScale(opacity/3));
+        for (double i=0; i<n; i++) {
+          cr.Arc (-width*4, height/4, r, t+i*af, t+(i+0.7)*af);
+          cr.Stroke ();
+        }
+        for (double i=0; i<n; i++) {
+          cr.Arc (-width*4, height/4, r+5, -t+i*af, -t+(i+0.7)*af);
+          cr.Stroke ();
+        }
+        QueueDraw ();
+      } else {
+        FirstProgress = 0;
+        LastProgress = 0;
+      }
+    cr.Restore ();
+  }
+
+  double cosScale (double n) {
+    return 0.5*(1-Math.Cos(n*Math.PI));
   }
 
   /** FAST */
@@ -381,13 +447,14 @@ public class Filezoo : DrawingArea
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
 
+  string rootChar = "/";
+  string dirSep = "/";
+
   /** FAST */
   void DrawBreadcrumb (Context cr, uint width)
   {
     Profiler p = new Profiler ();
     p.Time("In breadcrumb");
-    string rootChar = "⊘";
-    string dirSep = "→";
     TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, String.Join(dirSep, CurrentDirPath.Split(Helpers.DirSepC)) + dirSep);
     p.Time("GetTextExtents");
     cr.Color = Renderer.DirectoryColor;
@@ -403,9 +470,9 @@ public class Filezoo : DrawingArea
       } else {
     p.Time("start DrawText");
         foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
+          Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, s == "" ? rootChar : s);
           if (s != "")
             Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, dirSep);
-          Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, s == "" ? rootChar : s);
         }
     p.Time("DrawText");
       }
@@ -508,8 +575,6 @@ public class Filezoo : DrawingArea
   bool ClickBreadcrumb (Context cr, uint width, double x, double y)
   {
     if (CurrentDirPath == Helpers.RootDir) return false;
-    string rootChar = "⊘";
-    string dirSep = "→";
     TextExtents te1 = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, String.Join(dirSep, CurrentDirPath.Split(Helpers.DirSepC)) + dirSep);
     cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.Save ();
@@ -522,7 +587,7 @@ public class Filezoo : DrawingArea
       int hitIndex = 0;
       string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
       foreach (string s in segments) {
-        string name = (s == "") ? rootChar : dirSep+s;
+        string name = (s == "") ? rootChar : s+dirSep;
         TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, name);
         if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
           string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
@@ -813,12 +878,18 @@ public class Filezoo : DrawingArea
       if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
         FSNeedRedraw = false;
         using (Context scr = new Context (CachedSurface)) {
+          scr.Save ();
+            scr.Operator = Operator.Source;
+            scr.SetSourceRGBA (0,0,0,0);
+            scr.Paint ();
+          scr.Restore ();
           Draw (scr, Width, Height);
         }
       }
       cr.Save ();
         using (Pattern p = new Pattern (CachedSurface)) {
-          cr.Operator = Operator.Source;
+          cr.Operator = Operator.Over;
+          DrawBackground (cr, Width, Height);
           cr.Source = p;
           cr.Paint ();
           cr.Operator = Operator.Over;

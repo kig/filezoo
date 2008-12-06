@@ -30,17 +30,20 @@ public class SizeHandler {
 public interface IMeasurer {
   double Measure (FSEntry d);
   bool DependsOnTotals { get; }
+  bool DependsOnEntries { get; }
 }
 
 
 public class NullMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  public bool DependsOnEntries { get { return false; } }
   /** UNIMPORTANT */
   public double Measure (FSEntry d) { return 1.0; }
 }
 
 public class SizeMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  public bool DependsOnEntries { get { return false; } }
   /** FAST */
   public double Measure (FSEntry d) {
     return Math.Max(1.0, d.Size);
@@ -49,6 +52,7 @@ public class SizeMeasurer : IMeasurer {
 
 public class DateMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  public bool DependsOnEntries { get { return false; } }
   /** FAST */
   public double Measure (FSEntry d) {
     long elapsed = (DateTime.Today.AddDays(1) - d.LastModified).Ticks;
@@ -59,6 +63,7 @@ public class DateMeasurer : IMeasurer {
 
 public class TotalMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
+  public bool DependsOnEntries { get { return false; } }
   /** FAST */
   public double Measure (FSEntry d) {
     return Math.Max(1.0, d.SubTreeSize);
@@ -67,6 +72,7 @@ public class TotalMeasurer : IMeasurer {
 
 public class CountMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return true; } }
+  public bool DependsOnEntries { get { return false; } }
   /** FAST */
   public double Measure (FSEntry d) {
     double mul = (d.Name[0] == '.') ? 1.0 : 40.0;
@@ -74,8 +80,20 @@ public class CountMeasurer : IMeasurer {
   }
 }
 
+public class EntriesMeasurer : IMeasurer {
+  public bool DependsOnTotals { get { return false; } }
+  public bool DependsOnEntries { get { return true; } }
+  /** FAST */
+  public double Measure (FSEntry d) {
+    double mul = (d.Name[0] == '.') ? 1.0 : 40.0;
+    return (d.IsDirectory ? Math.Max(1, d.Count) : 1.0) * mul;
+  }
+}
+
+
 public class FlatMeasurer : IMeasurer {
   public bool DependsOnTotals { get { return false; } }
+  public bool DependsOnEntries { get { return false; } }
   /** FAST */
   public double Measure (FSEntry d) {
     bool isDotFile = d.Name[0] == '.';
