@@ -32,7 +32,7 @@ public static class FilezooApp {
     Profiler p = Helpers.StartupProfiler;
     p.Restart ();
     p.MinTime = 0;
-    Profiler.GlobalPrintProfile = true;
+    Profiler.GlobalPrintProfile = false;
 
     Catalog.Init("i18n","./locale");
     System.Threading.ThreadPool.SetMinThreads (10, 20);

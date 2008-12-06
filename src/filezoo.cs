@@ -365,15 +365,17 @@ public class Filezoo : DrawingArea
         Color ca = Renderer.DirectoryColor;
         ca.A = 0.3;
         cr.Color = ca;
-        cr.LineWidth = 1;
-        cr.Translate (80, -50);
-        for (double i=0; i<10; i++) {
-        for (double y=0; y<10; y++) {
+        cr.LineWidth = 0.5;
+        cr.Translate (250, -50);
+        cr.Rotate (0.1);
+        for (double y=0; y<6; y++) {
+        for (double i=0; i<6-y; i++) {
           cr.Save ();
             double hr = 45;
-            double iscale = Math.Sin(i/20 * Math.PI*2 + t);
-            double xscale = Math.Cos(i/20 * Math.PI*2 + t);
+            double iscale = Math.Sin(-i/20 * Math.PI*2 + t);
+            double xscale = Math.Cos(-i/20 * Math.PI*2 + 0.1 + t);
             cr.Translate (iscale * hr * 3, -100 + y*hr*(2*1.732) + hr*(i%2)*1.732);
+            hr = 40;
             cr.Scale (xscale, 1);
             cr.NewPath ();
             cr.MoveTo (0, -hr);
@@ -383,7 +385,14 @@ public class Filezoo : DrawingArea
             cr.LineTo (-0.866*hr, 0.5*hr);
             cr.LineTo (-0.866*hr, -0.5*hr);
             cr.ClosePath ();
+            cr.Color = ca;
             cr.Stroke ();
+            cr.Color = Renderer.SocketColor;
+            cr.Translate (0.75 * -0.866*hr, 0.75 * -0.5*hr);
+            double x2 = cr.Matrix.X0, y2 = cr.Matrix.Y0;
+            cr.IdentityMatrix ();
+            cr.Arc (x2,y2, 1, 0, Math.PI*2);
+            cr.Fill ();
           cr.Restore ();
         }
         }
@@ -393,7 +402,7 @@ public class Filezoo : DrawingArea
         if (CurrentDirEntry.InProgress) LastProgress = t;
         double opacity = Math.Min(3, t-FirstProgress) - Math.Max(0, t-LastProgress);
         t = (t * 0.1) % Math.PI*2;
-        Color c = Renderer.RegularFileColor;
+        Color c = Renderer.UnfinishedDirectoryColor;
         c.A = 0.1*opacity;
         cr.Color = c;
         cr.LineWidth = 1;
@@ -408,7 +417,13 @@ public class Filezoo : DrawingArea
           cr.Arc (-width*4, height/4, r+5, -t+i*af, -t+(i+0.7)*af);
           cr.Stroke ();
         }
-        QueueDraw ();
+        if (CurrentDirEntry.InProgress) {
+          cr.NewPath ();
+            // find FSCache.LastTraversed [or ancestor] y position from model
+            // draw line there
+          cr.NewPath ();
+        }
+        UpdateLayout ();
       } else {
         FirstProgress = 0;
         LastProgress = 0;
@@ -442,7 +457,11 @@ public class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Renderer.FileNameFontFamily = FileNameFontFamily;
       Renderer.FileInfoFontFamily = FileInfoFontFamily;
-      c = Renderer.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
+      lock (FSCache.Cache) {
+        FSCache.SortEntries(CurrentDirEntry);
+        FSCache.MeasureEntries(CurrentDirEntry);
+        c = Renderer.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
+      }
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }

@@ -212,6 +212,7 @@ public static class FSCache
     if (!f.IsDirectory) return;
     if (f.Measurer == Measurer && f.LastMeasure == f.LastChange)
       return;
+    DateTime lc = f.LastChange;
     f.Measurer = Measurer;
     double totalHeight = 0.0;
     foreach (FSEntry e in f.Entries) {
@@ -224,7 +225,7 @@ public static class FSCache
     foreach (FSEntry e in f.Entries) {
       e.Scale = scale;
     }
-    f.LastMeasure = f.LastChange;
+    f.LastMeasure = lc;
     f.ReadyToDraw = ( f.Comparer == Comparer
                       && f.SortDirection == SortDirection
                       && f.LastSort == f.LastChange);
@@ -403,7 +404,12 @@ public static class FSCache
     // ditch path's children, ditch path, excise path from parent,
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
-    d.Thumbnail = null;
+    LastChange = DateTime.Now;
+    if (d.Thumbnail != null) {
+      d.Thumbnail.Destroy ();
+      d.Thumbnail = null;
+      ThumbnailCache.Remove(d.FullName);
+    }
     DeleteChildren (path);
     List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
     e.Remove(d);
@@ -418,6 +424,11 @@ public static class FSCache
   { lock (Cache) {
     if (Cache.ContainsKey(path)) {
       FSEntry d = Cache[path];
+      if (d.Thumbnail != null) {
+        d.Thumbnail.Destroy ();
+        d.Thumbnail = null;
+        ThumbnailCache.Remove(d.FullName);
+      }
       Cache.Remove (path);
       lock (TraversalCache)
         if (TraversalCache.ContainsKey(path))
@@ -435,7 +446,15 @@ public static class FSCache
     // redo path's file pass
     // enter new data to parent
     FSEntry d = Get (path);
-    d.Thumbnail = null;
+    if (d.Thumbnail != null) {
+      d.Thumbnail.Destroy ();
+      d.Thumbnail = null;
+      ThumbnailCache.Remove(d.FullName);
+    }
+    lock (TraversalCache)
+      if (TraversalCache.ContainsKey(path))
+        TraversalCache.Remove(path);
+    LastChange = DateTime.Now;
     if (d.IsDirectory) {
       d.FilePassDone = false;
       bool oc = d.Complete;
@@ -589,6 +608,8 @@ public static class FSCache
     return new String(Array.ConvertAll<byte,char>(buf, Convert.ToChar));
   }
 
+  public static string LastTraversed = "";
+
   static void ApplyDuString (string l)
   {
     char[] tab = {'\t'};
@@ -598,7 +619,8 @@ public static class FSCache
     lock (TraversalCache) {
       TraversalCache[path] = new TraversalInfo(size, 1, DateTime.Now);
     }
-    lock (Cache) {
+    LastTraversed = path;
+    lock (Cache) { // this needs to propagate changes up along the existing tree
       if (Cache.ContainsKey(path))
         SetCountAndSize(path, 0, size);
       LastChange = DateTime.Now;

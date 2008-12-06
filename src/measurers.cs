@@ -98,6 +98,6 @@ public class FlatMeasurer : IMeasurer {
   public double Measure (FSEntry d) {
     bool isDotFile = d.Name[0] == '.';
     if (isDotFile) return 0.05;
-    return (d.IsDirectory ? 1.5 : 1.0);
+    return (d.IsDirectory ? 10.0 : 1.0);
   }
 }
