@@ -70,8 +70,8 @@ In particular:
        visible item.
     2. Draw traverses FSCache, drawing items that are set ReadyToDraw.
 
-    If the predraw for the a dir isn't finished, draw doesn't draw it, which
-    causes disturbing flicker if the dir is large on the screen.
+    If the new predraw for a previously drawn dir isn't finished, draw doesn't
+    draw it, which causes disturbing flicker if the dir is large on the screen.
 
     If draw enters a long-taking directory and predraw updates the directory
     entry measurements during that time, the draw may overflow.
