@@ -60,3 +60,38 @@ Clean conceptual models aside, this is the overview of the current program:
       - directory emblem patterns
       [- directory view settings, some day]
 
+
+Conceptually it's ok, but the design and implementation still suck.
+
+In particular:
+  Predraw and draw use the same data structure, which causes flicker:
+    0. Predraw and draw happen in separate threads.
+    1. Predraw traverses FSCache and calls "make this ReadyToDraw" for each
+       visible item.
+    2. Draw traverses FSCache, drawing items that are set ReadyToDraw.
+
+    If the predraw for the a dir isn't finished, draw doesn't draw it, which
+    causes disturbing flicker if the dir is large on the screen.
+
+    If draw enters a long-taking directory and predraw updates the directory
+    entry measurements during that time, the draw may overflow.
+
+    Predraw and draw use FSCache, which means that FS events (invalidation and
+    traversal) may cause the predraw & draw to fail.
+
+    FSCache is buggy, the du traversal doesn't do partial traversals, and stats
+    aren't updated for parent dirs during traversal.
+
+A better design:
+  * FSCache does _only_ FS caching. No sorting. No measuring. No draw state storage.
+  * Predraw builds a new draw tree on every rebuild, and does it by atomically
+    swapping completed bits. If something's not in the tree, it won't get drawn.
+    If something is in the tree, it will get drawn. No ReadyToDraw.
+  * The atomic swapping works like this:
+    1. if current is not visible, remove current from parent
+    2. if current is visible, create a copy of it and update the copy's entries
+    3. replace current with the copy and continue down the copy
+    - as only ready-to-draw entries are put into the tree, the tree is always
+      ready to draw.
+    - as _nodes_ are replaced (instead of whole subtrees), there won't be
+      drawing flicker.
