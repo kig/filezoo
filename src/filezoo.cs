@@ -356,6 +356,7 @@ public class Filezoo : DrawingArea
 
   double FirstProgress = 0;
   double LastProgress = 0;
+  double CylinderRotation = 0;
   void DrawBackground (Context cr, uint width, uint height)
   {
     cr.Save ();
@@ -372,8 +373,8 @@ public class Filezoo : DrawingArea
         for (double i=0; i<6-y; i++) {
           cr.Save ();
             double hr = 45;
-            double iscale = Math.Sin(-i/20 * Math.PI*2 + t);
-            double xscale = Math.Cos(-i/20 * Math.PI*2 + 0.1 + t);
+            double iscale = Math.Sin(-i/20 * Math.PI*2 + CylinderRotation);
+            double xscale = Math.Cos(-i/20 * Math.PI*2 + 0.1 + CylinderRotation);
             cr.Translate (iscale * hr * 3, -100 + y*hr*(2*1.732) + hr*(i%2)*1.732);
             hr = 40;
             cr.Scale (xscale, 1);
@@ -396,6 +397,7 @@ public class Filezoo : DrawingArea
           cr.Restore ();
         }
         }
+        CylinderRotation += 0.02;
       cr.Restore ();
       if (CurrentDirEntry.InProgress || (t - LastProgress < 3)) {
         if (FirstProgress == 0) { FirstProgress = LastProgress = t; }
