@@ -82,6 +82,7 @@ In particular:
     FSCache is buggy:
       * the du traversal doesn't do partial traversals, causing redundant work
       * du stats aren't updated for parent dirs during traversal
+      * ReadNullTerminatedString does unicode strings wrong
       * du stats are added several times for dirs not realized in FSCache
       * Invalidations may mess up the sorting of a directory, which is very
         confusing for the user.
@@ -100,3 +101,9 @@ A better design:
     - as _nodes_ are replaced (instead of whole subtrees), there won't be
       drawing flicker.
 
+  * Make FSCache total stats hierarchy very light-weight, instead of the current
+    one that carries a lot of frivolous extra state.
+  * Extract the extra state into info cache
+  * FSCache should be driven by filesystem changes and traversal requests, it
+    should do mtime validation on each directory get (go for correct first,
+    performance later)
