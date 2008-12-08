@@ -79,8 +79,12 @@ In particular:
     Predraw and draw use FSCache, which means that FS events (invalidation and
     traversal) may cause the predraw & draw to fail.
 
-    FSCache is buggy, the du traversal doesn't do partial traversals, and stats
-    aren't updated for parent dirs during traversal.
+    FSCache is buggy:
+      * the du traversal doesn't do partial traversals, causing redundant work
+      * du stats aren't updated for parent dirs during traversal
+      * du stats are added several times for dirs not realized in FSCache
+      * Invalidations may mess up the sorting of a directory, which is very
+        confusing for the user.
 
 A better design:
   * FSCache does _only_ FS caching. No sorting. No measuring. No draw state storage.
@@ -95,3 +99,4 @@ A better design:
       ready to draw.
     - as _nodes_ are replaced (instead of whole subtrees), there won't be
       drawing flicker.
+
