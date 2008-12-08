@@ -1000,9 +1000,9 @@ public class Filezoo : DrawingArea
     return true;
   }
 
-  string FlareGradientImage = "flare_gradient.png";
-  string FlareSpikeImage = "flare_spike.png";
-  string RainbowSpriteImage = "rainbow_sprite.png";
+  string FlareGradientImage = "res/flare_gradient.png";
+  string FlareSpikeImage = "res/flare_spike.png";
+  string RainbowSpriteImage = "res/rainbow_sprite.png";
   RadialGradient FlareGradient = null;
   RadialGradient BlackGradient;
   int FGRadius;
