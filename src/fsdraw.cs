@@ -177,8 +177,9 @@ public class FSDraw
     */
   public bool IsVisible (FSEntry d, Context cr, Rectangle target)
   {
-    double h = cr.Matrix.Yy * GetScaledHeight (d);
-    double y = cr.Matrix.Y0 - target.Y;
+    Matrix matrix = cr.Matrix;
+    double h = matrix.Yy * GetScaledHeight (d);
+    double y = matrix.Y0 - target.Y;
     // rectangle doesn't intersect any quarter-pixel midpoints
     if (h < 0.5 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
       return false;
@@ -228,12 +229,13 @@ public class FSDraw
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
       cr.Fill ();
       Color co = GetColor (d.FileType, d.Permissions);
+      Matrix matrix = cr.Matrix;
       if (!d.Complete && FSCache.Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
        if (d.IsDirectory) // fade out dir based on size on screen
-        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 0.2);
+        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
        else
-        co.A *= Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.1, 0.8);
+        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
       if (d.Thumbnail != null)
@@ -242,7 +244,7 @@ public class FSDraw
         cr.Fill ();
       if (d.IsDirectory) {
         cr.Save ();
-          if (cr.Matrix.Yy > 8) {
+          if (matrix.Yy > 8) {
             Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
             LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96);
             g.AddColorStop (0, new Color (0,0,0,0));
@@ -250,13 +252,13 @@ public class FSDraw
             g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
             cr.Pattern = g;
             cr.Fill ();
-            Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / cr.Matrix.Yy), target);
+            Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);
             cr.Color = new Color (0,0,0,0.8);
             cr.Fill ();
           }
-          if (cr.Matrix.Yy > 2) {
+          if (matrix.Yy > 2) {
             cr.Color = RegularFileColor;
-            double lh = (cr.Matrix.Yy * 0.02 > 3) ? (3 / cr.Matrix.Yy) : 0.02;
+            double lh = (matrix.Yy * 0.02 > 3) ? (3 / matrix.Yy) : 0.02;
             Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
             cr.Fill ();
             Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
@@ -267,10 +269,10 @@ public class FSDraw
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1.0;
       cr.Color = co;
-      if (cr.Matrix.Yy > 0.5 || depth < 2)
+      if (matrix.Yy > 0.5 || depth < 2)
         DrawTitle (d, prefixes, cr, target, depth);
       if (d.IsDirectory) {
-        bool childrenVisible = cr.Matrix.Yy > 2;
+        bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
         if (shouldDrawChildren && (d.ReadyToDraw || depth == 0)) {
           c += DrawChildren(d, prefixes, cr, target, depth);
@@ -294,19 +296,20 @@ public class FSDraw
     double rBoxWidth = BoxWidth / target.Height;
     using (Pattern p = new Pattern (thumb)) {
       cr.Save ();
-          double wr = cr.Matrix.Xx * rBoxWidth;
-          double hr = cr.Matrix.Yy * 0.96;
+          Matrix matrix = cr.Matrix;
+          double wr = matrix.Xx * rBoxWidth;
+          double hr = matrix.Yy * 0.96;
           double wscale = wr / thumb.Width;
           double hscale = hr / thumb.Height;
           double scale = Math.Max (wscale, hscale);
           double x = 0.5*rBoxWidth*(1 - (scale/wscale));
           double y = 0.02 + 0.5*0.48*(1 - (scale/hscale));
           cr.Translate (x, y);
-          cr.Scale (scale / cr.Matrix.Xx, scale / cr.Matrix.Yy);
-          p.Matrix.X0 = Math.Floor(p.Matrix.X0);
-          p.Matrix.Y0 = Math.Floor(p.Matrix.Y0);
-          p.Matrix.Xx = Math.Max(1, p.Matrix.Xx);
-          p.Matrix.Yy = Math.Max(1, p.Matrix.Yy);
+          cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
+          Matrix pm = p.Matrix;
+          pm.Xx = Math.Max(1, pm.Xx);
+          pm.Yy = Math.Max(1, pm.Yy);
+          p.Matrix = pm;
         cr.Pattern = p;
         cr.Fill ();
       cr.Restore ();
@@ -384,7 +387,7 @@ public class FSDraw
         cr.MoveTo (0, fs*0.1);
         Helpers.DrawText (cr, FileNameFontFamily, fs, name);
       } else {
-        cr.Rectangle (0.0, 0.0, fs / 2 * name.Length, fs/3);
+        Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2 * name.Length, fs/3, target);
         cr.Fill ();
       }
     cr.Restore ();

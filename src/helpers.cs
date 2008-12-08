@@ -144,10 +144,11 @@ public static class Helpers {
   public static void DrawRectangle
   (Context cr, double x, double y, double w, double h, Rectangle target)
   {
-    double x_a = cr.Matrix.X0+x*cr.Matrix.Xx;
-    double y_a = cr.Matrix.Y0+y*cr.Matrix.Yy;
-    double w_a = cr.Matrix.Xx*w;
-    double h_a = cr.Matrix.Yy*h;
+    Matrix matrix = cr.Matrix;
+    double x_a = matrix.X0+x*matrix.Xx;
+    double y_a = matrix.Y0+y*matrix.Yy;
+    double w_a = matrix.Xx*w;
+    double h_a = matrix.Yy*h;
     double y2_a = y_a + h_a;
     double x2_a = x_a + w_a;
     x_a = Clamp(x_a, -1, target.X+target.Width+1);
