@@ -269,12 +269,12 @@ public class Filezoo : DrawingArea
     Renderer.CancelPreDraw();
     lock (PreDrawLock) {
       if (PreDrawInProgress) return;
+      FSCache.Measurer = SizeField.Measurer;
+      FSCache.SortDirection = SortDirection;
+      FSCache.Comparer = SortField.Comparer;
       PreDrawInProgress = true;
     }
     PreDrawComplete = false;
-    FSCache.Measurer = SizeField.Measurer;
-    FSCache.SortDirection = SortDirection;
-    FSCache.Comparer = SortField.Comparer;
   }
 
   /** ASYNC */
@@ -571,7 +571,7 @@ public class Filezoo : DrawingArea
     foreach (ClickHit c in hits) {
       if (c.Height < 16) {
         double nz = (c.Target.IsDirectory ? 20 : 18) / c.Height;
-        Console.WriteLine("ZoomIn {0}x", nz);
+        // Console.WriteLine("ZoomIn {0}x", nz);
         cr.Save ();
           cr.IdentityMatrix ();
           ZoomBy(cr, width, height, x, y, nz);
@@ -579,12 +579,12 @@ public class Filezoo : DrawingArea
         break;
       } else {
         if (c.Target.IsDirectory) {
-          Console.WriteLine("Navigate {0}", c.Target.FullName);
+          // Console.WriteLine("Navigate {0}", c.Target.FullName);
           SetCurrentDir (c.Target.FullName);
           ResetZoom ();
           UpdateLayout ();
         } else {
-          Console.WriteLine("Open {0}", c.Target.FullName);
+          // Console.WriteLine("Open {0}", c.Target.FullName);
           Helpers.OpenFile(c.Target.FullName);
         }
         break;

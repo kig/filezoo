@@ -31,9 +31,9 @@ public class FSEntry
   public IMeasurer Measurer;
   public IComparer<FSEntry> Comparer;
   public SortingDirection SortDirection;
-  public DateTime LastMeasure;
-  public DateTime LastSort;
-  public DateTime LastChange;
+  public DateTime LastMeasure = Helpers.DefaultTime;
+  public DateTime LastSort = Helpers.DefaultTime;
+  public DateTime LastChange = DateTime.Now;
   public DateTime LastFileChange;
 
   // rolling 32-bit frame counter in 497 days at 100fps

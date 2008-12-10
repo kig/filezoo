@@ -181,6 +181,7 @@ public static class FSCache
         f.FilePassDone = true;
         if (AllChildrenComplete(path))
           SetComplete (path);
+        f.LastChange = LastChange = DateTime.Now;
       }
     }
   }
@@ -203,6 +204,7 @@ public static class FSCache
       entries.Reverse();
     f.Entries = entries;
     f.LastSort = lc;
+    //Console.WriteLine("Sorted {0}", f.FullName);
     f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
   } }
 
@@ -226,6 +228,7 @@ public static class FSCache
       e.Scale = scale;
     }
     f.LastMeasure = lc;
+    //Console.WriteLine("Measured {0}", f.FullName);
     f.ReadyToDraw = ( f.Comparer == Comparer
                       && f.SortDirection == SortDirection
                       && f.LastSort == f.LastChange);
@@ -234,6 +237,7 @@ public static class FSCache
   /** ASYNC */
   public static void Invalidate (string path)
   { lock (Cache) {
+    //Console.WriteLine("Invalidate on {0}", path);
     if (Cache.ContainsKey(path)) {
       if (Helpers.FileExists(path)) {
         Modified (path);
@@ -401,6 +405,7 @@ public static class FSCache
   /** ASYNC */
   static void Deleted (string path)
   { lock (Cache) {
+    //Console.WriteLine("Deleted on {0}", path);
     // ditch path's children, ditch path, excise path from parent,
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
@@ -417,6 +422,7 @@ public static class FSCache
     AddCountAndSize (d.ParentDir.FullName, -d.SubTreeCount, -d.SubTreeSize);
     if (!d.Complete && AllChildrenComplete(d.ParentDir.FullName))
       SetComplete (d.ParentDir.FullName);
+    d.LastChange = d.ParentDir.LastChange = LastChange = DateTime.Now;
   } }
 
   /** ASYNC */
@@ -442,6 +448,7 @@ public static class FSCache
   /** ASYNC */
   static void Modified (string path)
   { lock (Cache) {
+    //Console.WriteLine("Modified on {0}", path);
     // excise path data from parent
     // redo path's file pass
     // enter new data to parent
@@ -454,7 +461,6 @@ public static class FSCache
     lock (TraversalCache)
       if (TraversalCache.ContainsKey(path))
         TraversalCache.Remove(path);
-    LastChange = DateTime.Now;
     if (d.IsDirectory) {
       d.FilePassDone = false;
       bool oc = d.Complete;
@@ -463,8 +469,9 @@ public static class FSCache
         if (d.Complete) SetComplete(path);
         else SetIncomplete(path);
       }
+      d.LastChange = LastChange = DateTime.Now;
     } else {
-      UnixFileInfo u = new UnixFileInfo (path);
+      UnixSymbolicLinkInfo u = new UnixSymbolicLinkInfo (path);
       long oldSize = d.Size;
       d.Setup(u);
       AddCountAndSize(d.ParentDir.FullName, 0, d.Size-oldSize);
@@ -478,14 +485,14 @@ public static class FSCache
   /** FAST */
   static void WatcherChanged (object source, FileSystemEventArgs e)
   { lock (Invalids) {
-//     Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+    //Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
     Invalids[e.FullPath] = true;
   } }
 
   /** FAST */
   static void WatcherRenamed (object source, RenamedEventArgs e)
   { lock (Invalids) {
-//     Console.WriteLine("Invalidating {0} -> {1}: renamed", e.FullPath, e.OldFullPath);
+    //Console.WriteLine("Invalidating {0} -> {1}: renamed", e.FullPath, e.OldFullPath);
     Invalids[e.FullPath] = true;
     Invalids[e.OldFullPath] = true;
   } }
@@ -506,7 +513,7 @@ public static class FSCache
     try {
       watcher.Path = dirname;
     } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
+      Console.WriteLine("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
       Console.WriteLine("Here's the exception output: {0}", e);
       return watcher;
     }
@@ -518,8 +525,7 @@ public static class FSCache
     try {
       watcher.EnableRaisingEvents = true;
     } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not appreciate the characters in your path: {0}", dirname);
-      Console.WriteLine("You should go and fix System.IO.Path.IsPathRooted.");
+      Console.WriteLine("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
       Console.WriteLine("Here's the exception output: {0}", e);
     }
     return watcher;
