@@ -605,7 +605,7 @@ public static class FSCache
       }
     } catch (Exception) {}
     Array.Resize<byte>(ref buf, i);
-    return new String(Array.ConvertAll<byte,char>(buf, Convert.ToChar));
+    return (new System.Text.UTF8Encoding().GetString(buf));
   }
 
   public static string LastTraversed = "";
@@ -620,9 +620,8 @@ public static class FSCache
       TraversalCache[path] = new TraversalInfo(size, 1, DateTime.Now);
     }
     LastTraversed = path;
-    lock (Cache) { // this needs to propagate changes up along the existing tree
-      if (Cache.ContainsKey(path))
-        SetCountAndSize(path, 0, size);
+    lock (Cache) {
+      SetCountAndSize(path, 0, size);
       LastChange = DateTime.Now;
     }
   }
