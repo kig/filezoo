@@ -410,13 +410,13 @@ public class Filezoo : DrawingArea
         cr.LineWidth = 1;
         double n = 6;
         double af = Math.PI*2/n;
-        double r = width*(4.4+0.3*cosScale(opacity/3));
+        double r = 450*(4.4+0.3*cosScale(opacity/3));
         for (double i=0; i<n; i++) {
-          cr.Arc (-width*4, height/4, r, t+i*af, t+(i+0.7)*af);
+          cr.Arc (-450*4, 1000/4, r, t+i*af, t+(i+0.7)*af);
           cr.Stroke ();
         }
         for (double i=0; i<n; i++) {
-          cr.Arc (-width*4, height/4, r+5, -t+i*af, -t+(i+0.7)*af);
+          cr.Arc (-450*4, 1000/4, r+5, -t+i*af, -t+(i+0.7)*af);
           cr.Stroke ();
         }
         if (CurrentDirEntry.InProgress) {
@@ -459,11 +459,7 @@ public class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Renderer.FileNameFontFamily = FileNameFontFamily;
       Renderer.FileInfoFontFamily = FileInfoFontFamily;
-      lock (FSCache.Cache) {
-        FSCache.SortEntries(CurrentDirEntry);
-        FSCache.MeasureEntries(CurrentDirEntry);
-        c = Renderer.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
-      }
+      c = Renderer.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }

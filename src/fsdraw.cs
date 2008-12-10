@@ -257,10 +257,9 @@ public class FSDraw
             cr.Fill ();
           }
           if (matrix.Yy > 2) {
-            cr.Color = RegularFileColor;
+            cr.Color = (!d.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
             double lh = (matrix.Yy * 0.02 > 3) ? (3 / matrix.Yy) : 0.02;
             Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
-            cr.Fill ();
             Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
             cr.Fill ();
           }
