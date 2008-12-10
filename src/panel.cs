@@ -97,6 +97,12 @@ public class FilezooPanel : Window
     FilezooWindow.Decorated = false;
     FilezooWindow.Add (Fz);
 
+    FilezooWindow.KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
+      if (args.Event.Key == Gdk.Key.Escape) {
+        Toggle.Active = false;
+      }
+    };
+
     Fz.Width = 400;
     Fz.Height = 1000;
     Fz.CompleteInit ();
@@ -187,7 +193,7 @@ public class FilezooPanel : Window
   {
     ListStore om = (ListStore)entry.Completion.Model;
     entry.Completion.Model = CreateCompletionModel ();
-    Console.WriteLine("Created completion model");
+    // Console.WriteLine("Created completion model");
     om.Dispose ();
   }
 
