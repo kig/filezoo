@@ -89,6 +89,8 @@ public static class Helpers {
   /** FAST */
   static double QuantizeFontSize (double fs) { return Math.Max(0.5, Math.Floor(fs)); }
 
+  public static bool ShowTextExtents = false;
+
   /** BLOCKING */
   public static void DrawText (Context cr, string family, double fontSize, string text)
   {
@@ -98,9 +100,23 @@ public static class Helpers {
     Pango.Rectangle pe, le;
     layout.GetExtents(out pe, out le);
     p.Time ("GetExtents");
-    double w = (double)le.Width / (double)Pango.Scale.PangoScale;
+    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+           h = (double)le.Height / (double)Pango.Scale.PangoScale;
     Pango.CairoHelper.ShowLayout (cr, layout);
     p.Time ("ShowLayout");
+    if (ShowTextExtents) {
+      cr.Save ();
+        PointD pt = cr.CurrentPoint;
+        cr.MoveTo (pt.X, pt.Y);
+        cr.RelLineTo(w, 0);
+        cr.RelLineTo(0, h);
+        cr.Operator = Operator.Over;
+        cr.Color = new Color (1,0.5,1,0.5);
+        cr.LineWidth = 0.5;
+        cr.Stroke ();
+        cr.MoveTo (pt.X, pt.Y);
+      cr.Restore ();
+    }
     cr.RelMoveTo (w, 0);
   }
 
@@ -108,32 +124,39 @@ public static class Helpers {
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
   {
     TextExtents te = new TextExtents ();
-    Pango.Layout layout = GetLayout (cr, family, fontSize);
-    lock (layout) {
-      layout.SetText (text);
-      Pango.Rectangle pe, le;
-      layout.GetExtents(out pe, out le);
-      double w = (double)le.Width / (double)Pango.Scale.PangoScale,
-            h = (double)le.Height / (double)Pango.Scale.PangoScale;
-      te.Height = h;
-      te.Width = w;
-      te.XAdvance = w;
-      te.YAdvance = 0;
-    }
+    Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
+    layout.SetText (text);
+    Pango.Rectangle pe, le;
+    layout.GetExtents(out pe, out le);
+    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
+           h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    te.Height = h;
+    te.Width = w;
+    te.XAdvance = w;
+    te.YAdvance = 0;
     return te;
   }
 
 
   /** FAST */
   public static bool CheckTextExtents
-  (Context cr, double advance, TextExtents te, double x, double y)
+  (Context cr, TextExtents te, double x, double y)
   {
     bool retval = false;
     cr.Save ();
-      cr.Rectangle (advance, 0.0, te.Width, te.Height * 1.2);
+      PointD pt = cr.CurrentPoint;
+      cr.NewPath ();
+      cr.Rectangle (pt.X, pt.Y, te.Width, te.Height);
       cr.IdentityMatrix ();
       retval = cr.InFill (x, y);
+      if (ShowTextExtents) {
+        cr.Operator = Operator.Over;
+        cr.Color = new Color (1,0.5,1,0.5);
+        cr.LineWidth = 0.5;
+        cr.Stroke ();
+      }
     cr.Restore ();
+    cr.MoveTo (pt.X, pt.Y);
     return retval;
   }
 

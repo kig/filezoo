@@ -32,7 +32,8 @@ public static class FilezooApp {
     Profiler p = Helpers.StartupProfiler;
     p.Restart ();
     p.MinTime = 0;
-    Profiler.GlobalPrintProfile = false;
+    Profiler.GlobalPrintProfile = true;
+    Helpers.ShowTextExtents = false;
 
     Catalog.Init("i18n","./locale");
     System.Threading.ThreadPool.SetMinThreads (10, 20);

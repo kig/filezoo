@@ -442,7 +442,9 @@ public class Filezoo : DrawingArea
   {
     Profiler p = new Profiler ();
     cr.Save ();
+      cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
       DrawBreadcrumb (cr, width);
+      cr.Translate (0, ToolbarY);
       DrawSortBar (cr);
       DrawSizeBar (cr);
     cr.Restore ();
@@ -470,12 +472,13 @@ public class Filezoo : DrawingArea
   /** FAST */
   void DrawBreadcrumb (Context cr, uint width)
   {
+    cr.NewPath ();
+    cr.MoveTo (0.0, 0.0);
     Profiler p = new Profiler ();
     p.Time("In breadcrumb");
     TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, String.Join(dirSep, CurrentDirPath.Split(Helpers.DirSepC)) + dirSep);
     p.Time("GetTextExtents");
     cr.Color = Renderer.DirectoryColor;
-    cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.Save ();
       double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
       cr.Rectangle (0,0,areaWidth, te.Height);
@@ -487,9 +490,7 @@ public class Filezoo : DrawingArea
       } else {
     p.Time("start DrawText");
         foreach (string s in CurrentDirPath.Split(Helpers.DirSepC)) {
-          Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, s == "" ? rootChar : s);
-          if (s != "")
-            Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, dirSep);
+          Helpers.DrawText (cr, BreadcrumbFontFamily, BreadcrumbFontSize, s == "" ? rootChar : (s+dirSep));
         }
     p.Time("DrawText");
       }
@@ -499,7 +500,8 @@ public class Filezoo : DrawingArea
   /** FAST */
   void DrawSortBar (Context cr)
   {
-    cr.MoveTo (0.0, ToolbarY);
+    cr.NewPath ();
+    cr.MoveTo (0.0, 0.0);
     cr.Color = ActiveColor;
     cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * 0.4 );
     Helpers.DrawText (cr, ToolbarTitleFontFamily, ToolbarTitleFontSize, SortLabel);
@@ -510,10 +512,8 @@ public class Filezoo : DrawingArea
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
     cr.Color = ActiveColor;
-    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     bool SortDesc = (SortDirection == SortingDirection.Descending);
-    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, (SortDesc ? "▾" : "▴") + " ");
-    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
+    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
   }
 
   /** FAST */
@@ -528,7 +528,6 @@ public class Filezoo : DrawingArea
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
-    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
   }
 
 
@@ -539,14 +538,16 @@ public class Filezoo : DrawingArea
   void Click (Context cr, uint width, uint height, double x, double y)
   {
     cr.Save ();
+      cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
+      cr.Operator = Operator.Dest;
       if (ClickBreadcrumb (cr, width, x, y)) {
         cr.Restore ();
         return;
       }
-      double advance = 0.0;
+      cr.Translate (0, ToolbarY);
       if (
-        ClickSortBar (ref advance, cr, x, y) ||
-        ClickSizeBar (ref advance, cr, x, y)
+        ClickSortBar (cr, x, y) ||
+        ClickSizeBar (cr, x, y)
       ) {
         cr.Restore ();
         return;
@@ -593,20 +594,18 @@ public class Filezoo : DrawingArea
   {
     if (CurrentDirPath == Helpers.RootDir) return false;
     TextExtents te1 = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, String.Join(dirSep, CurrentDirPath.Split(Helpers.DirSepC)) + dirSep);
-    cr.Translate (BreadcrumbMarginLeft, BreadcrumbMarginTop);
     cr.Save ();
       double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
       cr.Rectangle (0,0,areaWidth, te1.Height);
       cr.Clip ();
       cr.Translate (Math.Min(0,areaWidth-te1.Width), 0);
       cr.MoveTo (0.0, 0.0);
-      double advance = 0.0;
       int hitIndex = 0;
       string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
       foreach (string s in segments) {
         string name = (s == "") ? rootChar : s+dirSep;
         TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, name);
-        if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
+        if (Helpers.CheckTextExtents(cr, te, x, y)) {
           string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
           if (newDir == "") newDir = Helpers.RootDir;
           if (newDir != CurrentDirPath) {
@@ -618,7 +617,7 @@ public class Filezoo : DrawingArea
           cr.Restore ();
           return true;
         }
-        advance += te.XAdvance;
+        cr.RelMoveTo( te.XAdvance, 0 );
         hitIndex += 1;
       }
     cr.Restore ();
@@ -626,14 +625,20 @@ public class Filezoo : DrawingArea
   }
 
   /** FAST */
-  bool ClickSortBar (ref double advance, Context cr, double x, double y)
+  bool ClickSortBar (Context cr, double x, double y)
   {
+    cr.NewPath ();
+    cr.MoveTo (0.0, 0.0);
     TextExtents te;
-    cr.Translate (0, ToolbarY);
-    advance += Helpers.GetTextExtents (cr, ToolbarTitleFontFamily, ToolbarTitleFontSize, SortLabel).XAdvance;
+    cr.Color = ActiveColor;
+    cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * 0.4 );
+    Helpers.DrawText (cr, ToolbarTitleFontFamily, ToolbarTitleFontSize, SortLabel);
+    cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * -0.4 );
     foreach (SortHandler sf in SortFields) {
-      te = Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
-      if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
+      cr.Color = (SortField == sf) ? ActiveColor : InActiveColor;
+      te = Helpers.GetTextExtents (
+        cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
+      if (Helpers.CheckTextExtents(cr, te, x, y)) {
         if (sf == SortField) {
           SortDirection = (SortDirection == SortingDirection.Ascending) ?
                           SortingDirection.Descending :
@@ -645,13 +650,14 @@ public class Filezoo : DrawingArea
         UpdateLayout ();
         return true;
       }
-      advance += te.XAdvance;
-      advance += Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ").XAdvance;
+      Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
+      Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
-    advance += Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ").XAdvance;
+    cr.Color = ActiveColor;
     bool SortDesc = (SortDirection == SortingDirection.Descending);
-    te = Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, (SortDesc ? "▾" : "▴") + " ");
-    if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
+    te = Helpers.GetTextExtents (
+      cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
+    if (Helpers.CheckTextExtents(cr, te, x, y)) {
       SortDirection = (SortDirection == SortingDirection.Ascending) ?
                       SortingDirection.Descending :
                       SortingDirection.Ascending;
@@ -659,28 +665,33 @@ public class Filezoo : DrawingArea
       UpdateLayout ();
       return true;
     }
-    advance += te.XAdvance;
-    advance += Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ").XAdvance;
+    Helpers.DrawText (
+      cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
     return false;
   }
 
   /** FAST */
-  bool ClickSizeBar (ref double advance, Context cr, double x, double y)
+  bool ClickSizeBar (Context cr, double x, double y)
   {
     TextExtents te;
-    advance += Helpers.GetTextExtents (cr, ToolbarTitleFontFamily, ToolbarTitleFontSize, SizeLabel).XAdvance;
+    cr.Color = ActiveColor;
+    cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * 0.4 );
+    Helpers.DrawText (cr, ToolbarTitleFontFamily, ToolbarTitleFontSize, SizeLabel);
+    cr.RelMoveTo ( 0.0, ToolbarLabelFontSize * -0.4 );
     foreach (SizeHandler sf in SizeFields) {
-      te = Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
-      if (Helpers.CheckTextExtents(cr, advance, te, x, y)) {
+      cr.Color = (SizeField == sf) ? ActiveColor : InActiveColor;
+      te = Helpers.GetTextExtents (
+        cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
+      if (Helpers.CheckTextExtents(cr, te, x, y)) {
         SizeField = sf;
         ResetZoom ();
         UpdateLayout ();
         return true;
       }
-      advance += te.XAdvance;
-      advance += Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ").XAdvance;
+      Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
+      Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
-    advance += Helpers.GetTextExtents (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ").XAdvance;
+    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     return false;
   }
 
@@ -805,7 +816,10 @@ public class Filezoo : DrawingArea
       {
         int w, h;
         e.Window.GetSize (out w, out h);
-        Click (cr, (uint)w, (uint)h, e.X, e.Y);
+        using (Context scr = new Context (CachedSurface)) {
+          scr.IdentityMatrix ();
+          Click (scr, (uint)w, (uint)h, e.X, e.Y);
+        }
       }
     }
     dragging = false;
