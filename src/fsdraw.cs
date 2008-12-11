@@ -252,11 +252,11 @@ public class FSDraw
         cr.Fill ();
       if (d.IsDirectory) {
         cr.Save ();
-          if (matrix.Yy > 8) {
+          if (matrix.Yy > 8 && matrix.Yy < 4000) {
             Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
             LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96);
             g.AddColorStop (0, new Color (0,0,0,0.8));
-            g.AddColorStop (Math.Min(0.01, 1 / matrix.Yy), new Color (0,0,0,0));
+            g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
             g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
             g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
             cr.Pattern = g;
