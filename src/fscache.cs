@@ -584,6 +584,8 @@ public static class FSCache
     psi.UseShellExecute = false;
     psi.RedirectStandardOutput = true;
     Process p = Process.Start (psi);
+    p.PriorityClass = ProcessPriorityClass.Idle;
+    p.ProcessorAffinity = (IntPtr)0x0002;
     using (BinaryReader b = new BinaryReader(p.StandardOutput.BaseStream)) {
       while (true) {
         string l = ReadNullTerminatedLine(b);

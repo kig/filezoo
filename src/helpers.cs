@@ -199,6 +199,8 @@ public static class Helpers {
     psi.UseShellExecute = false;
     psi.RedirectStandardOutput = true;
     Process p = Process.Start (psi);
+    p.PriorityClass = ProcessPriorityClass.Idle;
+    p.ProcessorAffinity = (IntPtr)0x0002;
     string rv = p.StandardOutput.ReadToEnd ();
     p.WaitForExit ();
     return rv;
