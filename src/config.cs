@@ -1,6 +1,8 @@
 
 using System.Collections.Generic;
 using Cairo;
+using Gtk;
+
 
 public class FilezooConfig
 {
@@ -25,20 +27,39 @@ public class FilezooConfig
     fz.FileNameFontFamily = "URW Gothic L";
     fz.FileInfoFontFamily = "Sans";
 
-    fz.ActiveColor = new Color (0.188, 0.755, 1, 1);
-    fz.InActiveColor = new Color (0.188, 0.755, 1, 0.5);
+    Style s = Widget.DefaultStyle;
 
+    fz.ActiveColor = ToColor(s.Foreground(StateType.Normal));
+
+    fz.Renderer.BackgroundColor = ToColor(s.Background(StateType.Normal));
+//     new Color (0.2, 0.2, 0.2);
     fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
-//     fz.Renderer.BackgroundColor = new Color (0.1, 0.1, 0.1);
+
+    fz.Renderer.DirectoryFGColor = ToColor(s.Foreground(StateType.Normal));
+
+    fz.Renderer.DirectoryFGColor = new Color (0.6, 0.65, 0.7);
+    fz.Renderer.DirectoryBGColor = new Color (0.6, 0.65, 0.7);
+    fz.Renderer.UnfinishedDirectoryColor = new Color (0.455, 0.4, 1);
+
     fz.Renderer.RegularFileColor = new Color (0.188, 0.755, 1);
     fz.Renderer.SymlinkColor = new Color (0.655, 0.588, 0.855);
-    fz.Renderer.DirectoryColor = new Color (0.6, 0.65, 0.7);
-    fz.Renderer.UnfinishedDirectoryColor = new Color (0.455, 0.4, 1);
     fz.Renderer.ExecutableColor = new Color (0.4, 0.855, 0.3);
     fz.Renderer.BlockDeviceColor = new Color (0.855,0.655,0);
     fz.Renderer.CharacterDeviceColor = new Color (0.75,0.5,0);
     fz.Renderer.FifoColor = new Color (0.75,0.1,0.32);
     fz.Renderer.SocketColor = new Color (0.95,0.2,0.52);
+
+    fz.ActiveColor = fz.Renderer.RegularFileColor;
+    fz.InActiveColor = fz.ActiveColor;
+    fz.InActiveColor.A = 0.5;
+  }
+
+  Color ToColor (Gdk.Color c)
+  {
+    return new Color (
+      ((double)c.Red) / 255.0,
+      ((double)c.Blue) / 255.0,
+      ((double)c.Green) / 255.0 );
   }
 
   void FillPrefixes () {

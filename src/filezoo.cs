@@ -328,7 +328,11 @@ public class Filezoo : DrawingArea
   void Draw (Context cr, uint width, uint height)
   {
     cr.Save ();
+      cr.NewPath ();
+      cr.IdentityMatrix ();
       DrawToolbars (cr, width, height);
+      cr.NewPath ();
+      cr.IdentityMatrix ();
       Rectangle targetBox = Transform (cr, width, height);
       DrawCurrentDir(cr, targetBox);
     cr.Restore ();
@@ -363,7 +367,7 @@ public class Filezoo : DrawingArea
       DrawClear (cr, width, height);
       double t = DateTime.Now.ToFileTime() / 1e7;
       cr.Save ();
-        Color ca = Renderer.DirectoryColor;
+        Color ca = Renderer.DirectoryBGColor;
         ca.A = 0.3;
         cr.Color = ca;
         cr.LineWidth = 0.5;
@@ -478,7 +482,7 @@ public class Filezoo : DrawingArea
     p.Time("In breadcrumb");
     TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, String.Join(dirSep, CurrentDirPath.Split(Helpers.DirSepC)) + dirSep);
     p.Time("GetTextExtents");
-    cr.Color = Renderer.DirectoryColor;
+    cr.Color = Renderer.DirectoryFGColor;
     cr.Save ();
       double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
       cr.Rectangle (0,0,areaWidth, te.Height);

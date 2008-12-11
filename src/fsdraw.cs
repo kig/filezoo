@@ -28,7 +28,8 @@ using Cairo;
 public class FSDraw
 {
   // Colors for the different file types, quite like ls
-  public Color DirectoryColor = new Color (0,0,1);
+  public Color DirectoryFGColor = new Color (0,0,1);
+  public Color DirectoryBGColor = new Color (0,0,1);
   public Color BlockDeviceColor = new Color (0.75,0.5,0);
   public Color CharacterDeviceColor = new Color (0.5,0.25,0);
   public Color FifoColor = new Color (0.75,0,0.22);
@@ -153,7 +154,7 @@ public class FSDraw
   public Color GetColor (FileTypes filetype, FileAccessPermissions perm)
   {
     switch (filetype) {
-      case FileTypes.Directory: return DirectoryColor;
+      case FileTypes.Directory: return DirectoryBGColor;
       case FileTypes.BlockDevice: return BlockDeviceColor;
       case FileTypes.CharacterDevice: return CharacterDeviceColor;
       case FileTypes.Fifo: return FifoColor;
@@ -163,6 +164,11 @@ public class FSDraw
     if ((perm & FileAccessPermissions.UserExecute) != 0)
       return ExecutableColor;
     return RegularFileColor;
+  }
+  public Color GetFontColor (FileTypes filetype, FileAccessPermissions perm)
+  {
+    if (filetype == FileTypes.Directory) return DirectoryFGColor;
+    return GetColor(filetype, perm);
   }
 
 
@@ -223,7 +229,9 @@ public class FSDraw
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
-      cr.Color = new Color (0,0,0,0.3);
+      Color bg = new Color (0,0,0,1);
+      bg.A = 0.3;
+      cr.Color = bg;
       if (depth == 0)
         cr.Translate (0.005*rBoxWidth, 0);
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
@@ -247,8 +255,9 @@ public class FSDraw
           if (matrix.Yy > 8) {
             Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
             LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96);
-            g.AddColorStop (0, new Color (0,0,0,0));
-            g.AddColorStop (0.75, new Color (0,0,0,co.A));
+            g.AddColorStop (0, new Color (0,0,0,0.8));
+            g.AddColorStop (Math.Min(0.01, 1 / matrix.Yy), new Color (0,0,0,0));
+            g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
             g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
             cr.Pattern = g;
             cr.Fill ();
@@ -264,6 +273,7 @@ public class FSDraw
             cr.Fill ();
           }
         cr.Restore ();
+        co = DirectoryFGColor;
       }
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1.0;
@@ -374,7 +384,7 @@ public class FSDraw
           MinFontSize, MaxFontSize*0.6);
         if (sfs > 1) {
           double a = sfs / (MaxFontSize*0.6);
-          Color co = GetColor (d.FileType, d.Permissions);
+          Color co = GetFontColor (d.FileType, d.Permissions);
           co.A = a*a;
           cr.Color = co;
           cr.MoveTo (0, fs*1.1+sfs*0.7);

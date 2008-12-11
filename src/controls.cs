@@ -60,8 +60,8 @@ public class FilezooControls : HBox
     };
 
     PackStart (entry, false, false, 0);
-    PackEnd (dlButton, false, false, 0);
-    PackEnd (homeButton, false, false, 0);
+    PackStart (dlButton, false, false, 0);
+    PackStart (homeButton, false, false, 0);
   }
 
   void openUrl (string url) {
@@ -88,7 +88,7 @@ public class FilezooControls : HBox
     }
   }
 
-  bool HandleEntry (string newDir) {
+  protected bool HandleEntry (string newDir) {
     newDir = newDir.Trim(' ');
     if (newDir.Length == 0) return true;
     if (newDir.StartsWith("~")) // tilde expansion
@@ -117,7 +117,7 @@ public class FilezooControls : HBox
     return true;
   }
 
-  void Go (string entry) {
+  public virtual void Go (string entry) {
     HandleEntry(entry);
   }
 
