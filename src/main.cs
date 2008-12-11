@@ -17,6 +17,7 @@
 */
 
 using System;
+using System.Diagnostics;
 using Gtk;
 using Mono.Unix;
 
@@ -54,7 +55,11 @@ public static class FilezooApp {
     } else {
       win = new Window ("Filezoo");
       win.SetDefaultSize (420, 800);
-      win.Add (fz);
+      VBox vbox = new VBox (false, 0);
+      FilezooControls controls = new FilezooControls(fz);
+      vbox.PackStart (fz, true, true, 0);
+      vbox.PackEnd (controls, false, false, 0);
+      win.Add (vbox);
     }
 
     win.DeleteEvent += new DeleteEventHandler (OnQuit);
