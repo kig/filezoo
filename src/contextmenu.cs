@@ -31,6 +31,9 @@ public class FilezooContextMenu : Menu {
   }
 
   string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
+  string[] amarokSuffixes = {"mp3", "m4a", "ogg", "flac", "wav"};
+  string[] mplayerSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov"};
+  string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
     menu.Title = c.Target.FullName;
@@ -62,6 +65,17 @@ public class FilezooContextMenu : Menu {
         menu.Append (gitk);
       }
 
+      if (HasEntryWithSuffix(u, gqviewSuffixes)) {
+        AddCommandItem(menu, "View images", "gqview", "", targetPath);
+      }
+
+      Menu audioMenu = new Menu ();
+      AddCommandItem(audioMenu, "Set as playlist", "amarok", "-p --load", targetPath);
+      AddCommandItem(audioMenu, "Append to playlist", "amarok", "--append", targetPath);
+      MenuItem audioMenuItem = new MenuItem ("Audio");
+      audioMenuItem.Submenu = audioMenu;
+      menu.Append(audioMenuItem);
+
     } else {
     // File menu items
 
@@ -74,6 +88,19 @@ public class FilezooContextMenu : Menu {
       fterm.Activated += new EventHandler(delegate {
         Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
       menu.Append (fterm);
+
+      if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
+        AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
+      }
+
+      if (Array.IndexOf (gqviewSuffixes, c.Target.Suffix) > -1) {
+        AddCommandItem(menu, "View image", "gqview", "", targetPath);
+      }
+
+      if (Array.IndexOf (amarokSuffixes, c.Target.Suffix) > -1) {
+        AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
+        AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
+      }
 
       /** DESTRUCTIVE */
       if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
@@ -123,6 +150,23 @@ public class FilezooContextMenu : Menu {
       FSCache.Invalidate (targetPath);
     });
     menu.Append (trash);
+  }
+
+  void AddCommandItem (Menu menu, string title, string cmd, string args, string path)
+  {
+    MenuItem m = new MenuItem (title);
+    m.Activated += new EventHandler(delegate {
+      Helpers.RunCommandInDir (cmd, args + " " + Helpers.EscapePath(path), Helpers.Dirname(path));
+    });
+    menu.Append (m);
+  }
+
+  bool HasEntryWithSuffix (UnixDirectoryInfo u, string[] suffixes)
+  {
+    foreach (UnixFileSystemInfo f in Helpers.EntriesMaybe(u))
+      if (Array.IndexOf(suffixes, Helpers.Extname(f.FullName).ToLower ()) > -1)
+        return true;
+    return false;
   }
 
   void ShowRenameDialog (string path)

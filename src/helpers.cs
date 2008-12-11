@@ -473,13 +473,20 @@ public static class Helpers {
 
   /** BLOCKING */
   public static UnixFileSystemInfo[] Entries (string dirname) {
-    UnixDirectoryInfo di = new UnixDirectoryInfo (dirname);
+    return Entries (new UnixDirectoryInfo (dirname));
+  }
+  public static UnixFileSystemInfo[] Entries (UnixDirectoryInfo di) {
     return di.GetFileSystemEntries ();
   }
 
   /** BLOCKING */
   public static UnixFileSystemInfo[] EntriesMaybe (string dirname) {
     try { return Entries(dirname); }
+    catch (Exception) { return new UnixFileSystemInfo[0]; }
+  }
+
+  public static UnixFileSystemInfo[] EntriesMaybe (UnixDirectoryInfo di) {
+    try { return Entries(di); }
     catch (Exception) { return new UnixFileSystemInfo[0]; }
   }
 
