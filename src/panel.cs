@@ -104,9 +104,8 @@ public class FilezooPanelControls : FilezooControls
     } else {
       Toggle.Active = true;
       int x,y,mw,mh;
-      ((Window)Parent).GetPosition(out x, out y);
-      ((Window)Parent).GetSize (out mw, out mh);
-      Console.WriteLine("x:{0} y:{1} w:{2} h:{3}", x, y, mw, mh);
+      Parent.GdkWindow.GetPosition(out x, out y);
+      Parent.GdkWindow.GetSize (out mw, out mh);
       x = Math.Min (Screen.Width-mw, x);
 //       x = Screen.Width-mw;
       FilezooWindow.Resize (1, 1);
