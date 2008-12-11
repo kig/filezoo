@@ -17,7 +17,11 @@ public class FilezooConfig
   }
 
   public void Apply (Filezoo fz) {
-    fz.QuitAfterFirstFrame = (System.Array.IndexOf(Args, "--quit") > -1);
+    int idx = System.Array.IndexOf(Args, "--quit");
+    if (idx > -1) {
+      fz.QuitAfterFirstFrame = true;
+      fz.SetCurrentDir (idx >= Args.Length-1 ? "." : Args[idx+1]);
+    }
     fz.Prefixes = Prefixes;
 
     fz.BreadcrumbFontFamily = "URW Gothic L";

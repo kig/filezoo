@@ -465,25 +465,30 @@ public class FSDraw
   /** ASYNC */
   public bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
   {
-    if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
-        FSCache.RequestTraversal(d.FullName);
-    if (depth > 0 && !IsVisible(d, cr, target)) return true;
     lock (PreDrawLock) PreDrawInProgress ++;
     bool rv = true;
-    double h = depth == 0 ? 1 : GetScaledHeight (d);
-    if (!PreDrawCancelled) {
-      cr.Save ();
-        cr.Scale (1, h);
-        RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);
-        if (d.IsDirectory) {
-          bool childrenVisible = cr.Matrix.Yy > 2;
-          bool shouldDrawChildren = (depth == 0 || childrenVisible);
-          if (shouldDrawChildren)
-            rv &= PreDrawChildren(d, cr, target, depth);
-        }
-      cr.Restore ();
-    } else { rv = false; }
-    lock (PreDrawLock) PreDrawInProgress --;
+    try {
+      if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
+          FSCache.RequestTraversal(d.FullName);
+      if (depth > 0 && !IsVisible(d, cr, target)) return true;
+      double h = depth == 0 ? 1 : GetScaledHeight (d);
+      if (PreDrawCancelled) {
+        rv = false;
+      } else {
+        cr.Save ();
+          cr.Scale (1, h);
+          RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);
+          if (d.IsDirectory) {
+            bool childrenVisible = cr.Matrix.Yy > 2;
+            bool shouldDrawChildren = (depth == 0 || childrenVisible);
+            if (shouldDrawChildren)
+              rv &= PreDrawChildren(d, cr, target, depth);
+          }
+        cr.Restore ();
+      }
+    } finally {
+      lock (PreDrawLock) PreDrawInProgress --;
+    }
     return rv;
   }
 

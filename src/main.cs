@@ -37,7 +37,6 @@ public static class FilezooApp {
     Helpers.ShowTextExtents = false;
 
     Catalog.Init("i18n","./locale");
-    System.Threading.ThreadPool.SetMinThreads (10, 20);
     Application.Init ();
 
     p.Time ("Init done");
