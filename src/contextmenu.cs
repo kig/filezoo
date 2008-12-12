@@ -31,7 +31,7 @@ public class FilezooContextMenu : Menu {
   }
 
   string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
-  string[] amarokSuffixes = {"mp3", "m4a", "ogg", "flac", "wav"};
+  string[] amarokSuffixes = {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
   string[] mplayerSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov"};
   string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
 

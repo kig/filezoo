@@ -315,6 +315,85 @@ public static class Helpers {
     } catch (Exception) {}
   }
 
+  public static void CopyURI (string src, string dst)
+  {
+    Console.WriteLine ("Copy {0} to {1}", src, dst);
+    Gnome.Vfs.Vfs.Initialize ();
+    Gnome.Vfs.Xfer.XferUri (
+      new Gnome.Vfs.Uri(src), new Gnome.Vfs.Uri(dst),
+      Gnome.Vfs.XferOptions.Recursive,
+      Gnome.Vfs.XferErrorMode.Query,
+      Gnome.Vfs.XferOverwriteMode.Query,
+      ConsoleURIProgressCallback
+    );
+  }
+
+  public static void MoveURI (string src, string dst)
+  {
+    Console.WriteLine ("Move {0} to {1}", src, dst);
+    Gnome.Vfs.Vfs.Initialize ();
+    Gnome.Vfs.Xfer.XferUri (
+      new Gnome.Vfs.Uri(src), new Gnome.Vfs.Uri(dst),
+      Gnome.Vfs.XferOptions.Recursive | Gnome.Vfs.XferOptions.Removesource,
+      Gnome.Vfs.XferErrorMode.Query,
+      Gnome.Vfs.XferOverwriteMode.Query,
+      ConsoleURIProgressCallback
+    );
+  }
+
+  public static void CopyURIs (string[] src, string dst)
+  {
+    Console.WriteLine ("Copy {0} to {1}", String.Join(", ", src), dst);
+    Gnome.Vfs.Vfs.Initialize ();
+    Gnome.Vfs.Uri[] sources = new Gnome.Vfs.Uri[src.Length];
+    Gnome.Vfs.Uri[] targets = new Gnome.Vfs.Uri[src.Length];
+    for (int i=0; i<src.Length; i++) {
+      sources[i] = new Gnome.Vfs.Uri(src[i]);
+      targets[i] = new Gnome.Vfs.Uri(dst + DirSepS + Basename(src[i]));
+    }
+    Gnome.Vfs.Xfer.XferUriList (
+      sources, targets,
+      Gnome.Vfs.XferOptions.Recursive,
+      Gnome.Vfs.XferErrorMode.Query,
+      Gnome.Vfs.XferOverwriteMode.Query,
+      ConsoleURIProgressCallback
+    );
+  }
+
+  public static void MoveURIs (string[] src, string dst)
+  {
+    Console.WriteLine ("Move {0} to {1}", String.Join(", ", src), dst);
+    Gnome.Vfs.Vfs.Initialize ();
+    Gnome.Vfs.Uri[] sources = new Gnome.Vfs.Uri[src.Length];
+    Gnome.Vfs.Uri[] targets = new Gnome.Vfs.Uri[src.Length];
+    for (int i=0; i<src.Length; i++) {
+      sources[i] = new Gnome.Vfs.Uri(src[i]);
+      targets[i] = new Gnome.Vfs.Uri(dst + DirSepS + Basename(src[i]));
+    }
+    Gnome.Vfs.Xfer.XferUriList (
+      sources, targets,
+      Gnome.Vfs.XferOptions.Recursive | Gnome.Vfs.XferOptions.Removesource,
+      Gnome.Vfs.XferErrorMode.Query,
+      Gnome.Vfs.XferOverwriteMode.Query,
+      ConsoleURIProgressCallback
+    );
+  }
+
+  private static int ConsoleURIProgressCallback (Gnome.Vfs.XferProgressInfo info)
+  {
+    switch (info.Status) {
+      case Gnome.Vfs.XferProgressStatus.Vfserror:
+        Console.WriteLine("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
+        return (int)Gnome.Vfs.XferErrorAction.Abort;
+      case Gnome.Vfs.XferProgressStatus.Overwrite:
+        Console.WriteLine("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
+        return (int)Gnome.Vfs.XferOverwriteAction.Abort;
+      default:
+        Console.WriteLine("{0} / {1} {2} -> {3}", info.BytesCopied, info.BytesTotal, info.SourceName, info.TargetName);
+        return 1;
+    }
+  }
+
   /** DESTRUCTIVE, BLOCKING */
   public static void Touch (string path)
   {
@@ -668,6 +747,16 @@ public static class Helpers {
     }
   }
 
+  public static bool IsURI (string s)
+  {
+    try {
+      new Uri (s);
+      return true;
+    } catch (Exception) {
+      return false;
+    }
+  }
+
   static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,/-])");
   /** FAST */
   public static string EscapePath (string path) {
@@ -731,6 +820,19 @@ public static class Helpers {
     d.ShowAll ();
     e.Position = position;
     e.SelectRegion(selectStart, selectEnd);
+  }
+
+  public static void PrintDragData (DragDataReceivedArgs e) {
+    Console.WriteLine("SuggestedAction: {0}, X:{1} Y:{2}", e.Context.SuggestedAction, e.X, e.Y);
+    Console.WriteLine("Data: {0}", BitConverter.ToString(e.SelectionData.Data));
+    Console.WriteLine("Format: {0}", e.SelectionData.Format);
+    Console.WriteLine("Length: {0}", e.SelectionData.Length);
+    Console.WriteLine("Pixbuf: {0}", e.SelectionData.Pixbuf);
+    Console.WriteLine("Selection: {0}", e.SelectionData.Selection.Name);
+    Console.WriteLine("Target: {0}", e.SelectionData.Target.Name);
+    Console.WriteLine("Text: {0}", e.SelectionData.Text);
+    Console.WriteLine("Type: {0}", e.SelectionData.Type.Name);
+    Console.WriteLine("Uris: {0}", e.SelectionData.Uris);
   }
 
 }

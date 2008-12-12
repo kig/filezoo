@@ -140,6 +140,14 @@ public class Filezoo : DrawingArea
 
   /* Constructor */
 
+  private static TargetEntry [] target_table = new TargetEntry [] {
+    new TargetEntry ("text/uri-list", 0, 0),
+    new TargetEntry ("application/x-color", 0, 1),
+    new TargetEntry ("text/plain", 0, 2),
+    new TargetEntry ("application/octet-stream", 0, 2),
+    new TargetEntry ("STRING", 0, 2)
+  };
+
   /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
   {
@@ -151,6 +159,37 @@ public class Filezoo : DrawingArea
 
     CurrentDirPath = dirname;
 
+    DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
+      string type = e.SelectionData.Type.Name;
+      Console.WriteLine(type);
+      Gdk.DragAction action = e.Context.SuggestedAction;
+      Console.WriteLine();
+      string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
+      if (type == "application/x-color") {
+        Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(e.SelectionData.Data));
+      } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(e.SelectionData.Text))) {
+        string data = new System.Text.ASCIIEncoding().GetString(e.SelectionData.Data);
+        string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
+        if (action == Gdk.DragAction.Move) {
+          targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+          Helpers.MoveURIs(uris, targetPath);
+        } else if (action == Gdk.DragAction.Copy) {
+          targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+          Helpers.CopyURIs(uris, targetPath);
+        } else if (action == Gdk.DragAction.Ask) {
+          DragURIMenu(uris, targetPath);
+        }
+      } else {
+        if (Helpers.IsDir(targetPath)) {
+          CreateFileDialog(targetPath, e.SelectionData.Data);
+        } else {
+          DragDataToFileMenu(targetPath, e.SelectionData.Data);
+        }
+      }
+    };
+
+    Gtk.Drag.DestSet (this, DestDefaults.All, target_table, Gdk.DragAction.Move|Gdk.DragAction.Copy|Gdk.DragAction.Ask);
+
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask
       | Gdk.EventMask.ButtonReleaseMask
@@ -160,17 +199,25 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.LeaveNotifyMask
     ));
 
-//     LeaveNotifyEvent += delegate (object sender, LeaveNotifyEventArgs e)
-//     {
-//       flareTargetX = dragX;
-//       flareTargetY = -dragY;
-//     };
-
     ThreadStart ts = new ThreadStart (PreDrawCallback);
     Thread t = new Thread(ts);
     t.IsBackground = true;
     t.Start ();
 
+  }
+
+  void DragURIMenu (string[] sources, string target)
+  {
+    Console.WriteLine ("Would ask about dragging {0} to {1}", String.Join(", ", sources), target);
+  }
+  void CreateFileDialog (string target, byte[] data)
+  {
+    Console.WriteLine ("Would ask about creating a file in {0} with\n{1}", target, data);
+  }
+
+  void DragDataToFileMenu (string target, byte[] data)
+  {
+    Console.WriteLine ("Would ask about appending {0} with\n{1}", target, data);
   }
 
   public void CompleteInit ()
@@ -700,34 +747,44 @@ public class Filezoo : DrawingArea
   }
 
 
+  public List<ClickHit> FindHits (uint width, uint height, double x, double y)
+  {
+    List<ClickHit> hits;
+    using (Context cr = new Context (CachedSurface)) {
+      cr.IdentityMatrix ();
+      cr.Save();
+        Rectangle box = Transform (cr, width, height);
+        cr.Scale (1, Zoomer.Z);
+        cr.Translate (0.0, Zoomer.Y);
+        hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
+        hits.Add (new ClickHit(CurrentDirEntry, cr.Matrix.Yy));
+      cr.Restore ();
+    }
+    return hits;
+  }
+
+  public ClickHit FindHit (uint width, uint height, double x, double y, double minHeight)
+  {
+    List<ClickHit> hits = FindHits(width, height, x, y);
+    ClickHit ch = hits[hits.Count-1];
+    foreach (ClickHit c in hits) {
+      if (c.Height > minHeight) {
+        ch = c;
+        break;
+      }
+    }
+    return ch;
+  }
+
 
   /* Context menu */
 
 
   /** BLOCKING */
-  void ContextClick (Context cr, uint width, uint height, double x, double y)
+  void ContextClick (uint width, uint height, double x, double y)
   {
-    cr.Save();
-      Rectangle box = Transform (cr, width, height);
-      cr.Scale (1, Zoomer.Z);
-      cr.Translate (0.0, Zoomer.Y);
-      List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
-      ClickHit ch = new ClickHit(CurrentDirEntry, cr.Matrix.Yy);
-      foreach (ClickHit c in hits) {
-        if (c.Height > 8) {
-          ch = c;
-          break;
-        }
-      }
-    cr.Restore ();
-
     if (ContextMenu != null) ContextMenu.Dispose ();
-    ContextMenu = new FilezooContextMenu (this, ch);
-    ContextMenu.UnmapEvent += delegate {
-      flareTargetX = Width/2;
-      flareTargetY = -100;
-      QueueDraw ();
-    };
+    ContextMenu = new FilezooContextMenu (this, FindHit(width, height, x, y, 8));
     ContextMenu.ShowAll ();
     ContextMenu.Popup ();
   }
@@ -798,15 +855,9 @@ public class Filezoo : DrawingArea
     dragStartY = dragY = e.Y;
     dragging = false;
     if (e.Button == 3) {
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        ContextClick (cr, (uint)w, (uint)h, e.X, e.Y);
-        flareTargetX = e.X;
-        flareTargetY = e.Y;
-        QueueDraw ();
-      }
+      int w, h;
+      e.Window.GetSize (out w, out h);
+      ContextClick ((uint)w, (uint)h, e.X, e.Y);
     }
     return true;
   }
@@ -816,14 +867,11 @@ public class Filezoo : DrawingArea
   {
     if (e.Button == 1 && !dragging) {
       InteractionProfiler.Restart ();
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        using (Context scr = new Context (CachedSurface)) {
-          scr.IdentityMatrix ();
-          Click (scr, (uint)w, (uint)h, e.X, e.Y);
-        }
+      int w, h;
+      e.Window.GetSize (out w, out h);
+      using (Context scr = new Context (CachedSurface)) {
+        scr.IdentityMatrix ();
+        Click (scr, (uint)w, (uint)h, e.X, e.Y);
       }
     }
     dragging = false;
