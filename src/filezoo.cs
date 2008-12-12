@@ -159,6 +159,7 @@ public class Filezoo : DrawingArea
 
     CurrentDirPath = dirname;
 
+    /** DESCTRUCTIVE */
     DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
       string type = e.SelectionData.Type.Name;
       Console.WriteLine(type);
@@ -166,8 +167,10 @@ public class Filezoo : DrawingArea
       Console.WriteLine();
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
       if (type == "application/x-color") {
+        /** DESCTRUCTIVE */
         Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(e.SelectionData.Data));
       } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(e.SelectionData.Text))) {
+        /** DESCTRUCTIVE */
         string data = new System.Text.ASCIIEncoding().GetString(e.SelectionData.Data);
         string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
         if (action == Gdk.DragAction.Move) {
@@ -180,6 +183,7 @@ public class Filezoo : DrawingArea
           DragURIMenu(uris, targetPath);
         }
       } else {
+        /** DESCTRUCTIVE */
         if (Helpers.IsDir(targetPath)) {
           CreateFileDialog(targetPath, e.SelectionData.Data);
         } else {

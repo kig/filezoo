@@ -308,6 +308,7 @@ public static class Helpers {
     }
   }
 
+  /** DESCTRUCTIVE, BLOCKING */
   public static void Copy (string src, string dst)
   {
     try {
@@ -315,6 +316,14 @@ public static class Helpers {
     } catch (Exception) {}
   }
 
+  /** DESTRUCTIVE, BLOCKING */
+  public static void Touch (string path)
+  {
+    Process p = Process.Start("touch", EscapePath(path));
+    p.WaitForExit ();
+  }
+
+  /** DESCTRUCTIVE, ASYNC */
   public static void CopyURI (string src, string dst)
   {
     Console.WriteLine ("Copy {0} to {1}", src, dst);
@@ -328,6 +337,7 @@ public static class Helpers {
     );
   }
 
+  /** DESCTRUCTIVE, ASYNC */
   public static void MoveURI (string src, string dst)
   {
     Console.WriteLine ("Move {0} to {1}", src, dst);
@@ -341,6 +351,7 @@ public static class Helpers {
     );
   }
 
+  /** DESCTRUCTIVE, ASYNC */
   public static void CopyURIs (string[] src, string dst)
   {
     Console.WriteLine ("Copy {0} to {1}", String.Join(", ", src), dst);
@@ -360,6 +371,7 @@ public static class Helpers {
     );
   }
 
+  /** DESCTRUCTIVE, ASYNC */
   public static void MoveURIs (string[] src, string dst)
   {
     Console.WriteLine ("Move {0} to {1}", String.Join(", ", src), dst);
@@ -379,6 +391,7 @@ public static class Helpers {
     );
   }
 
+  /** BLOCKING */
   private static int ConsoleURIProgressCallback (Gnome.Vfs.XferProgressInfo info)
   {
     switch (info.Status) {
@@ -394,14 +407,7 @@ public static class Helpers {
     }
   }
 
-  /** DESTRUCTIVE, BLOCKING */
-  public static void Touch (string path)
-  {
-    Process p = Process.Start("touch", EscapePath(path));
-    p.WaitForExit ();
-  }
-
-  /** ASYNC, DESTRUCTIVE */
+  /** DESTRUCTIVE, ASYNC */
   public static ImageSurface GetThumbnail (string path)
   {
     try {
@@ -451,6 +457,7 @@ public static class Helpers {
     }
   }
 
+  /** ASYNC */
   public static ImageSurface ScaleDownSurface (ImageSurface s, uint size)
   {
     double scale = (double)size / (double)Math.Max(s.Width, s.Height);
@@ -468,12 +475,14 @@ public static class Helpers {
     return rv;
   }
 
+  /** ASYNC */
   public static int ImageWidth (string path)
   {
     using (ImageSurface s = new ImageSurface (path))
       return s.Width;
   }
 
+  /** BLOCKING */
   public static RadialGradient RadialGradientFromImage (string path)
   {
     using (ImageSurface s = new ImageSurface (path)) {
@@ -484,6 +493,7 @@ public static class Helpers {
     }
   }
 
+  /** FAST */
   public static Color Sample (ImageSurface s, int x, int y)
   {
     int i = s.Stride * y, j;
@@ -517,10 +527,12 @@ public static class Helpers {
     return BitConverter.ToString(MD5("file://"+path)).Replace("-", "").ToLower();
   }
 
+  /** ASYNC */
   public static byte[] MD5 (string s) {
     return MD5 (new System.Text.ASCIIEncoding().GetBytes(s));
   }
 
+  /** ASYNC */
   public static byte[] MD5 (byte[] b) {
     using (HashAlgorithm h = HashAlgorithm.Create ("MD5"))
       return h.ComputeHash (b);
