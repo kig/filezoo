@@ -307,11 +307,17 @@ public class Filezoo : DrawingArea
     }
   }
 
+  bool LimitedRedraw = false;
+
   bool CheckRedraw ()
   {
     if (!PreDrawComplete || NeedRedraw) {
       NeedRedraw = false;
       FSNeedRedraw = true;
+      LimitedRedraw = false;
+      QueueDraw ();
+    } else if (LimitedRedraw) {
+      LimitedRedraw = false;
       QueueDraw ();
     }
     return true;
@@ -372,12 +378,16 @@ public class Filezoo : DrawingArea
 
   System.Object PreDrawLock = new System.Object ();
   bool PreDrawInProgress = false;
+  bool clearTraversal = false;
   /** BLOCKING */
   void PreDraw ()
   {
     Renderer.CancelPreDraw();
     lock (PreDrawLock) {
       if (PreDrawInProgress) return;
+      if (FSCache.Measurer != null && SizeField != null)
+        if (!SizeField.Measurer.DependsOnTotals && FSCache.Measurer.DependsOnTotals)
+          clearTraversal = true;
       FSCache.Measurer = SizeField.Measurer;
       FSCache.SortDirection = SortDirection;
       FSCache.Comparer = SortField.Comparer;
@@ -395,6 +405,10 @@ public class Filezoo : DrawingArea
         try {
           if (!FSCache.Measurer.DependsOnTotals)
             FSCache.CancelTraversal ();
+          if (clearTraversal) {
+            clearTraversal = false;
+            FSCache.ClearTraversalCache ();
+          }
           FSCache.CancelThumbnailing ();
           using (Context cr = new Context (PreDrawSurface)) {
             cr.IdentityMatrix ();
@@ -523,13 +537,13 @@ public class Filezoo : DrawingArea
         cr.LineWidth = 1;
         double n = 6;
         double af = Math.PI*2/n;
-        double r = 450*(4.4+0.3*cosScale(opacity/3));
+        double r = 400*(4.4+0.3*cosScale(opacity/3));
         for (double i=0; i<n; i++) {
-          cr.Arc (-450*4, 1000/4, r, t+i*af, t+(i+0.7)*af);
+          cr.Arc (-400*4, 1000/4, r, t+i*af, t+(i+0.7)*af);
           cr.Stroke ();
         }
         for (double i=0; i<n; i++) {
-          cr.Arc (-450*4, 1000/4, r+5, -t+i*af, -t+(i+0.7)*af);
+          cr.Arc (-400*4, 1000/4, r+5, -t+i*af, -t+(i+0.7)*af);
           cr.Stroke ();
         }
         if (CurrentDirEntry.InProgress) {
@@ -538,7 +552,7 @@ public class Filezoo : DrawingArea
             // draw line there
           cr.NewPath ();
         }
-        UpdateLayout ();
+        LimitedRedraw = true;
       } else {
         FirstProgress = 0;
         LastProgress = 0;
@@ -957,9 +971,8 @@ public class Filezoo : DrawingArea
         PanBy (cr, (uint)w, (uint)h, dx, dy);
       }
     }
-    if (SillyFlare && !DrawQueued) {
-      DrawQueued = true;
-      QueueDraw();
+    if (SillyFlare) {
+      LimitedRedraw = true;
     }
     dragX = e.X;
     dragY = e.Y;
@@ -991,8 +1004,6 @@ public class Filezoo : DrawingArea
     return true;
   }
 
-  bool DrawQueued = false;
-
   /** BLOCKING */
   /**
     The expose event handler. Gets the Cairo.Context for the
@@ -1006,7 +1017,6 @@ public class Filezoo : DrawingArea
     using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
     {
       int w, h;
-      DrawQueued = false;
       e.Window.GetSize (out w, out h);
       bool sizeChanged = false;
       if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
@@ -1039,7 +1049,7 @@ public class Filezoo : DrawingArea
           cr.Paint ();
           cr.Operator = Operator.Over;
           if (DrawEffects (cr, Width, Height))
-            QueueDraw ();
+            LimitedRedraw = true;
         }
       cr.Restore ();
     }

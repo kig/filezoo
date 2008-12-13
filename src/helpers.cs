@@ -56,26 +56,25 @@ public static class Helpers {
 
   /* Text drawing helpers */
 
-  static Dictionary<string,Pango.FontDescription> FontCache = new Dictionary<string,Pango.FontDescription> (21);
+  static Dictionary<string,Pango.FontDescription> FontCache = new Dictionary<string,Pango.FontDescription> ();
 
-  static object FontCacheLock = new System.Object ();
+  static Pango.Layout layout = null;
 
   /** BLOCKING */
   static Pango.Layout GetLayout(Context cr, string family, double fontSize)
   {
     Profiler p = new Profiler ("GetFont");
-    lock (FontCacheLock) {
-      p.Time ("Got FontCacheLock");
-      Pango.Layout layout = Pango.CairoHelper.CreateLayout (cr);
-      layout.FontDescription = CreateFont (family, fontSize);
-      p.Time ("Got font and created layout");
-      return layout;
-    }
+    if (layout == null)
+      layout = Pango.CairoHelper.CreateLayout (cr);
+    Pango.CairoHelper.UpdateLayout (cr, layout);
+    layout.FontDescription = CreateFont (family, fontSize);
+    p.Time ("Got font and created layout");
+    return layout;
   }
 
   static Pango.FontDescription CreateFont (string family, double fontSize)
   {
-    string key = family+fontSize.ToString();
+    string key = family+((int)(fontSize * Pango.Scale.PangoScale)).ToString();
     if (!FontCache.ContainsKey(key)) {
       Pango.FontDescription font = Pango.FontDescription.FromString (family);
       font.Size = (int)(fontSize * Pango.Scale.PangoScale);
@@ -90,18 +89,20 @@ public static class Helpers {
   static double QuantizeFontSize (double fs) { return Math.Max(0.5, Math.Floor(fs)); }
 
   public static bool ShowTextExtents = false;
+  static TextExtents te = new TextExtents ();
+  static Pango.Rectangle pe, le;
 
   /** BLOCKING */
   public static void DrawText (Context cr, string family, double fontSize, string text)
   {
     Profiler p = new Profiler ("DrawText");
+    double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
-    Pango.Rectangle pe, le;
     layout.GetExtents(out pe, out le);
     p.Time ("GetExtents");
-    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
-           h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    w = (double)le.Width / (double)Pango.Scale.PangoScale;
+    h = (double)le.Height / (double)Pango.Scale.PangoScale;
     Pango.CairoHelper.ShowLayout (cr, layout);
     p.Time ("ShowLayout");
     if (ShowTextExtents) {
@@ -123,13 +124,12 @@ public static class Helpers {
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
   {
-    TextExtents te = new TextExtents ();
+    double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
-    Pango.Rectangle pe, le;
     layout.GetExtents(out pe, out le);
-    double w = (double)le.Width / (double)Pango.Scale.PangoScale,
-           h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    w = (double)le.Width / (double)Pango.Scale.PangoScale;
+    h = (double)le.Height / (double)Pango.Scale.PangoScale;
     te.Height = h;
     te.Width = w;
     te.XAdvance = w;
@@ -199,7 +199,7 @@ public static class Helpers {
     psi.UseShellExecute = false;
     psi.RedirectStandardOutput = true;
     Process p = Process.Start (psi);
-    p.PriorityClass = ProcessPriorityClass.Idle;
+//     p.PriorityClass = ProcessPriorityClass.Idle;
     p.ProcessorAffinity = (IntPtr)0x0002;
     string rv = p.StandardOutput.ReadToEnd ();
     p.WaitForExit ();

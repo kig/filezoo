@@ -584,7 +584,7 @@ public static class FSCache
     psi.UseShellExecute = false;
     psi.RedirectStandardOutput = true;
     Process p = Process.Start (psi);
-    p.PriorityClass = ProcessPriorityClass.Idle;
+//     p.PriorityClass = ProcessPriorityClass.Idle;
     p.ProcessorAffinity = (IntPtr)0x0002;
     using (BinaryReader b = new BinaryReader(p.StandardOutput.BaseStream)) {
       while (true) {
@@ -633,6 +633,40 @@ public static class FSCache
       LastChange = DateTime.Now;
     }
   }
+
+  public static void PruneCache (int maxFrameDelta)
+  { lock (ThumbnailCache) { lock (Cache) {
+    List<string> deletions = new List<string> ();
+    foreach (FSEntry d in Cache.Values) {
+      if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
+        if (d.Thumbnail != null) {
+          ThumbnailCache.Remove(d.FullName);
+          d.Thumbnail.Destroy ();
+          d.Thumbnail = null;
+        }
+        d.ParentDir.LastFileChange = DateTime.Now;
+        d.ParentDir.ReadyToDraw = false;
+        deletions.Add(d.FullName);
+      }
+    }
+    foreach (string k in deletions)
+      Cache.Remove(k);
+    LastChange = DateTime.Now;
+  } } }
+
+  public static void ClearTraversalCache ()
+  { lock (Cache) {
+    lock (TraversalCache) {
+      foreach (FSEntry d in Cache.Values) {
+        if (d.IsDirectory) {
+          d.Complete = false;
+          d.SubTreeCount = d.SubTreeSize = 0;
+        }
+      }
+      PruneCache (100);
+      TraversalCache.Clear ();
+    }
+  } }
 
   static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
 

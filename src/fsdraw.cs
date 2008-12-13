@@ -254,16 +254,17 @@ public class FSDraw
         cr.Save ();
           if (matrix.Yy > 8 && matrix.Yy < 4000) {
             Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
-            LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96);
-            g.AddColorStop (0, new Color (0,0,0,0.8));
-            g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
-            g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
-            g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
-            cr.Pattern = g;
-            cr.Fill ();
-            Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);
-            cr.Color = new Color (0,0,0,0.8);
-            cr.Fill ();
+            using (LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96)) {
+              g.AddColorStop (0, new Color (0,0,0,0.8));
+              g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
+              g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
+              g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
+              cr.Pattern = g;
+              cr.Fill ();
+              Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);
+              cr.Color = new Color (0,0,0,0.8);
+              cr.Fill ();
+            }
           }
           if (matrix.Yy > 2) {
             cr.Color = (!d.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
