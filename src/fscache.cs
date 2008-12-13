@@ -302,15 +302,11 @@ public static class FSCache
 
   /** ASYNC */
   public static void PruneCache (int maxFrameDelta)
-  { lock (ThumbnailCache) { lock (Cache) {
+  { lock (Cache) {
     List<string> deletions = new List<string> ();
     foreach (FSEntry d in Cache.Values) {
       if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
-        if (d.Thumbnail != null) {
-          ThumbnailCache.Remove(d.FullName);
-          d.Thumbnail.Destroy ();
-          d.Thumbnail = null;
-        }
+        DestroyThumbnail(d);
         d.ParentDir.ReadyToDraw = false;
         d.ParentDir.LastChange = d.ParentDir.LastFileChange = DateTime.Now;
         d.ParentDir.FilePassDone = false;
@@ -323,7 +319,7 @@ public static class FSCache
     if (deletions.Count > 0) {
       LastChange = DateTime.Now;
     }
-  } } }
+  } }
 
   /** ASYNC */
   public static void ClearTraversalCache ()
@@ -335,7 +331,7 @@ public static class FSCache
           d.SubTreeCount = d.SubTreeSize = 0;
         }
       }
-      TraversalCache.Clear ();
+      TraversalCache = new Dictionary<string,TraversalInfo> ();
     }
   } }
 
@@ -448,11 +444,7 @@ public static class FSCache
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
     LastChange = DateTime.Now;
-    if (d.Thumbnail != null) {
-      d.Thumbnail.Destroy ();
-      d.Thumbnail = null;
-      ThumbnailCache.Remove(d.FullName);
-    }
+    DestroyThumbnail(d);
     DeleteChildren (path);
     List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
     e.Remove(d);
@@ -471,11 +463,7 @@ public static class FSCache
   { lock (Cache) {
     if (Cache.ContainsKey(path)) {
       FSEntry d = Cache[path];
-      if (d.Thumbnail != null) {
-        d.Thumbnail.Destroy ();
-        d.Thumbnail = null;
-        ThumbnailCache.Remove(d.FullName);
-      }
+      DestroyThumbnail(d);
       Cache.Remove (path);
       lock (TraversalCache)
         if (TraversalCache.ContainsKey(path))
@@ -494,11 +482,7 @@ public static class FSCache
     // redo path's file pass
     // enter new data to parent
     FSEntry d = Get (path);
-    if (d.Thumbnail != null) {
-      d.Thumbnail.Destroy ();
-      d.Thumbnail = null;
-      ThumbnailCache.Remove(d.FullName);
-    }
+    DestroyThumbnail(d);
     lock (TraversalCache)
       if (TraversalCache.ContainsKey(path))
         TraversalCache.Remove(path);
@@ -690,13 +674,24 @@ public static class FSCache
 
   /* Thumbnailing internals */
 
+  static void DestroyThumbnail(FSEntry d)
+  { lock (Cache) { lock (d) {
+    ImageSurface tn = d.Thumbnail;
+    if (tn != null) {
+      tn.Destroy ();
+      tn.Destroy ();
+      d.Thumbnail = null;
+      ThumbnailCache.Remove(d.FullName);
+    }
+  } } }
+
   static void GetThumbnail (string path)
   {
     if (Get (path).Thumbnail == null) {
       ImageSurface tn = Helpers.GetThumbnail (path);
       FSEntry f = Get (path);
-      f.Thumbnail = tn;
-      lock (ThumbnailCache) {
+      lock (Cache) {
+        f.Thumbnail = tn;
         ThumbnailCache[f.FullName] = f;
         bool checkForOld = true;
         int deletecount = 0;
@@ -705,9 +700,7 @@ public static class FSCache
           foreach (FSEntry e in ThumbnailCache.Values) {
             if (e.LastDraw < f.LastDraw) oldest = e;
           }
-          ThumbnailCache.Remove(oldest.FullName);
-          oldest.Thumbnail.Destroy ();
-          oldest.Thumbnail = null;
+          DestroyThumbnail(oldest);
           deletecount++;
           checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
         }
@@ -717,9 +710,7 @@ public static class FSCache
             if (e.LastDraw < FSDraw.frame - 1000) old.Add(e);
           }
           foreach (FSEntry e in old) {
-            ThumbnailCache.Remove(e.FullName);
-            e.Thumbnail.Destroy ();
-            e.Thumbnail = null;
+            DestroyThumbnail(e);
             deletecount++;
           }
         }

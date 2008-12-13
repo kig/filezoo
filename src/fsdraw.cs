@@ -304,28 +304,31 @@ public class FSDraw
     Draws the thumbnail of the FSEntry.
     */
   void DrawThumb (FSEntry d, Context cr, Rectangle target) {
-    ImageSurface thumb = d.Thumbnail;
-    if (thumb == null) return;
-    double rBoxWidth = BoxWidth / target.Height;
-    using (Pattern p = new Pattern (thumb)) {
-      cr.Save ();
-          Matrix matrix = cr.Matrix;
-          double wr = matrix.Xx * rBoxWidth;
-          double hr = matrix.Yy * 0.96;
-          double wscale = wr / thumb.Width;
-          double hscale = hr / thumb.Height;
-          double scale = Math.Max (wscale, hscale);
-          double x = 0.5*rBoxWidth*(1 - (scale/wscale));
-          double y = 0.02 + 0.5*0.48*(1 - (scale/hscale));
-          cr.Translate (x, y);
-          cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
-          Matrix pm = p.Matrix;
-          pm.Xx = Math.Max(1, pm.Xx);
-          pm.Yy = Math.Max(1, pm.Yy);
-          p.Matrix = pm;
-        cr.Pattern = p;
-        cr.Fill ();
-      cr.Restore ();
+    ImageSurface thumb;
+    lock (d) {
+      thumb = d.Thumbnail;
+      if (thumb == null) return;
+      double rBoxWidth = BoxWidth / target.Height;
+      using (Pattern p = new Pattern (thumb)) {
+        cr.Save ();
+            Matrix matrix = cr.Matrix;
+            double wr = matrix.Xx * rBoxWidth;
+            double hr = matrix.Yy * 0.96;
+            double wscale = wr / thumb.Width;
+            double hscale = hr / thumb.Height;
+            double scale = Math.Max (wscale, hscale);
+            double x = 0.5*rBoxWidth*(1 - (scale/wscale));
+            double y = 0.02 + 0.5*0.48*(1 - (scale/hscale));
+            cr.Translate (x, y);
+            cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
+            Matrix pm = p.Matrix;
+            pm.Xx = Math.Max(1, pm.Xx);
+            pm.Yy = Math.Max(1, pm.Yy);
+            p.Matrix = pm;
+          cr.Pattern = p;
+          cr.Fill ();
+        cr.Restore ();
+      }
     }
   }
 

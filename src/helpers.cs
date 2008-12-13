@@ -478,6 +478,7 @@ public static class Helpers {
         if (thumb.Width > thumbSize || thumb.Height > thumbSize) {
           ImageSurface nthumb = ScaleDownSurface (thumb, thumbSize);
           thumb.Destroy ();
+          thumb.Destroy ();
           thumb = nthumb;
         }
       }
