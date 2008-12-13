@@ -1,4 +1,4 @@
-
+using System;
 using System.Collections.Generic;
 using Cairo;
 using Gtk;
@@ -17,11 +17,13 @@ public class FilezooConfig
   }
 
   public void Apply (Filezoo fz) {
-    int idx = System.Array.IndexOf(Args, "--quit");
-    if (idx > -1) {
-      fz.QuitAfterFirstFrame = true;
-      fz.SetCurrentDir (idx >= Args.Length-1 ? "." : Args[idx+1]);
-    }
+    string[] args = Args;
+
+    fz.QuitAfterFirstFrame = (Array.IndexOf(args, "--quit") > -1);
+    args = Helpers.Without(args, "--quit");
+
+    if (args.Length > 0) fz.SetCurrentDir (args[args.Length - 1]);
+
     fz.Prefixes = Prefixes;
 
     fz.BreadcrumbFontFamily = "URW Gothic L";

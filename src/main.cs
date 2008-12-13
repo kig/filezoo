@@ -42,8 +42,17 @@ public static class FilezooApp {
     p.Time ("Init done");
 
     bool panelMode = (Array.IndexOf (args, "--panel") > -1);
+    args = Helpers.Without(args, "--panel");
 
-    string dir = panelMode ? Helpers.HomeDir : ((args.Length > 0) ? args[0] : ".");
+    int panelBgIdx = Array.IndexOf(args, "--panel-bg");
+    string panelBg = "";
+    if (panelBgIdx > -1 && panelBgIdx != args.Length-1) {
+      panelBg = args[panelBgIdx + 1];
+      args = Helpers.Without (args, panelBg);
+    }
+    args = Helpers.Without (args, "--panel-bg");
+
+    string dir = panelMode ? Helpers.HomeDir : ".";
     Filezoo fz = new Filezoo (dir);
     new FilezooConfig (args).Apply(fz);
 
@@ -51,6 +60,14 @@ public static class FilezooApp {
 
     if (panelMode) {
       win = new FilezooPanel (fz);
+      if (panelBg.Length > 0) {
+        Gdk.Color c = new Gdk.Color(0,0,0);
+        if (Gdk.Color.Parse(panelBg, ref c)) {
+          win.ModifyBg (StateType.Normal, c);
+        } else {
+          Console.WriteLine("Failed to parse panel bg color: {0}", panelBg);
+        }
+      }
     } else {
       win = new Window ("Filezoo");
       win.SetDefaultSize (420, 800);

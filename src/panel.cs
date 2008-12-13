@@ -23,10 +23,10 @@ using Mono.Unix;
 
 public class FilezooPanel : Window
 {
-  Window FilezooWindow;
-  Filezoo Fz;
+  public Window FilezooWindow;
+  public Filezoo Fz;
 
-  FilezooPanelControls Controls;
+  public FilezooPanelControls Controls;
 
   public FilezooPanel (Filezoo fz) : base ("Filezoo Panel")
   {
@@ -39,6 +39,11 @@ public class FilezooPanel : Window
     FilezooWindow = new Window ("Filezoo");
     FilezooWindow.Decorated = false;
     FilezooWindow.Add (Fz);
+    byte r, g, b;
+    r = (byte)(Fz.Renderer.BackgroundColor.R * 255);
+    g = (byte)(Fz.Renderer.BackgroundColor.G * 255);
+    b = (byte)(Fz.Renderer.BackgroundColor.B * 255);
+    FilezooWindow.ModifyBg (StateType.Normal, new Gdk.Color(r,g,b));
 
     Controls = new FilezooPanelControls(Fz, FilezooWindow);
 

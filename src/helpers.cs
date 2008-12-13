@@ -810,6 +810,20 @@ public static class Helpers {
   }
 
 
+  public static string[] Without (string[] a, string v)
+  {
+    List<string> l = new List<string> (a.Length);
+    bool first = true;
+    foreach(string s in a) {
+      if (first && s == v)
+        first = false;
+      else
+        l.Add(s);
+    }
+    return l.ToArray();
+  }
+
+
   /* Gtk helpers */
 
   public delegate void TextPromptHandler (string s);
