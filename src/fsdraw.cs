@@ -217,13 +217,16 @@ public class FSDraw
   public uint Draw
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
+    d.LastDraw = frame;
     if (depth == 0) {
+      FSEntry o = d;
+      while ((o = o.ParentDir) != null)
+        o.LastDraw = frame;
       FrameProfiler.Restart ();
     }
     if (depth > 0 && !IsVisible(d, cr, target)) {
       return 0;
     }
-    d.LastDraw = frame;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     uint c = 1;
     cr.Save ();

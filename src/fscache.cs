@@ -186,7 +186,7 @@ public static class FSCache
     }
   }
 
-  /** BLOCKING */
+  /** ASYNC */
   public static void SortEntries (FSEntry f)
   { lock (Cache) {
     if (!f.IsDirectory) return;
@@ -208,7 +208,7 @@ public static class FSCache
     f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
   } }
 
-  /** BLOCKING */
+  /** ASYNC */
   public static void MeasureEntries (FSEntry f)
   { lock (Cache) {
     if (!f.IsDirectory) return;
@@ -300,6 +300,44 @@ public static class FSCache
     ThumbnailQueue.Clear ();
   } }
 
+  /** ASYNC */
+  public static void PruneCache (int maxFrameDelta)
+  { lock (ThumbnailCache) { lock (Cache) {
+    List<string> deletions = new List<string> ();
+    foreach (FSEntry d in Cache.Values) {
+      if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
+        if (d.Thumbnail != null) {
+          ThumbnailCache.Remove(d.FullName);
+          d.Thumbnail.Destroy ();
+          d.Thumbnail = null;
+        }
+        d.ParentDir.ReadyToDraw = false;
+        d.ParentDir.LastChange = d.ParentDir.LastFileChange = DateTime.Now;
+        d.ParentDir.FilePassDone = false;
+        d.ParentDir.Entries = new List<FSEntry> ();
+        deletions.Add(d.FullName);
+      }
+    }
+    foreach (string k in deletions)
+      Cache.Remove(k);
+    if (deletions.Count > 0) {
+      LastChange = DateTime.Now;
+    }
+  } } }
+
+  /** ASYNC */
+  public static void ClearTraversalCache ()
+  { lock (Cache) {
+    lock (TraversalCache) {
+      foreach (FSEntry d in Cache.Values) {
+        if (d.IsDirectory) {
+          d.Complete = false;
+          d.SubTreeCount = d.SubTreeSize = 0;
+        }
+      }
+      TraversalCache.Clear ();
+    }
+  } }
 
 
 
@@ -419,7 +457,10 @@ public static class FSCache
     List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
     e.Remove(d);
     d.ParentDir.Entries = e;
-    AddCountAndSize (d.ParentDir.FullName, -d.SubTreeCount, -d.SubTreeSize);
+    if (d.IsDirectory)
+      AddCountAndSize (d.ParentDir.FullName, -d.SubTreeCount, -d.SubTreeSize);
+    else
+      AddCountAndSize (d.ParentDir.FullName, -1, -d.Size);
     if (!d.Complete && AllChildrenComplete(d.ParentDir.FullName))
       SetComplete (d.ParentDir.FullName);
     d.LastChange = d.ParentDir.LastChange = LastChange = DateTime.Now;
@@ -633,40 +674,6 @@ public static class FSCache
       LastChange = DateTime.Now;
     }
   }
-
-  public static void PruneCache (int maxFrameDelta)
-  { lock (ThumbnailCache) { lock (Cache) {
-    List<string> deletions = new List<string> ();
-    foreach (FSEntry d in Cache.Values) {
-      if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
-        if (d.Thumbnail != null) {
-          ThumbnailCache.Remove(d.FullName);
-          d.Thumbnail.Destroy ();
-          d.Thumbnail = null;
-        }
-        d.ParentDir.LastFileChange = DateTime.Now;
-        d.ParentDir.ReadyToDraw = false;
-        deletions.Add(d.FullName);
-      }
-    }
-    foreach (string k in deletions)
-      Cache.Remove(k);
-    LastChange = DateTime.Now;
-  } } }
-
-  public static void ClearTraversalCache ()
-  { lock (Cache) {
-    lock (TraversalCache) {
-      foreach (FSEntry d in Cache.Values) {
-        if (d.IsDirectory) {
-          d.Complete = false;
-          d.SubTreeCount = d.SubTreeSize = 0;
-        }
-      }
-      PruneCache (100);
-      TraversalCache.Clear ();
-    }
-  } }
 
   static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
 

@@ -396,6 +396,8 @@ public class Filezoo : DrawingArea
     PreDrawComplete = false;
   }
 
+  long lastTenframe = 0;
+
   /** ASYNC */
   void PreDrawCallback ()
   {
@@ -408,6 +410,10 @@ public class Filezoo : DrawingArea
           if (clearTraversal) {
             clearTraversal = false;
             FSCache.ClearTraversalCache ();
+          }
+          if (FSDraw.frame % 10 > lastTenframe) {
+            lastTenframe = FSDraw.frame % 10;
+            FSCache.PruneCache (100);
           }
           FSCache.CancelThumbnailing ();
           using (Context cr = new Context (PreDrawSurface)) {

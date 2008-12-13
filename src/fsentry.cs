@@ -77,6 +77,7 @@ public class FSEntry
 
   public FSEntry (UnixFileSystemInfo u)
   {
+    LastDraw = FSDraw.frame;
     Setup(u);
   }
 
