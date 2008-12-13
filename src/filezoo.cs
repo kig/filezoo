@@ -164,7 +164,6 @@ public class Filezoo : DrawingArea
       string type = e.SelectionData.Type.Name;
       Console.WriteLine(type);
       Gdk.DragAction action = e.Context.SuggestedAction;
-      Console.WriteLine();
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
       if (type == "application/x-color") {
         /** DESCTRUCTIVE */
@@ -192,7 +191,11 @@ public class Filezoo : DrawingArea
       }
     };
 
-    Gtk.Drag.DestSet (this, DestDefaults.All, target_table, Gdk.DragAction.Move|Gdk.DragAction.Copy|Gdk.DragAction.Ask);
+    Gtk.Drag.DestSet (this, DestDefaults.All, target_table,
+        Gdk.DragAction.Move
+      | Gdk.DragAction.Copy
+      | Gdk.DragAction.Ask
+    );
 
     AddEvents((int)(
         Gdk.EventMask.ButtonPressMask

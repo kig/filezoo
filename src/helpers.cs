@@ -326,73 +326,87 @@ public static class Helpers {
   /** DESCTRUCTIVE, ASYNC */
   public static void CopyURI (string src, string dst)
   {
-    Console.WriteLine ("Copy {0} to {1}", src, dst);
-    Gnome.Vfs.Vfs.Initialize ();
-    Gnome.Vfs.Xfer.XferUri (
-      new Gnome.Vfs.Uri(src), new Gnome.Vfs.Uri(dst),
-      Gnome.Vfs.XferOptions.Recursive,
-      Gnome.Vfs.XferErrorMode.Query,
-      Gnome.Vfs.XferOverwriteMode.Query,
-      ConsoleURIProgressCallback
-    );
+    CopyURIs (new string[] {src}, new string[] {dst});
   }
 
   /** DESCTRUCTIVE, ASYNC */
   public static void MoveURI (string src, string dst)
   {
-    Console.WriteLine ("Move {0} to {1}", src, dst);
-    Gnome.Vfs.Vfs.Initialize ();
-    Gnome.Vfs.Xfer.XferUri (
-      new Gnome.Vfs.Uri(src), new Gnome.Vfs.Uri(dst),
-      Gnome.Vfs.XferOptions.Recursive | Gnome.Vfs.XferOptions.Removesource,
-      Gnome.Vfs.XferErrorMode.Query,
-      Gnome.Vfs.XferOverwriteMode.Query,
-      ConsoleURIProgressCallback
-    );
+    MoveURIs (new string[] {src}, new string[] {dst});
   }
 
   /** DESCTRUCTIVE, ASYNC */
   public static void CopyURIs (string[] src, string dst)
   {
     Console.WriteLine ("Copy {0} to {1}", String.Join(", ", src), dst);
-    Gnome.Vfs.Vfs.Initialize ();
-    Gnome.Vfs.Uri[] sources = new Gnome.Vfs.Uri[src.Length];
-    Gnome.Vfs.Uri[] targets = new Gnome.Vfs.Uri[src.Length];
-    for (int i=0; i<src.Length; i++) {
-      sources[i] = new Gnome.Vfs.Uri(src[i]);
-      targets[i] = new Gnome.Vfs.Uri(dst + DirSepS + Basename(src[i]));
-    }
-    Gnome.Vfs.Xfer.XferUriList (
-      sources, targets,
-      Gnome.Vfs.XferOptions.Recursive,
-      Gnome.Vfs.XferErrorMode.Query,
-      Gnome.Vfs.XferOverwriteMode.Query,
-      ConsoleURIProgressCallback
-    );
+    CopyURIs (src, ExpandDsts(src, dst));
+  }
+  public static void CopyURIs (string[] src, string[] dst)
+  {
+    CopyURIs (StringsToUris(src), StringsToUris(dst));
+  }
+  public static void CopyURIs (Gnome.Vfs.Uri[] sources, Gnome.Vfs.Uri[] targets)
+  {
+    XferURIs (sources, targets, false);
   }
 
   /** DESCTRUCTIVE, ASYNC */
   public static void MoveURIs (string[] src, string dst)
   {
     Console.WriteLine ("Move {0} to {1}", String.Join(", ", src), dst);
+    MoveURIs (src, ExpandDsts(src, dst));
+  }
+  public static void MoveURIs (string[] src, string[] dst)
+  {
+    MoveURIs (StringsToUris(src), StringsToUris(dst));
+  }
+  public static void MoveURIs (Gnome.Vfs.Uri[] sources, Gnome.Vfs.Uri[] targets)
+  {
+    XferURIs (sources, targets, true);
+  }
+
+  /** FAST */
+  public static Gnome.Vfs.Uri[] StringsToUris (string[] src)
+  {
     Gnome.Vfs.Vfs.Initialize ();
-    Gnome.Vfs.Uri[] sources = new Gnome.Vfs.Uri[src.Length];
-    Gnome.Vfs.Uri[] targets = new Gnome.Vfs.Uri[src.Length];
-    for (int i=0; i<src.Length; i++) {
-      sources[i] = new Gnome.Vfs.Uri(src[i]);
-      targets[i] = new Gnome.Vfs.Uri(dst + DirSepS + Basename(src[i]));
-    }
+    Gnome.Vfs.Uri[] uris = new Gnome.Vfs.Uri[src.Length];
+    for (int i=0; i<src.Length; i++)
+      uris[i] = new Gnome.Vfs.Uri(src[i]);
+    return uris;
+  }
+
+  /** FAST */
+  public static string[] ExpandDsts (string[] src, string dst)
+  {
+    string[] dsts = new string[src.Length];
+    for (int i=0; i<src.Length; i++)
+      dsts[i] = dst + DirSepS + Basename(src[i]);
+    return dsts;
+  }
+
+  /** DESCTRUCTIVE, ASYNC */
+  public static void XferURIs
+  (Gnome.Vfs.Uri[] sources, Gnome.Vfs.Uri[] targets, bool removeSources)
+  {
+    XferURIs(sources, targets, removeSources, ConsoleXferProgressCallback);
+  }
+  public static void XferURIs
+  (Gnome.Vfs.Uri[] sources, Gnome.Vfs.Uri[] targets, bool removeSources,
+   Gnome.Vfs.XferProgressCallback callback)
+  {
+    Gnome.Vfs.Vfs.Initialize ();
+    Gnome.Vfs.XferOptions mode = Gnome.Vfs.XferOptions.Recursive;
+    if (removeSources) mode = mode | Gnome.Vfs.XferOptions.Removesource;
     Gnome.Vfs.Xfer.XferUriList (
-      sources, targets,
-      Gnome.Vfs.XferOptions.Recursive | Gnome.Vfs.XferOptions.Removesource,
+      sources, targets, mode,
       Gnome.Vfs.XferErrorMode.Query,
-      Gnome.Vfs.XferOverwriteMode.Query,
-      ConsoleURIProgressCallback
+      Gnome.Vfs.XferOverwriteMode.Replace,
+      callback
     );
   }
 
   /** BLOCKING */
-  private static int ConsoleURIProgressCallback (Gnome.Vfs.XferProgressInfo info)
+  public static int ConsoleXferProgressCallback (Gnome.Vfs.XferProgressInfo info)
   {
     switch (info.Status) {
       case Gnome.Vfs.XferProgressStatus.Vfserror:
