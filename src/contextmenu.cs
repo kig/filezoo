@@ -32,7 +32,7 @@ public class FilezooContextMenu : Menu {
 
   string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
   string[] amarokSuffixes = {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
-  string[] mplayerSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov"};
+  string[] mplayerSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
   string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
