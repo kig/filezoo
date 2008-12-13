@@ -57,6 +57,12 @@ public class FilezooContextMenu : Menu {
         ShowCreateDialog (targetPath); });
       menu.Append (create);
 
+      /** DESTRUCTIVE */
+      MenuItem created = new MenuItem ("Create _directory…");
+      created.Activated += new EventHandler(delegate {
+        ShowCreateDirDialog (targetPath); });
+      menu.Append (created);
+
       UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
       if (u.GetEntries(@"^\.git$").Length > 0) {
         MenuItem gitk = new MenuItem ("Gitk");
@@ -229,4 +235,15 @@ public class FilezooContextMenu : Menu {
       }));
   }
 
+  void ShowCreateDirDialog (string path)
+  {
+    Helpers.TextPrompt (
+      "Create directory", "Create directory",
+      path + Helpers.DirSepS + "new_directory", "Create",
+      0, path.Length+Helpers.DirSepS.Length, -1,
+      new Helpers.TextPromptHandler(delegate (string newPath) {
+        Helpers.MkdirP (newPath);
+        FSCache.Invalidate (newPath);
+      }));
+  }
 }

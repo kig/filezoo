@@ -58,6 +58,12 @@ public static class FilezooApp {
 
     p.Time ("Created Filezoo");
 
+    byte r, g, b;
+    r = (byte)(fz.Renderer.BackgroundColor.R * 255);
+    g = (byte)(fz.Renderer.BackgroundColor.G * 255);
+    b = (byte)(fz.Renderer.BackgroundColor.B * 255);
+    fz.ModifyBg (StateType.Normal, new Gdk.Color(r,g,b));
+
     if (panelMode) {
       win = new FilezooPanel (fz);
       if (panelBg.Length > 0) {
@@ -76,10 +82,6 @@ public static class FilezooApp {
       vbox.PackStart (fz, true, true, 0);
       vbox.PackEnd (controls, false, false, 0);
       win.Add (vbox);
-      byte r, g, b;
-      r = (byte)(fz.Renderer.BackgroundColor.R * 255);
-      g = (byte)(fz.Renderer.BackgroundColor.G * 255);
-      b = (byte)(fz.Renderer.BackgroundColor.B * 255);
       win.ModifyBg (StateType.Normal, new Gdk.Color(r,g,b));
     }
 

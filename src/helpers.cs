@@ -308,7 +308,7 @@ public static class Helpers {
     }
   }
 
-  /** DESCTRUCTIVE, BLOCKING */
+  /** DESTRUCTIVE, BLOCKING */
   public static void Copy (string src, string dst)
   {
     try {
@@ -319,23 +319,51 @@ public static class Helpers {
   /** DESTRUCTIVE, BLOCKING */
   public static void Touch (string path)
   {
+    MkdirP (Dirname(path));
     Process p = Process.Start("touch", EscapePath(path));
     p.WaitForExit ();
   }
 
-  /** DESCTRUCTIVE, ASYNC */
+  /** DESTRUCTIVE, BLOCKING */
+  public static void MkdirP (string path)
+  {
+    Process p = Process.Start("mkdir", "-p "+EscapePath(path));
+    p.WaitForExit ();
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
+  public static void NewFileWith (string path, byte[] data)
+  {
+    if (FileExists(path)) Trash(path);
+    File.WriteAllBytes (path, data);
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
+  public static void ReplaceFileWith (string path, byte[] data)
+  {
+    if (FileExists(path)) Trash(path);
+    File.WriteAllBytes (path, data);
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
+  public static void AppendToFile (string path, byte[] data)
+  {
+    File.AppendAllText (path, BytesToASCII(data));
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
   public static void CopyURI (string src, string dst)
   {
     CopyURIs (new string[] {src}, new string[] {dst});
   }
 
-  /** DESCTRUCTIVE, ASYNC */
+  /** DESTRUCTIVE, BLOCKING */
   public static void MoveURI (string src, string dst)
   {
     MoveURIs (new string[] {src}, new string[] {dst});
   }
 
-  /** DESCTRUCTIVE, ASYNC */
+  /** DESTRUCTIVE, BLOCKING */
   public static void CopyURIs (string[] src, string dst)
   {
     Console.WriteLine ("Copy {0} to {1}", String.Join(", ", src), dst);
@@ -350,7 +378,7 @@ public static class Helpers {
     XferURIs (sources, targets, false);
   }
 
-  /** DESCTRUCTIVE, ASYNC */
+  /** DESTRUCTIVE, BLOCKING */
   public static void MoveURIs (string[] src, string dst)
   {
     Console.WriteLine ("Move {0} to {1}", String.Join(", ", src), dst);
@@ -384,7 +412,7 @@ public static class Helpers {
     return dsts;
   }
 
-  /** DESCTRUCTIVE, ASYNC */
+  /** DESTRUCTIVE, ASYNC */
   public static void XferURIs
   (Gnome.Vfs.Uri[] sources, Gnome.Vfs.Uri[] targets, bool removeSources)
   {
@@ -823,6 +851,10 @@ public static class Helpers {
     return l.ToArray();
   }
 
+  public static string BytesToASCII (byte[] b)
+  {
+    return new System.Text.ASCIIEncoding().GetString(b);
+  }
 
   /* Gtk helpers */
 

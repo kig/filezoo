@@ -162,7 +162,6 @@ public class Filezoo : DrawingArea
     /** DESCTRUCTIVE */
     DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
       string type = e.SelectionData.Type.Name;
-      Console.WriteLine(type);
       Gdk.DragAction action = e.Context.SuggestedAction;
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
       if (type == "application/x-color") {
@@ -170,21 +169,19 @@ public class Filezoo : DrawingArea
         Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(e.SelectionData.Data));
       } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(e.SelectionData.Text))) {
         /** DESCTRUCTIVE */
-        string data = new System.Text.ASCIIEncoding().GetString(e.SelectionData.Data);
+        string data = Helpers.BytesToASCII(e.SelectionData.Data);
         string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
         if (action == Gdk.DragAction.Move) {
-          targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
-          Helpers.MoveURIs(uris, targetPath);
+          moveUris(uris, targetPath);
         } else if (action == Gdk.DragAction.Copy) {
-          targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
-          Helpers.CopyURIs(uris, targetPath);
+          copyUris(uris, targetPath);
         } else if (action == Gdk.DragAction.Ask) {
           DragURIMenu(uris, targetPath);
         }
       } else {
         /** DESCTRUCTIVE */
         if (Helpers.IsDir(targetPath)) {
-          CreateFileDialog(targetPath, e.SelectionData.Data);
+          DragDataToCreateFileMenu(targetPath, e.SelectionData.Data);
         } else {
           DragDataToFileMenu(targetPath, e.SelectionData.Data);
         }
@@ -213,18 +210,76 @@ public class Filezoo : DrawingArea
 
   }
 
-  void DragURIMenu (string[] sources, string target)
+  /** DESCTRUCTIVE, BLOCKING */
+  void moveUris (string[] uris, string targetPath)
   {
-    Console.WriteLine ("Would ask about dragging {0} to {1}", String.Join(", ", sources), target);
-  }
-  void CreateFileDialog (string target, byte[] data)
-  {
-    Console.WriteLine ("Would ask about creating a file in {0} with\n{1}", target, data);
+    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+    Helpers.MoveURIs(uris, targetPath);
   }
 
-  void DragDataToFileMenu (string target, byte[] data)
+  /** DESCTRUCTIVE, BLOCKING */
+  void copyUris (string[] uris, string targetPath)
   {
-    Console.WriteLine ("Would ask about appending {0} with\n{1}", target, data);
+    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+    Helpers.CopyURIs(uris, targetPath);
+  }
+
+  void DragURIMenu (string[] sources, string target)
+  {
+    Menu menu = new Menu();
+    MenuItem move = new MenuItem("_Move");
+    MenuItem copy = new MenuItem("_Copy");
+    move.Activated += delegate { moveUris (sources, target); };
+    copy.Activated += delegate { copyUris (sources, target); };
+    menu.Append (move);
+    menu.Append (copy);
+    menu.ShowAll ();
+    menu.Popup ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void DragDataToCreateFileMenu (string target, byte[] data)
+  {
+    Menu menu = new Menu();
+    MenuItem newfile = new MenuItem("_Create file from dragged data");
+    newfile.Activated += delegate {
+      Helpers.TextPrompt ("Create file", "Filename for dragged data",
+        target + Helpers.DirSepS + "new_file", "Create",
+        target.Length+1, target.Length+1, -1,
+        delegate (string filename) {
+          Helpers.NewFileWith(filename, data);
+        });
+    };
+    menu.Append (newfile);
+    menu.ShowAll ();
+    menu.Popup ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void DragDataToFileMenu (string targetFile, byte[] data)
+  {
+    Menu menu = new Menu();
+    MenuItem newfile = new MenuItem("_Create file from dragged data");
+    string target = Helpers.Dirname(targetFile);
+    newfile.Activated += delegate {
+      Helpers.TextPrompt ("Create file", "Filename for dragged data",
+        target + Helpers.DirSepS + "new_file", "Create",
+        target.Length+1, target.Length+1, -1,
+        delegate (string filename) {
+          Helpers.NewFileWith(filename, data);
+        });
+    };
+    MenuItem replace = new MenuItem(String.Format("_Replace contents of {0}", Helpers.Basename(targetFile)));
+    replace.Activated += delegate { Helpers.ReplaceFileWith(targetFile, data); };
+    MenuItem append = new MenuItem(String.Format("_Append to {0}", Helpers.Basename(targetFile)));
+    append.Activated += delegate { Helpers.AppendToFile(targetFile, data); };
+
+    menu.Append (newfile);
+    menu.Append (new SeparatorMenuItem ());
+    menu.Append (replace);
+    menu.Append (append);
+    menu.ShowAll ();
+    menu.Popup ();
   }
 
   public void CompleteInit ()
