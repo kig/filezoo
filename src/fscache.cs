@@ -97,6 +97,8 @@ public static class FSCache
   static PriorityQueue ThumbnailQueue = new PriorityQueue ();
   static Dictionary<string,FSEntry> ThumbnailCache = new Dictionary<string,FSEntry> ();
 
+  static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
+
 
   /** BLOCKING */
   public static void Watch (string path)
@@ -331,7 +333,7 @@ public static class FSCache
           d.SubTreeCount = d.SubTreeSize = 0;
         }
       }
-      TraversalCache = new Dictionary<string,TraversalInfo> ();
+      TraversalCache.Clear ();
     }
   } }
 
@@ -659,8 +661,6 @@ public static class FSCache
     }
   }
 
-  static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
-
   struct TraversalInfo {
     public Int64 size;
     public Int64 count;
@@ -698,11 +698,13 @@ public static class FSCache
         if (ThumbnailCache.Count > 4000) {
           FSEntry oldest = f;
           foreach (FSEntry e in ThumbnailCache.Values) {
-            if (e.LastDraw < f.LastDraw) oldest = e;
+            if (e.LastDraw < oldest.LastDraw) oldest = e;
           }
-          DestroyThumbnail(oldest);
-          deletecount++;
-          checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
+          if (oldest.LastDraw != FSDraw.frame) {
+            DestroyThumbnail(oldest);
+            deletecount++;
+            checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
+          }
         }
         if (checkForOld && ThumbnailCache.Count > 2000) {
           List<FSEntry> old = new List<FSEntry> ();

@@ -484,6 +484,7 @@ public class FSDraw
       } else {
         cr.Save ();
           cr.Scale (1, h);
+          d.LastDraw = FSDraw.frame;
           RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);
           if (d.IsDirectory) {
             bool childrenVisible = cr.Matrix.Yy > 2;

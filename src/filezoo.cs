@@ -358,12 +358,11 @@ public class Filezoo : DrawingArea
 
     FSCache.CancelTraversal ();
 
-    FSCache.FilePass (CurrentDirPath);
     CurrentDirEntry = FSCache.Get (CurrentDirPath);
     FSCache.Watch (CurrentDirPath);
 
     ResetZoom ();
-    PreDraw ();
+    UpdateLayout ();
     p.Time("SetCurrentDir");
   }
 
@@ -411,10 +410,13 @@ public class Filezoo : DrawingArea
             clearTraversal = false;
             FSCache.ClearTraversalCache ();
           }
+          FSCache.PruneCache (10);
+          /*
           if (FSDraw.frame % 10 > lastTenframe) {
             lastTenframe = FSDraw.frame % 10;
             FSCache.PruneCache (100);
           }
+          */
           FSCache.CancelThumbnailing ();
           using (Context cr = new Context (PreDrawSurface)) {
             cr.IdentityMatrix ();
