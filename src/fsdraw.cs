@@ -58,6 +58,13 @@ public class FSDraw
 
   public static Int64 frame = 0;
 
+  /* Constructor */
+
+  public FSDraw ()
+  {
+  }
+
+
   /* Subtitles */
 
   /** FAST */
@@ -211,11 +218,15 @@ public class FSDraw
     @returns The number of files instances drawn.
   */
   public uint Draw
-  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target) {
-    return Draw (d, prefixes, cr, target, 0);
+  (FSEntry d,
+    Dictionary<string, string> prefixes,
+    Dictionary<string, bool> selection,
+    Context cr, Rectangle target) {
+    return Draw (d, prefixes, selection, cr, target, 0);
   }
   public uint Draw
-  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
+  (FSEntry d, Dictionary<string, string> prefixes,
+   Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
   {
     d.LastDraw = frame;
     if (depth == 0) {
@@ -231,7 +242,7 @@ public class FSDraw
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
-      double rBoxWidth = BoxWidth / target.Height;
+      double rBoxWidth = BoxWidth / target.Height; // to keep pixel boxwidth the same
       Color bg = new Color (0,0,0,1);
       bg.A = 0.3;
       cr.Color = bg;
@@ -288,7 +299,19 @@ public class FSDraw
         bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
         if (shouldDrawChildren && (d.ReadyToDraw || depth == 0)) {
-          c += DrawChildren(d, prefixes, cr, target, depth);
+          c += DrawChildren(d, prefixes, selection ,cr, target, depth);
+        }
+      }
+      if (selection.ContainsKey(d.FullName)) {
+        using (LinearGradient g = new LinearGradient (0.0, 0.0, 1.0, 0.0)) {
+          Helpers.DrawRectangle (cr, 0.0, 0.02, 1.0, 0.96, target);
+          Color co2 = RegularFileColor;
+          co2.A = 0.1;
+          g.AddColorStop (0, co2);
+          co2.A = 0.7;
+          g.AddColorStop (1, co2);
+          cr.Pattern = g;
+          cr.Fill ();
         }
       }
     cr.Restore ();
@@ -437,14 +460,15 @@ public class FSDraw
     @returns The total amount of subtree files drawn.
     */
   uint DrawChildren
-  (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
+  (FSEntry d, Dictionary<string, string> prefixes,
+   Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
   {
     cr.Save ();
       ChildTransform (d, cr, target);
       uint c = 0;
       foreach (FSEntry child in d.Entries) {
         double h = GetScaledHeight(child);
-        c += Draw (child, prefixes, cr, target, depth+1);
+        c += Draw (child, prefixes, selection, cr, target, depth+1);
         cr.Translate (0.0, h);
       }
     cr.Restore ();

@@ -148,9 +148,12 @@ public class Filezoo : DrawingArea
     new TargetEntry ("STRING", 0, 2)
   };
 
+  Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
+
   /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
   {
+    Selection = new Dictionary<string, bool> ();
     Renderer = new FSDraw ();
 
     SortField = SortFields[0];
@@ -395,7 +398,7 @@ public class Filezoo : DrawingArea
     PreDrawComplete = false;
   }
 
-  long lastTenframe = 0;
+//   long lastTenframe = 0;
 
   /** ASYNC */
   void PreDrawCallback ()
@@ -539,7 +542,7 @@ public class Filezoo : DrawingArea
         if (CurrentDirEntry.InProgress) LastProgress = t;
         double opacity = Math.Min(3, t-FirstProgress) - Math.Max(0, t-LastProgress);
         t = (t * 0.1) % Math.PI*2;
-        Color c = Renderer.UnfinishedDirectoryColor;
+        Color c = Renderer.RegularFileColor;
         c.A = 0.1*opacity;
         cr.Color = c;
         cr.LineWidth = 1;
@@ -596,7 +599,7 @@ public class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Renderer.FileNameFontFamily = FileNameFontFamily;
       Renderer.FileInfoFontFamily = FileInfoFontFamily;
-      c = Renderer.Draw(CurrentDirEntry, Prefixes, cr, targetBox);
+      c = Renderer.Draw(CurrentDirEntry, Prefixes, Selection, cr, targetBox);
     cr.Restore ();
     p.Time (String.Format("DrawCurrentDir: {0} entries", c));
   }
@@ -693,6 +696,32 @@ public class Filezoo : DrawingArea
     cr.Restore ();
   }
 
+  FSEntry spanStart = null;
+  FSEntry spanEnd = null;
+
+  void ToggleSpan (FSEntry start, FSEntry end)
+  {
+    if (start.ParentDir == end.ParentDir) {
+      FSEntry[] entries = end.ParentDir.Entries.ToArray ();
+      int startIdx = Array.IndexOf(entries, start);
+      int endIdx = Array.IndexOf(entries, end);
+      if (startIdx > -1 && endIdx > -1) {
+        int i = Math.Min (startIdx, endIdx);
+        int j = Math.Max (startIdx, endIdx);
+        for (;i<=j;i++) {
+          if (i != startIdx)
+            ToggleSelection(entries[i].FullName);
+        }
+      }
+    }
+  }
+
+  public void ToggleSelection (string path)
+  {
+    if (Selection.ContainsKey(path)) Selection.Remove(path);
+    else Selection[path] = true;
+  }
+
   /** BLOCKING */
   void ClickCurrentDir (Context cr, uint width, uint height, double x, double y)
   {
@@ -701,24 +730,46 @@ public class Filezoo : DrawingArea
     cr.Translate (0.0, Zoomer.Y);
     List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
     foreach (ClickHit c in hits) {
-      if (c.Height < 16) {
-        double nz = (c.Target.IsDirectory ? 20 : 18) / c.Height;
-        // Console.WriteLine("ZoomIn {0}x", nz);
-        cr.Save ();
-          cr.IdentityMatrix ();
-          ZoomBy(cr, width, height, x, y, nz);
-        cr.Restore ();
+      if (c.Height < 17.9) {
+        if (c.Target.ParentDir == CurrentDirEntry) {
+          double nz = (c.Target.IsDirectory ? 24 : 18) / c.Height;
+          // Console.WriteLine("ZoomIn {0}x", nz);
+          cr.Save ();
+            cr.IdentityMatrix ();
+            ZoomBy(cr, width, height, x, y, nz);
+          cr.Restore ();
+          break;
+        }
+      } else if (DoubleClick) {
         break;
       } else {
-        if (c.Target.IsDirectory) {
-          // Console.WriteLine("Navigate {0}", c.Target.FullName);
-          SetCurrentDir (c.Target.FullName);
-          ResetZoom ();
-          UpdateLayout ();
+        if (AltKeyDown) {
+          Selection.Clear ();
+        } else if (CtrlKeyDown) {
+          ToggleSelection(c.Target.FullName);
+          spanStart = c.Target;
+        } else if (ShiftKeyDown) {
+          if (spanStart != null) {
+            if (spanEnd != null) {
+              ToggleSpan(spanStart, spanEnd);
+            }
+            spanEnd = c.Target;
+            ToggleSpan(spanStart, spanEnd);
+          } else {
+            ToggleSelection(c.Target.FullName);
+            spanStart = c.Target;
+          }
         } else {
-          // Console.WriteLine("Open {0}", c.Target.FullName);
-          Helpers.OpenFile(c.Target.FullName);
+          Selection.Clear ();
+          if (c.Target.IsDirectory) {
+            // Console.WriteLine("Navigate {0}", c.Target.FullName);
+            SetCurrentDir (c.Target.FullName);
+          } else {
+            // Console.WriteLine("Open {0}", c.Target.FullName);
+            Helpers.OpenFile(c.Target.FullName);
+          }
         }
+        UpdateLayout ();
         break;
       }
     }
@@ -942,9 +993,16 @@ public class Filezoo : DrawingArea
       int w, h;
       e.Window.GetSize (out w, out h);
       ContextClick ((uint)w, (uint)h, e.X, e.Y);
+    } else if (e.Button == 1 && !dragging) {
+      DoubleClick = (e.Type == Gdk.EventType.TwoButtonPress);
     }
     return true;
   }
+
+  bool AltKeyDown = false;
+  bool CtrlKeyDown = false;
+  bool ShiftKeyDown = false;
+  bool DoubleClick = false;
 
   /** BLOCKING */
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
@@ -953,10 +1011,14 @@ public class Filezoo : DrawingArea
       InteractionProfiler.Restart ();
       int w, h;
       e.Window.GetSize (out w, out h);
+      AltKeyDown = (e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask;
+      CtrlKeyDown = (e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask;
+      ShiftKeyDown = (e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask;
       using (Context scr = new Context (CachedSurface)) {
         scr.IdentityMatrix ();
         Click (scr, (uint)w, (uint)h, e.X, e.Y);
       }
+      DoubleClick = false;
     }
     dragging = false;
     return true;
