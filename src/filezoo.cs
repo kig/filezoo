@@ -164,31 +164,8 @@ public class Filezoo : DrawingArea
 
     /** DESCTRUCTIVE */
     DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
-      string type = e.SelectionData.Type.Name;
-      Gdk.DragAction action = e.Context.SuggestedAction;
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
-      if (type == "application/x-color") {
-        /** DESCTRUCTIVE */
-        Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(e.SelectionData.Data));
-      } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(e.SelectionData.Text))) {
-        /** DESCTRUCTIVE */
-        string data = Helpers.BytesToASCII(e.SelectionData.Data);
-        string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
-        if (action == Gdk.DragAction.Move) {
-          moveUris(uris, targetPath);
-        } else if (action == Gdk.DragAction.Copy) {
-          copyUris(uris, targetPath);
-        } else if (action == Gdk.DragAction.Ask) {
-          DragURIMenu(uris, targetPath);
-        }
-      } else {
-        /** DESCTRUCTIVE */
-        if (Helpers.IsDir(targetPath)) {
-          DragDataToCreateFileMenu(targetPath, e.SelectionData.Data);
-        } else {
-          DragDataToFileMenu(targetPath, e.SelectionData.Data);
-        }
-      }
+      HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
     };
 
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
@@ -221,11 +198,50 @@ public class Filezoo : DrawingArea
 
   }
 
+  public string GetSelectionData ()
+  {
+    List<string> paths = new List<string> ();
+    foreach(string p in Selection.Keys) paths.Add("file://"+p);
+    return String.Join("\r\n", paths.ToArray());
+  }
+
+  public void HandleSelectionData (SelectionData sd, Gdk.DragAction action, string targetPath)
+  {
+    string type = sd.Type.Name;
+    if (type == "application/x-color") {
+      /** DESCTRUCTIVE */
+      Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
+    } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(sd.Text))) {
+      /** DESCTRUCTIVE */
+      string data = Helpers.BytesToASCII(sd.Data);
+      string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
+      if (action == Gdk.DragAction.Move) {
+        moveUris(uris, targetPath);
+      } else if (action == Gdk.DragAction.Copy) {
+        copyUris(uris, targetPath);
+      } else if (action == Gdk.DragAction.Ask) {
+        DragURIMenu(uris, targetPath);
+      }
+    } else {
+      /** DESCTRUCTIVE */
+      if (Helpers.IsDir(targetPath)) {
+        DragDataToCreateFileMenu(targetPath, sd.Data);
+      } else {
+        DragDataToFileMenu(targetPath, sd.Data);
+      }
+    }
+  }
+
   /** DESCTRUCTIVE, BLOCKING */
   void moveUris (string[] uris, string targetPath)
   {
     targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
     Helpers.MoveURIs(uris, targetPath);
+    foreach (string u in uris) {
+      if (u.StartsWith ("/")) FSCache.Invalidate (u);
+      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
+    }
+    FSCache.Invalidate (targetPath);
   }
 
   /** DESCTRUCTIVE, BLOCKING */
@@ -233,6 +249,11 @@ public class Filezoo : DrawingArea
   {
     targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
     Helpers.CopyURIs(uris, targetPath);
+    foreach (string u in uris) {
+      if (u.StartsWith ("/")) FSCache.Invalidate (u);
+      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
+    }
+    FSCache.Invalidate (targetPath);
   }
 
   void DragURIMenu (string[] sources, string target)

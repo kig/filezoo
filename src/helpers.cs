@@ -897,15 +897,24 @@ public static class Helpers {
 
   public static void PrintDragData (DragDataReceivedArgs e) {
     Console.WriteLine("SuggestedAction: {0}, X:{1} Y:{2}", e.Context.SuggestedAction, e.X, e.Y);
-    Console.WriteLine("Data: {0}", BitConverter.ToString(e.SelectionData.Data));
-    Console.WriteLine("Format: {0}", e.SelectionData.Format);
-    Console.WriteLine("Length: {0}", e.SelectionData.Length);
-    Console.WriteLine("Pixbuf: {0}", e.SelectionData.Pixbuf);
-    Console.WriteLine("Selection: {0}", e.SelectionData.Selection.Name);
-    Console.WriteLine("Target: {0}", e.SelectionData.Target.Name);
-    Console.WriteLine("Text: {0}", e.SelectionData.Text);
-    Console.WriteLine("Type: {0}", e.SelectionData.Type.Name);
-    Console.WriteLine("Uris: {0}", e.SelectionData.Uris);
+    PrintSelectionData(e.SelectionData);
+  }
+
+  public static void PrintSelectionData (SelectionData sd) {
+    Console.WriteLine ();
+    Console.WriteLine("Selection: {0}", sd.Selection.Name);
+    Console.WriteLine("Target: {0}", sd.Target.Name);
+    string[] targets = new string[sd.Targets.Length];
+    for (int i=0; i<targets.Length; i++) targets[i] = sd.Targets[i].Name;
+    Console.WriteLine("Targets: {0}", String.Join(", ", targets));
+    Console.WriteLine("Format: {0}", sd.Format);
+    Console.WriteLine("Length: {0}", sd.Length);
+    if (sd.Length < 0) return;
+    Console.WriteLine("Data: {0}", BitConverter.ToString(sd.Data));
+    Console.WriteLine("Pixbuf: {0}", sd.Pixbuf);
+    Console.WriteLine("Text: {0}", sd.Text);
+    Console.WriteLine("Type: {0}", sd.Type.Name);
+    Console.WriteLine("Uris: {0}", sd.Uris);
   }
 
 }

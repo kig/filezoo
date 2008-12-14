@@ -25,8 +25,10 @@ using Mono.Unix;
 public class FilezooContextMenu : Menu {
 
   Filezoo App;
+  Clipboard clipboard;
 
   public FilezooContextMenu (Filezoo fz, ClickHit c) {
+    clipboard = Clipboard.Get(Gdk.Atom.Intern("CLIPBOARD", true));
     App = fz;
     Build (this, c);
   }
@@ -55,34 +57,26 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    MenuItem goTo = new MenuItem ("_Go to " + c.Target.Name);
-    goTo.Activated += new EventHandler(delegate {
-      App.SetCurrentDir (targetPath); });
-    menu.Append (goTo);
+    AddItem (menu, "_Go to " + c.Target.Name, delegate {
+      App.SetCurrentDir (targetPath);
+    });
 
-    MenuItem term = new MenuItem ("Open _terminal");
-    term.Activated += new EventHandler(delegate {
-      Helpers.OpenTerminal (targetPath); });
-    menu.Append (term);
+    AddItem (menu, "Open _terminal", delegate { Helpers.OpenTerminal (targetPath); });
 
     /** DESTRUCTIVE */
-    MenuItem create = new MenuItem ("Create _file…");
-    create.Activated += new EventHandler(delegate {
-      ShowCreateDialog (targetPath); });
-    menu.Append (create);
+    AddItem (menu, "Create _file…", delegate { ShowCreateDialog (targetPath); });
+
 
     /** DESTRUCTIVE */
-    MenuItem created = new MenuItem ("Create _directory…");
-    created.Activated += new EventHandler(delegate {
-      ShowCreateDirDialog (targetPath); });
-    menu.Append (created);
+    AddItem (menu, "Create _directory…", delegate {
+      ShowCreateDirDialog (targetPath);
+    });
 
     UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
     if (u.GetEntries(@"^\.git$").Length > 0) {
-      MenuItem gitk = new MenuItem ("Gitk");
-      gitk.Activated += new EventHandler(delegate {
-        Helpers.RunCommandInDir ("gitk", "", targetPath); });
-      menu.Append (gitk);
+      AddItem (menu, "Gitk", delegate {
+        Helpers.RunCommandInDir ("gitk", "", targetPath);
+      });
     }
 
     if (HasEntryWithSuffix(u, gqviewSuffixes)) {
@@ -92,9 +86,7 @@ public class FilezooContextMenu : Menu {
     Menu audioMenu = new Menu ();
     AddCommandItem(audioMenu, "Set as playlist", "amarok", "-p --load", targetPath);
     AddCommandItem(audioMenu, "Append to playlist", "amarok", "--append", targetPath);
-    MenuItem audioMenuItem = new MenuItem ("Audio");
-    audioMenuItem.Submenu = audioMenu;
-    menu.Append(audioMenuItem);
+    AddItem (menu, "Audio", audioMenu);
   }
 
   // File menu items
@@ -102,15 +94,13 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    MenuItem open = new MenuItem ("_Open " + c.Target.Name);
-    open.Activated += new EventHandler(delegate {
-      Helpers.OpenFile (targetPath); });
-    menu.Append (open);
+    AddItem (menu, "_Open " + c.Target.Name, delegate {
+      Helpers.OpenFile (targetPath);
+    });
 
-    MenuItem fterm = new MenuItem ("Open _terminal");
-    fterm.Activated += new EventHandler(delegate {
-      Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
-    menu.Append (fterm);
+    AddItem (menu, "Open _terminal", delegate {
+      Helpers.OpenTerminal (Helpers.Dirname(targetPath));
+    });
 
     if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
       AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
@@ -127,17 +117,13 @@ public class FilezooContextMenu : Menu {
 
     /** DESTRUCTIVE */
     if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
-      MenuItem ex = new MenuItem ("_Extract");
-      ex.Activated += new EventHandler(delegate {
-        Helpers.ExtractFile (targetPath); });
-      menu.Append (ex);
+      AddItem (menu, "_Extract", delegate { Helpers.ExtractFile (targetPath); });
     }
 
     if ((c.Target.Permissions & FileAccessPermissions.UserExecute) != 0) {
-      MenuItem runf = new MenuItem ("Run");
-      runf.Activated += new EventHandler(delegate {
-        Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath)); });
-      menu.Append (runf);
+      AddItem (menu, "Run", delegate {
+        Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath));
+      });
     }
   }
 
@@ -145,67 +131,121 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    menu.Append (new SeparatorMenuItem ());
+    BuildCopyPasteMenu (menu, c);
 
     /** DESTRUCTIVE */
-    MenuItem run = new MenuItem ("_Run command…");
-    run.Activated += new EventHandler(delegate {
+    AddItem (menu, "_Run command…", delegate {
       ShowRunDialog (targetPath);
     });
-    menu.Append (run);
+
 
     /** DESTRUCTIVE */
-    MenuItem copy = new MenuItem ("_Copy to…");
-    copy.Activated += new EventHandler(delegate {
+    AddItem (menu, "_Copy to…", delegate {
       ShowCopyDialog (targetPath);
     });
-    menu.Append (copy);
 
     /** DESTRUCTIVE */
-    MenuItem rename = new MenuItem ("Re_name…");
-    rename.Activated += new EventHandler(delegate {
+    AddItem (menu, "Re_name…", delegate {
       ShowRenameDialog (targetPath);
     });
-    menu.Append (rename);
 
     /** DESTRUCTIVE */
-    MenuItem trash = new MenuItem ("Move to trash");
-    trash.Activated += new EventHandler(delegate {
+    AddItem (menu, "Move to trash", delegate {
       Helpers.Trash(targetPath);
       FSCache.Invalidate (targetPath);
     });
-    menu.Append (trash);
   }
 
+  TargetEntry[] targets = new TargetEntry[] {
+    new TargetEntry ("text/uri-list", 0, 0),
+    new TargetEntry ("text/plain", 0, 2),
+    new TargetEntry ("STRING", 0, 2)
+  };
+
+  static bool cut = false;
+
+  void BuildCopyPasteMenu (Menu menu, ClickHit c)
+  {
+    string targetPath = c.Target.FullName;
+    string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
+
+    Separator (menu);
+    string items = "file://" + c.Target.FullName;
+    if (App.Selection.Count > 0) {
+      items = App.GetSelectionData ();
+    }
+
+    AddItem(menu, "Cut", delegate {
+      SetClipBoard(items);
+      cut = true;
+    });
+
+    AddItem(menu, "Copy", delegate {
+      SetClipBoard(items);
+      cut = false;
+    });
+
+    AddItem(menu, "Paste to "+Helpers.Basename(targetDir)+"/", delegate {
+      bool handled = false;
+      clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
+        if (data.Length > -1) {
+          handled = true;
+          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+          cut = false;
+        }
+      });
+      clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
+        if (data.Length > -1 && !handled) {
+          handled = true;
+          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+        }
+      });
+      clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
+        if (data.Length > -1 && !handled) {
+          handled = true;
+          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+        }
+      });
+    });
+    Separator (menu);
+  }
+
+  void SetClipBoard (string items)
+  {
+    clipboard.SetWithData(targets,
+      delegate (Clipboard cb, SelectionData data, uint info) {
+        data.Set(data.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
+        data.Text = items;
+      },
+      delegate (Clipboard cb) {
+        cut = false;
+      }
+    );
+  }
 
   void BuildSelectionMenu (Menu menu, ClickHit c)
   {
-    MenuItem deselect = new MenuItem ("_Clear selection");
-    deselect.Activated += new EventHandler(delegate {
-      App.ClearSelection ();
-    });
-    menu.Append (deselect);
+    AddItem (menu, "Clear selection", delegate { App.ClearSelection (); });
+
+    BuildCopyPasteMenu (menu, c);
 
     string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
     /** DESTRUCTIVE */
-    MenuItem move = new MenuItem (String.Format("_Move selected to {0}", Helpers.Basename(targetDir)));
-    move.Activated += new EventHandler(delegate {
-      Helpers.MoveURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
-      App.ClearSelection ();
+    AddItem (menu, String.Format("_Move selected to {0}/", Helpers.Basename(targetDir)),
+      delegate {
+        Helpers.MoveURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
+        App.ClearSelection ();
     });
-    menu.Append (move);
 
     /** DESTRUCTIVE */
-    MenuItem copy = new MenuItem (String.Format("_Copy selected to {0}", Helpers.Basename(targetDir)));
-    copy.Activated += new EventHandler(delegate {
-      Helpers.CopyURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
+    AddItem (menu, String.Format("_Copy selected to {0}/", Helpers.Basename(targetDir)),
+      delegate {
+        Helpers.CopyURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
     });
-    menu.Append (copy);
 
     /** DESTRUCTIVE */
-    MenuItem trash = new MenuItem ("Move selection to trash");
-    trash.Activated += new EventHandler(delegate {
+    AddItem (menu, "Move selected to trash", delegate {
       foreach (string path in (new List<string>(App.Selection.Keys))) {
         Helpers.Trash(path);
         App.ToggleSelection (path);
@@ -213,20 +253,47 @@ public class FilezooContextMenu : Menu {
       }
       App.ClearSelection ();
     });
-    menu.Append (trash);
   }
 
 
-  void AddCommandItem (Menu menu, string title, string cmd, string args, string path)
+  /* GTK Menu helpers */
+
+  public static void Separator (Menu menu)
+  {
+    menu.Append (new SeparatorMenuItem());
+  }
+
+  public static MenuItem MkItem (string title, EventHandler onActivate)
   {
     MenuItem m = new MenuItem (title);
-    m.Activated += new EventHandler(delegate {
-      Helpers.RunCommandInDir (cmd, args + " " + Helpers.EscapePath(path), Helpers.Dirname(path));
-    });
-    menu.Append (m);
+    m.Activated += onActivate;
+    return m;
   }
 
-  bool HasEntryWithSuffix (UnixDirectoryInfo u, string[] suffixes)
+  public static MenuItem MkItem (string title, Menu subMenu)
+  {
+    MenuItem m = new MenuItem (title);
+    m.Submenu = subMenu;
+    return m;
+  }
+
+  public static void AddItem (Menu menu, string title, EventHandler onActivate)
+  { menu.Append(MkItem(title, onActivate)); }
+
+  public static void AddItem (Menu menu, string title, Menu subMenu)
+  { menu.Append(MkItem(title, subMenu)); }
+
+  public static void AddCommandItem (Menu menu, string title, string cmd, string args, string path)
+  {
+    AddItem(menu, title, delegate {
+      Helpers.RunCommandInDir (cmd, args + " " + Helpers.EscapePath(path), Helpers.Dirname(path));
+    });
+  }
+
+
+  /* Filesystem helpers */
+
+  public static bool HasEntryWithSuffix (UnixDirectoryInfo u, string[] suffixes)
   {
     foreach (UnixFileSystemInfo f in Helpers.EntriesMaybe(u))
       if (Array.IndexOf(suffixes, Helpers.Extname(f.FullName).ToLower ()) > -1)
@@ -234,7 +301,10 @@ public class FilezooContextMenu : Menu {
     return false;
   }
 
-  void ShowRenameDialog (string path)
+
+  /* GTK dialog helpers */
+
+  public void ShowRenameDialog (string path)
   {
     string basename = Helpers.Basename(path);
     Helpers.TextPrompt (
@@ -254,7 +324,7 @@ public class FilezooContextMenu : Menu {
     );
   }
 
-  void ShowCopyDialog (string path)
+  public static void ShowCopyDialog (string path)
   {
     string basename = Helpers.Basename(path);
     Helpers.TextPrompt (
@@ -270,7 +340,7 @@ public class FilezooContextMenu : Menu {
     );
   }
 
-  void ShowRunDialog (string path)
+  public static void ShowRunDialog (string path)
   {
     Helpers.TextPrompt (
       "Run command", "Enter command to run",
@@ -282,7 +352,7 @@ public class FilezooContextMenu : Menu {
     );
   }
 
-  void ShowCreateDialog (string path)
+  public static void ShowCreateDialog (string path)
   {
     Helpers.TextPrompt (
       "Create file", "Create file",
@@ -294,7 +364,7 @@ public class FilezooContextMenu : Menu {
       }));
   }
 
-  void ShowCreateDirDialog (string path)
+  public static void ShowCreateDirDialog (string path)
   {
     Helpers.TextPrompt (
       "Create directory", "Create directory",
