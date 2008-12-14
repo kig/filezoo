@@ -17,6 +17,7 @@
 */
 
 using System.Diagnostics;
+using System.Collections.Generic;
 using System;
 using Gtk;
 using Mono.Unix;
@@ -36,95 +37,113 @@ public class FilezooContextMenu : Menu {
   string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
-    menu.Title = c.Target.FullName;
-    string targetPath = c.Target.FullName;
-    if (c.Target.IsDirectory) {
-    // Directory menu items
-
-      MenuItem goTo = new MenuItem ("_Go to " + c.Target.Name);
-      goTo.Activated += new EventHandler(delegate {
-        App.SetCurrentDir (targetPath); });
-      menu.Append (goTo);
-
-      MenuItem term = new MenuItem ("Open _terminal");
-      term.Activated += new EventHandler(delegate {
-        Helpers.OpenTerminal (targetPath); });
-      menu.Append (term);
-
-      /** DESTRUCTIVE */
-      MenuItem create = new MenuItem ("Create _file…");
-      create.Activated += new EventHandler(delegate {
-        ShowCreateDialog (targetPath); });
-      menu.Append (create);
-
-      /** DESTRUCTIVE */
-      MenuItem created = new MenuItem ("Create _directory…");
-      created.Activated += new EventHandler(delegate {
-        ShowCreateDirDialog (targetPath); });
-      menu.Append (created);
-
-      UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
-      if (u.GetEntries(@"^\.git$").Length > 0) {
-        MenuItem gitk = new MenuItem ("Gitk");
-        gitk.Activated += new EventHandler(delegate {
-          Helpers.RunCommandInDir ("gitk", "", targetPath); });
-        menu.Append (gitk);
-      }
-
-      if (HasEntryWithSuffix(u, gqviewSuffixes)) {
-        AddCommandItem(menu, "View images", "gqview", "", targetPath);
-      }
-
-      Menu audioMenu = new Menu ();
-      AddCommandItem(audioMenu, "Set as playlist", "amarok", "-p --load", targetPath);
-      AddCommandItem(audioMenu, "Append to playlist", "amarok", "--append", targetPath);
-      MenuItem audioMenuItem = new MenuItem ("Audio");
-      audioMenuItem.Submenu = audioMenu;
-      menu.Append(audioMenuItem);
-
+    if (App.Selection.Count > 0) {
+      BuildSelectionMenu (menu, c);
     } else {
-    // File menu items
-
-      MenuItem open = new MenuItem ("_Open " + c.Target.Name);
-      open.Activated += new EventHandler(delegate {
-        Helpers.OpenFile (targetPath); });
-      menu.Append (open);
-
-      MenuItem fterm = new MenuItem ("Open _terminal");
-      fterm.Activated += new EventHandler(delegate {
-        Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
-      menu.Append (fterm);
-
-      if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
-        AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
-      }
-
-      if (Array.IndexOf (gqviewSuffixes, c.Target.Suffix) > -1) {
-        AddCommandItem(menu, "View image", "gqview", "", targetPath);
-      }
-
-      if (Array.IndexOf (amarokSuffixes, c.Target.Suffix) > -1) {
-        AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
-        AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
-      }
-
-      /** DESTRUCTIVE */
-      if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
-        MenuItem ex = new MenuItem ("_Extract");
-        ex.Activated += new EventHandler(delegate {
-          Helpers.ExtractFile (targetPath); });
-        menu.Append (ex);
-      }
-
-      if ((c.Target.Permissions & FileAccessPermissions.UserExecute) != 0) {
-        MenuItem runf = new MenuItem ("Run");
-        runf.Activated += new EventHandler(delegate {
-          Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath)); });
-        menu.Append (runf);
-      }
-
-
+      menu.Title = c.Target.FullName;
+      if (c.Target.IsDirectory)
+        BuildDirMenu (menu, c);
+      else
+        BuildFileMenu (menu, c);
+      BuildCommonMenu (menu, c);
     }
+  }
+
+
+  // Directory menu items
+  void BuildDirMenu (Menu menu, ClickHit c)
+  {
+    string targetPath = c.Target.FullName;
+
+    MenuItem goTo = new MenuItem ("_Go to " + c.Target.Name);
+    goTo.Activated += new EventHandler(delegate {
+      App.SetCurrentDir (targetPath); });
+    menu.Append (goTo);
+
+    MenuItem term = new MenuItem ("Open _terminal");
+    term.Activated += new EventHandler(delegate {
+      Helpers.OpenTerminal (targetPath); });
+    menu.Append (term);
+
+    /** DESTRUCTIVE */
+    MenuItem create = new MenuItem ("Create _file…");
+    create.Activated += new EventHandler(delegate {
+      ShowCreateDialog (targetPath); });
+    menu.Append (create);
+
+    /** DESTRUCTIVE */
+    MenuItem created = new MenuItem ("Create _directory…");
+    created.Activated += new EventHandler(delegate {
+      ShowCreateDirDialog (targetPath); });
+    menu.Append (created);
+
+    UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
+    if (u.GetEntries(@"^\.git$").Length > 0) {
+      MenuItem gitk = new MenuItem ("Gitk");
+      gitk.Activated += new EventHandler(delegate {
+        Helpers.RunCommandInDir ("gitk", "", targetPath); });
+      menu.Append (gitk);
+    }
+
+    if (HasEntryWithSuffix(u, gqviewSuffixes)) {
+      AddCommandItem(menu, "View images", "gqview", "", targetPath);
+    }
+
+    Menu audioMenu = new Menu ();
+    AddCommandItem(audioMenu, "Set as playlist", "amarok", "-p --load", targetPath);
+    AddCommandItem(audioMenu, "Append to playlist", "amarok", "--append", targetPath);
+    MenuItem audioMenuItem = new MenuItem ("Audio");
+    audioMenuItem.Submenu = audioMenu;
+    menu.Append(audioMenuItem);
+  }
+
+  // File menu items
+  void BuildFileMenu (Menu menu, ClickHit c)
+  {
+    string targetPath = c.Target.FullName;
+
+    MenuItem open = new MenuItem ("_Open " + c.Target.Name);
+    open.Activated += new EventHandler(delegate {
+      Helpers.OpenFile (targetPath); });
+    menu.Append (open);
+
+    MenuItem fterm = new MenuItem ("Open _terminal");
+    fterm.Activated += new EventHandler(delegate {
+      Helpers.OpenTerminal (Helpers.Dirname(targetPath)); });
+    menu.Append (fterm);
+
+    if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
+      AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
+    }
+
+    if (Array.IndexOf (gqviewSuffixes, c.Target.Suffix) > -1) {
+      AddCommandItem(menu, "View image", "gqview", "", targetPath);
+    }
+
+    if (Array.IndexOf (amarokSuffixes, c.Target.Suffix) > -1) {
+      AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
+      AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
+    }
+
+    /** DESTRUCTIVE */
+    if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
+      MenuItem ex = new MenuItem ("_Extract");
+      ex.Activated += new EventHandler(delegate {
+        Helpers.ExtractFile (targetPath); });
+      menu.Append (ex);
+    }
+
+    if ((c.Target.Permissions & FileAccessPermissions.UserExecute) != 0) {
+      MenuItem runf = new MenuItem ("Run");
+      runf.Activated += new EventHandler(delegate {
+        Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath)); });
+      menu.Append (runf);
+    }
+  }
+
+  void BuildCommonMenu (Menu menu, ClickHit c)
+  {
+    string targetPath = c.Target.FullName;
 
     menu.Append (new SeparatorMenuItem ());
 
@@ -157,6 +176,46 @@ public class FilezooContextMenu : Menu {
     });
     menu.Append (trash);
   }
+
+
+  void BuildSelectionMenu (Menu menu, ClickHit c)
+  {
+    MenuItem deselect = new MenuItem ("_Clear selection");
+    deselect.Activated += new EventHandler(delegate {
+      App.ClearSelection ();
+    });
+    menu.Append (deselect);
+
+    string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
+
+    /** DESTRUCTIVE */
+    MenuItem move = new MenuItem (String.Format("_Move selected to {0}", Helpers.Basename(targetDir)));
+    move.Activated += new EventHandler(delegate {
+      Helpers.MoveURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
+      App.ClearSelection ();
+    });
+    menu.Append (move);
+
+    /** DESTRUCTIVE */
+    MenuItem copy = new MenuItem (String.Format("_Copy selected to {0}", Helpers.Basename(targetDir)));
+    copy.Activated += new EventHandler(delegate {
+      Helpers.CopyURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
+    });
+    menu.Append (copy);
+
+    /** DESTRUCTIVE */
+    MenuItem trash = new MenuItem ("Move selection to trash");
+    trash.Activated += new EventHandler(delegate {
+      foreach (string path in (new List<string>(App.Selection.Keys))) {
+        Helpers.Trash(path);
+        App.ToggleSelection (path);
+        FSCache.Invalidate (path);
+      }
+      App.ClearSelection ();
+    });
+    menu.Append (trash);
+  }
+
 
   void AddCommandItem (Menu menu, string title, string cmd, string args, string path)
   {
