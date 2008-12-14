@@ -39,16 +39,16 @@ public class FilezooContextMenu : Menu {
   string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
+    menu.Title = c.Target.FullName;
     if (App.Selection.Count > 0) {
       BuildSelectionMenu (menu, c);
-    } else {
-      menu.Title = c.Target.FullName;
-      if (c.Target.IsDirectory)
-        BuildDirMenu (menu, c);
-      else
-        BuildFileMenu (menu, c);
-      BuildCommonMenu (menu, c);
+      Separator (menu);
     }
+    if (c.Target.IsDirectory)
+      BuildDirMenu (menu, c);
+    else
+      BuildFileMenu (menu, c);
+    BuildCommonMenu (menu, c);
   }
 
 
@@ -226,8 +226,6 @@ public class FilezooContextMenu : Menu {
   void BuildSelectionMenu (Menu menu, ClickHit c)
   {
     AddItem (menu, "Clear selection", delegate { App.ClearSelection (); });
-
-    BuildCopyPasteMenu (menu, c);
 
     string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
