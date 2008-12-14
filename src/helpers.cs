@@ -94,13 +94,13 @@ public static class Helpers {
 
   /** BLOCKING */
   public static void DrawText (Context cr, string family, double fontSize, string text)
-  {
+  { lock (FontCache) {
     Profiler p = new Profiler ("DrawText");
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
     layout.GetExtents(out pe, out le);
-    p.Time ("GetExtents");
+    p.Time ("GetExtents {0}", pe);
     w = (double)le.Width / (double)Pango.Scale.PangoScale;
     h = (double)le.Height / (double)Pango.Scale.PangoScale;
     Pango.CairoHelper.ShowLayout (cr, layout);
@@ -119,11 +119,11 @@ public static class Helpers {
       cr.Restore ();
     }
     cr.RelMoveTo (w, 0);
-  }
+  } }
 
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
-  {
+  { lock (FontCache) {
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
@@ -135,7 +135,7 @@ public static class Helpers {
     te.XAdvance = w;
     te.YAdvance = 0;
     return te;
-  }
+  } }
 
 
   /** FAST */
