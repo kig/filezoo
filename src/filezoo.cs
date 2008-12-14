@@ -148,7 +148,7 @@ public class Filezoo : DrawingArea
     new TargetEntry ("STRING", 0, 2)
   };
 
-  Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
+  public Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
 
   /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
@@ -191,6 +191,13 @@ public class Filezoo : DrawingArea
       }
     };
 
+    KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
+      if (args.Event.Key == Gdk.Key.Escape && Selection.Count > 0) {
+        ClearSelection ();
+        args.RetVal = true;
+      }
+    };
+
     Gtk.Drag.DestSet (this, DestDefaults.All, target_table,
         Gdk.DragAction.Move
       | Gdk.DragAction.Copy
@@ -203,6 +210,7 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
       | Gdk.EventMask.EnterNotifyMask
+      | Gdk.EventMask.KeyReleaseMask
       | Gdk.EventMask.LeaveNotifyMask
     ));
 
@@ -722,6 +730,12 @@ public class Filezoo : DrawingArea
     else Selection[path] = true;
   }
 
+  public void ClearSelection ()
+  {
+    Selection.Clear ();
+    UpdateLayout ();
+  }
+
   /** BLOCKING */
   void ClickCurrentDir (Context cr, uint width, uint height, double x, double y)
   {
@@ -744,7 +758,7 @@ public class Filezoo : DrawingArea
         break;
       } else {
         if (AltKeyDown) {
-          Selection.Clear ();
+          ClearSelection ();
         } else if (CtrlKeyDown) {
           ToggleSelection(c.Target.FullName);
           spanStart = c.Target;
@@ -760,7 +774,6 @@ public class Filezoo : DrawingArea
             spanStart = c.Target;
           }
         } else {
-          Selection.Clear ();
           if (c.Target.IsDirectory) {
             // Console.WriteLine("Navigate {0}", c.Target.FullName);
             SetCurrentDir (c.Target.FullName);

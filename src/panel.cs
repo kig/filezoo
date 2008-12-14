@@ -81,13 +81,19 @@ public class FilezooPanelControls : FilezooControls
 
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape) {
-        Toggle.Active = false;
+        if (Fz.Selection.Count > 0)
+          Fz.ClearSelection ();
+        else
+          Toggle.Active = false;
       }
     };
 
     FilezooWindow.KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape) {
-        Toggle.Active = false;
+        if (Fz.Selection.Count > 0)
+          Fz.ClearSelection ();
+        else
+          Toggle.Active = false;
       }
     };
   }

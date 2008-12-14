@@ -22,9 +22,9 @@ using Mono.Unix;
 
 public class FilezooControls : HBox
 {
-  Filezoo Fz;
+  protected Filezoo Fz;
 
-  Entry entry;
+  protected Entry entry;
 
   public FilezooControls (Filezoo fz) : base (false, 0)
   {
@@ -57,6 +57,12 @@ public class FilezooControls : HBox
     entry.Completion.Model = CreateCompletionModel ();
     entry.Focused += delegate {
       RecreateEntryCompletion ();
+    };
+    entry.KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
+      if (args.Event.Key == Gdk.Key.Escape && Fz.Selection.Count > 0) {
+        Fz.ClearSelection ();
+        args.RetVal = true;
+      }
     };
 
     PackStart (entry, false, false, 0);
