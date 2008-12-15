@@ -244,6 +244,15 @@ public static class Helpers {
   }
 
   /** BLOCKING */
+  public static bool IsValidCommandLine (string cmdline)
+  {
+    if (cmdline.Length == 0) return false;
+    string[] split = cmdline.Trim(' ').Split(' ');
+    string cmd = split[0];
+    return IsValidCommand(cmd);
+  }
+
+  /** BLOCKING */
   public static bool IsPlausibleCommandLine (string cmdline, string dir)
   {
     if (cmdline.Length == 0) return false;
@@ -579,6 +588,25 @@ public static class Helpers {
   public static byte[] MD5 (byte[] b) {
     using (HashAlgorithm h = HashAlgorithm.Create ("MD5"))
       return h.ComputeHash (b);
+  }
+
+  /** ASYNC */
+  public static ImageSurface ToImageSurface (Gdk.Pixbuf pixbuf)
+  {
+    ImageSurface s = new ImageSurface (Format.ARGB32, pixbuf.Width, pixbuf.Height);
+    using (Context cr = new Context(s)) {
+      cr.Operator = Operator.Source;
+      Gdk.CairoHelper.SetSourcePixbuf(cr, pixbuf, 0, 0);
+      cr.Paint ();
+    }
+    return s;
+  }
+
+  /** NONE */
+  public static ImageSurface ToImageSurface (string filename)
+  {
+    Gdk.Pixbuf pixbuf = new Gdk.Pixbuf (filename);
+    return ToImageSurface(pixbuf);
   }
 
   /* String formatting helpers */

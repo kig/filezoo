@@ -83,14 +83,12 @@ public class FilezooControls : HBox
                            // is not a good idea.
     } else if (url.Contains(".") && !url.Contains(" ")) {
       Helpers.OpenURL(url);
-    } else if (Helpers.IsPlausibleCommandLine(url, Fz.CurrentDirPath)) {
+    } else if (Helpers.IsValidCommandLine(url)) {
     /** DESTRUCTIVE */
       try { Helpers.RunCommandInDir ("sh", "-c "+ Helpers.EscapePath(url), Fz.CurrentDirPath); }
       catch (Exception) {} // Possibly fails if current dir doesn't exist,
                            // and doing something destructive in a random dir
                            // is not a good idea.
-    } else {
-      Helpers.Search(url);
     }
   }
 

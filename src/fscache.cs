@@ -93,7 +93,6 @@ public static class FSCache
   static System.Timers.Timer InvalidsTimer = null;
 
   static Thread ThumbnailThread;
-  public static string[] thumbnailable = {"png", "jpg", "jpeg", "gif", "bmp", "ps", "pdf"};
   static PriorityQueue ThumbnailQueue = new PriorityQueue ();
   static Dictionary<string,FSEntry> ThumbnailCache = new Dictionary<string,FSEntry> ();
 
@@ -277,13 +276,17 @@ public static class FSCache
     return !d.FilePassDone;
   } }
 
+  static Gnome.ThumbnailFactory TNF = new Gnome.ThumbnailFactory (Gnome.ThumbnailSize.Normal);
   /** ASYNC */
   public static void FetchThumbnail (string path, int priority)
   {
     FSEntry f = Get (path);
     if (f.Thumbnail != null) return;
     if (f.IsDirectory) return;
-    if (Array.IndexOf (thumbnailable, f.Suffix) > -1)
+    string uri = "file://" + path;
+    Gnome.Vfs.Vfs.Initialize ();
+    string mime = Gnome.Vfs.MimeType.GetMimeTypeForUri(uri);
+    if (TNF.CanThumbnail(uri, mime, f.LastModified))
     {
         lock (ThumbnailQueue) ThumbnailQueue.Enqueue(f.FullName, priority);
     }
@@ -687,9 +690,24 @@ public static class FSCache
 
   static void GetThumbnail (string path)
   {
-    if (Get (path).Thumbnail == null) {
-      ImageSurface tn = Helpers.GetThumbnail (path);
-      FSEntry f = Get (path);
+    FSEntry f = Get (path);
+    if (f.Thumbnail == null) {
+      string uri = "file://"+path;
+      string mime = Gnome.Vfs.MimeType.GetMimeTypeForUri(uri);
+      ImageSurface tn;
+      string tfn = TNF.Lookup(uri, f.LastModified);
+      if (tfn != null) {
+        tn = new ImageSurface (tfn);
+      } else {
+        Gdk.Pixbuf pbuf = TNF.GenerateThumbnail(uri, mime);
+        if (pbuf != null) {
+          TNF.SaveThumbnail(pbuf, uri, f.LastModified);
+        } else {
+          TNF.CreateFailedThumbnail(uri, f.LastModified);
+          return;
+        }
+        tn = Helpers.ToImageSurface(pbuf);
+      }
       lock (Cache) {
         f.Thumbnail = tn;
         ThumbnailCache[f.FullName] = f;
