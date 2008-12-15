@@ -25,10 +25,8 @@ using Mono.Unix;
 public class FilezooContextMenu : Menu {
 
   Filezoo App;
-  Clipboard clipboard;
 
   public FilezooContextMenu (Filezoo fz, ClickHit c) {
-    clipboard = Clipboard.Get(Gdk.Atom.Intern("CLIPBOARD", true));
     App = fz;
     Build (this, c);
   }
@@ -156,71 +154,21 @@ public class FilezooContextMenu : Menu {
     });
   }
 
-  TargetEntry[] targets = new TargetEntry[] {
-    new TargetEntry ("text/uri-list", 0, 0),
-    new TargetEntry ("text/plain", 0, 2),
-    new TargetEntry ("STRING", 0, 2)
-  };
-
-  static bool cut = false;
-
   void BuildCopyPasteMenu (Menu menu, ClickHit c)
   {
     string targetPath = c.Target.FullName;
-    string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
     Separator (menu);
-    string items = "file://" + c.Target.FullName;
-    if (App.Selection.Count > 0) {
-      items = App.GetSelectionData ();
-    }
-
     AddItem(menu, "Cut", delegate {
-      SetClipBoard(items);
-      cut = true;
+      App.CutSelection(targetPath);
     });
-
     AddItem(menu, "Copy", delegate {
-      SetClipBoard(items);
-      cut = false;
+      App.CopySelection(targetPath);
     });
-
-    AddItem(menu, "Paste to "+Helpers.Basename(targetDir)+"/", delegate {
-      bool handled = false;
-      clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
-        if (data.Length > -1) {
-          handled = true;
-          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-          cut = false;
-        }
-      });
-      clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
-        if (data.Length > -1 && !handled) {
-          handled = true;
-          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-        }
-      });
-      clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
-        if (data.Length > -1 && !handled) {
-          handled = true;
-          App.HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-        }
-      });
+    AddItem(menu, "Paste", delegate {
+      App.PasteSelection(targetPath);
     });
     Separator (menu);
-  }
-
-  void SetClipBoard (string items)
-  {
-    clipboard.SetWithData(targets,
-      delegate (Clipboard cb, SelectionData data, uint info) {
-        data.Set(data.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
-        data.Text = items;
-      },
-      delegate (Clipboard cb) {
-        cut = false;
-      }
-    );
   }
 
   void BuildSelectionMenu (Menu menu, ClickHit c)
@@ -232,24 +180,18 @@ public class FilezooContextMenu : Menu {
     /** DESTRUCTIVE */
     AddItem (menu, String.Format("_Move selected to {0}/", Helpers.Basename(targetDir)),
       delegate {
-        Helpers.MoveURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
-        App.ClearSelection ();
+        App.MoveSelectionTo(targetDir);
     });
 
     /** DESTRUCTIVE */
     AddItem (menu, String.Format("_Copy selected to {0}/", Helpers.Basename(targetDir)),
       delegate {
-        Helpers.CopyURIs(new List<string>(App.Selection.Keys).ToArray(), targetDir);
+        App.CopySelectionTo(targetDir);
     });
 
     /** DESTRUCTIVE */
     AddItem (menu, "Move selected to trash", delegate {
-      foreach (string path in (new List<string>(App.Selection.Keys))) {
-        Helpers.Trash(path);
-        App.ToggleSelection (path);
-        FSCache.Invalidate (path);
-      }
-      App.ClearSelection ();
+      App.TrashSelection ();
     });
   }
 

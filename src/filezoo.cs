@@ -148,13 +148,24 @@ public class Filezoo : DrawingArea
     new TargetEntry ("STRING", 0, 2)
   };
 
+  TargetEntry[] targets = new TargetEntry[] {
+    new TargetEntry ("text/uri-list", 0, 0),
+    new TargetEntry ("text/plain", 0, 2),
+    new TargetEntry ("STRING", 0, 2)
+  };
+
+
   public Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
+
+  Clipboard clipboard;
 
   /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
   {
     Selection = new Dictionary<string, bool> ();
     Renderer = new FSDraw ();
+
+    clipboard = Clipboard.Get(Gdk.Atom.Intern("CLIPBOARD", true));
 
     SortField = SortFields[0];
     SizeField = SizeFields[0];
@@ -168,10 +179,24 @@ public class Filezoo : DrawingArea
       HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
     };
 
+    CanFocus = true;
+
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape && Selection.Count > 0) {
         ClearSelection ();
         args.RetVal = true;
+      } else if ((args.Event.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask) {
+        switch (args.Event.Key) {
+          case Gdk.Key.x:
+            CutSelection(CurrentDirPath);
+            break;
+          case Gdk.Key.c:
+            CopySelection(CurrentDirPath);
+            break;
+          case Gdk.Key.v:
+            PasteSelection(CurrentDirPath);
+            break;
+        }
       }
     };
 
@@ -232,6 +257,85 @@ public class Filezoo : DrawingArea
     }
   }
 
+  bool cut = false;
+
+  public void CutSelection (string targetPath)
+  {
+    CopySelection (targetPath);
+    cut = true;
+  }
+
+  public void CopySelection (string targetPath)
+  {
+    string items = "file://" + targetPath;
+    if (Selection.Count > 0)
+      items = GetSelectionData ();
+    SetClipboard (items);
+    cut = false;
+  }
+
+  /** DESTRUCTIVE */
+  public void PasteSelection (string targetPath)
+  {
+    bool handled = false;
+    clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1) {
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+        if (cut) ClearSelection ();
+        cut = false;
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+  }
+
+  void SetClipboard (string items)
+  {
+    clipboard.SetWithData(targets,
+      delegate (Clipboard cb, SelectionData data, uint info) {
+        data.Set(data.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
+        data.Text = items;
+      },
+      delegate (Clipboard cb) {
+        cut = false;
+      }
+    );
+  }
+
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void MoveSelectionTo (string targetPath)
+  {
+    moveUris (new List<string>(Selection.Keys).ToArray (), targetPath);
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void CopySelectionTo (string targetPath)
+  {
+    copyUris (new List<string>(Selection.Keys).ToArray (), targetPath);
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void TrashSelection ()
+  {
+    foreach (string path in (new List<string>(Selection.Keys))) {
+      Helpers.Trash(path);
+      FSCache.Invalidate (path);
+    }
+    ClearSelection ();
+  }
+
   /** DESCTRUCTIVE, BLOCKING */
   void moveUris (string[] uris, string targetPath)
   {
@@ -256,6 +360,7 @@ public class Filezoo : DrawingArea
     FSCache.Invalidate (targetPath);
   }
 
+  /** ASYNC */
   void DragURIMenu (string[] sources, string target)
   {
     Menu menu = new Menu();
@@ -391,6 +496,7 @@ public class Filezoo : DrawingArea
     FSCache.CancelTraversal ();
 
     CurrentDirEntry = FSCache.Get (CurrentDirPath);
+    FSCache.FilePass(CurrentDirEntry);
     FSCache.Watch (CurrentDirPath);
 
     ResetZoom ();
@@ -765,7 +871,7 @@ public class Filezoo : DrawingArea
     cr.Translate (0.0, Zoomer.Y);
     List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
     foreach (ClickHit c in hits) {
-      if (c.Height < 17.9) {
+      if (c.Height < 15.9) {
         if (c.Target.ParentDir == CurrentDirEntry) {
           double nz = (c.Target.IsDirectory ? 24 : 18) / c.Height;
           // Console.WriteLine("ZoomIn {0}x", nz);
@@ -1020,6 +1126,7 @@ public class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
+    GrabFocus ();
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
     dragging = false;
@@ -1041,6 +1148,7 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
+    GrabFocus ();
     if (e.Button == 1 && !dragging) {
       InteractionProfiler.Restart ();
       int w, h;
