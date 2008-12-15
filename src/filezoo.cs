@@ -159,6 +159,12 @@ public class Filezoo : DrawingArea
 
   Clipboard clipboard;
 
+  Gdk.Cursor clickCursor = new Gdk.Cursor (Gdk.CursorType.Hand2);
+
+  Gdk.Cursor copyCursor = new Gdk.Cursor (Gdk.CursorType.LeftPtr);
+  Gdk.Cursor shiftCopyCursor = new Gdk.Cursor (Gdk.CursorType.RightPtr);
+  Gdk.Cursor clearSelCursor = new Gdk.Cursor (Gdk.CursorType.Circle);
+
   /** BLOCKING - startup dir latency */
   public Filezoo (string dirname)
   {
@@ -180,6 +186,24 @@ public class Filezoo : DrawingArea
     };
 
     CanFocus = true;
+    KeyPressEvent += delegate (object o, KeyPressEventArgs args) {
+      Gdk.ModifierType state = args.Event.State;
+      switch (args.Event.Key) {
+        case Gdk.Key.Control_L:
+        case Gdk.Key.Control_R:
+          state |= Gdk.ModifierType.ControlMask;
+          break;
+        case Gdk.Key.Shift_L:
+        case Gdk.Key.Shift_R:
+          state |= Gdk.ModifierType.ShiftMask;
+          break;
+        case Gdk.Key.Alt_L:
+        case Gdk.Key.Alt_R:
+          state |= Gdk.ModifierType.Mod1Mask;
+          break;
+      }
+      SetCursor (state);
+    };
 
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape && Selection.Count > 0) {
@@ -197,7 +221,35 @@ public class Filezoo : DrawingArea
             PasteSelection(CurrentDirPath);
             break;
         }
+      } else {
+        switch (args.Event.Key) {
+          case Gdk.Key.Delete:
+            TrashSelection ();
+            break;
+          case Gdk.Key.BackSpace:
+            GoToParent ();
+            break;
+          case Gdk.Key.Home:
+            SetCurrentDir (Helpers.HomeDir);
+            break;
+        }
       }
+      Gdk.ModifierType state = args.Event.State;
+      switch (args.Event.Key) {
+        case Gdk.Key.Control_L:
+        case Gdk.Key.Control_R:
+          state &= ~Gdk.ModifierType.ControlMask;
+          break;
+        case Gdk.Key.Shift_L:
+        case Gdk.Key.Shift_R:
+          state &= ~Gdk.ModifierType.ShiftMask;
+          break;
+        case Gdk.Key.Alt_L:
+        case Gdk.Key.Alt_R:
+          state &= ~Gdk.ModifierType.Mod1Mask;
+          break;
+      }
+      SetCursor (state);
     };
 
     Gtk.Drag.DestSet (this, DestDefaults.All, target_table,
@@ -212,6 +264,7 @@ public class Filezoo : DrawingArea
       | Gdk.EventMask.ScrollMask
       | Gdk.EventMask.PointerMotionMask
       | Gdk.EventMask.EnterNotifyMask
+      | Gdk.EventMask.KeyPressMask
       | Gdk.EventMask.KeyReleaseMask
       | Gdk.EventMask.LeaveNotifyMask
     ));
@@ -221,6 +274,24 @@ public class Filezoo : DrawingArea
     t.IsBackground = true;
     t.Start ();
 
+  }
+
+  void GoToParent () {
+    if (CurrentDirPath != Helpers.RootDir) {
+      SetCurrentDir (Helpers.Dirname(CurrentDirPath));
+    }
+  }
+
+  void SetCursor (Gdk.ModifierType state) {
+    if ((state & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
+      GdkWindow.Cursor = shiftCopyCursor;
+    } else if ((state & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask) {
+      GdkWindow.Cursor = clearSelCursor;
+    } else if ((state & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask) {
+      GdkWindow.Cursor = copyCursor;
+    } else {
+      GdkWindow.Cursor = clickCursor;
+    }
   }
 
   public string GetSelectionData ()
@@ -1127,6 +1198,7 @@ public class Filezoo : DrawingArea
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
     GrabFocus ();
+    SetCursor (e.State);
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
     dragging = false;
@@ -1149,6 +1221,7 @@ public class Filezoo : DrawingArea
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
     GrabFocus ();
+    SetCursor (e.State);
     if (e.Button == 1 && !dragging) {
       InteractionProfiler.Restart ();
       int w, h;
@@ -1169,6 +1242,7 @@ public class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
+    SetCursor (e.State);
     if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
         (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask
     ) {
@@ -1196,6 +1270,7 @@ public class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnScrollEvent (Gdk.EventScroll e)
   {
+    SetCursor (e.State);
     InteractionProfiler.Restart ();
     if (e.Direction == Gdk.ScrollDirection.Up) {
       using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
