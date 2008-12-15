@@ -1292,21 +1292,14 @@ public class Filezoo : DrawingArea
     bool left = (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask;
     bool middle = (e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask;
 
-    if ((left && !dragInProgress) || middle) {
-      InteractionProfiler.Restart ();
-      dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
-      double dx = e.X - dragX;
-      double dy = e.Y - dragY;
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        PanBy (cr, (uint)w, (uint)h, dx, dy);
-      }
+    if (middle) {
+      dragging = true;
+      panning = true;
     }
     if (left) {
-      panning = panning || (Math.Abs(dragY - dragStartY) > 50) || (dragStartX > 128+FilesMarginLeft);
-      if (!panning && e.X < FilesMarginLeft && !dragInProgress) {
+      dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
+      panning = panning || (dragStartX > 128+FilesMarginLeft);
+      if (!dragInProgress && !panning && dragging) {
         Gdk.DragAction action = Gdk.DragAction.Move;
         if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
           action = Gdk.DragAction.Copy;
@@ -1317,6 +1310,17 @@ public class Filezoo : DrawingArea
         dragInProgress = true;
         Drag.Begin (this, new TargetList(targets), action, 1, e);
         SetCursor (e.State);
+      }
+    }
+    if (panning) {
+      InteractionProfiler.Restart ();
+      double dx = e.X - dragX;
+      double dy = e.Y - dragY;
+      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+      {
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        PanBy (cr, (uint)w, (uint)h, dx, dy);
       }
     }
     if (SillyFlare) {
