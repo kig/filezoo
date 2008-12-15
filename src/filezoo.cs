@@ -154,12 +154,16 @@ public class Filezoo : DrawingArea
     new TargetEntry ("STRING", 0, 2)
   };
 
+  FSEntry DragSourceEntry;
+  string DragSourcePath;
 
   public Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
 
   Clipboard clipboard;
 
   Gdk.Cursor clickCursor = new Gdk.Cursor (Gdk.CursorType.Hand2);
+
+  Gdk.Cursor dragCursor = new Gdk.Cursor (Gdk.CursorType.Hand1);
 
   Gdk.Cursor copyCursor = new Gdk.Cursor (Gdk.CursorType.LeftPtr);
   Gdk.Cursor shiftCopyCursor = new Gdk.Cursor (Gdk.CursorType.RightPtr);
@@ -178,12 +182,6 @@ public class Filezoo : DrawingArea
     Zoomer = new FlatZoomer ();
 
     CurrentDirPath = dirname;
-
-    /** DESCTRUCTIVE */
-    DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
-      string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
-      HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
-    };
 
     CanFocus = true;
     KeyPressEvent += delegate (object o, KeyPressEventArgs args) {
@@ -252,6 +250,27 @@ public class Filezoo : DrawingArea
       SetCursor (state);
     };
 
+    DragDataGet += delegate (object o, DragDataGetArgs args) {
+      string items = "file://" + DragSourcePath;
+      if (Selection.Count > 0 && Selection.ContainsKey(DragSourcePath))
+        items = GetSelectionData ();
+      args.SelectionData.Set(args.SelectionData.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
+      args.SelectionData.Text = items;
+    };
+
+    DragEnd += delegate {
+      dragInProgress = false;
+      DragSourceEntry = null;
+      DragSourcePath = null;
+    };
+
+    /** DESCTRUCTIVE */
+    DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
+      string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
+      Helpers.PrintSelectionData(e.SelectionData);
+      HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
+    };
+
     Gtk.Drag.DestSet (this, DestDefaults.All, target_table,
         Gdk.DragAction.Move
       | Gdk.DragAction.Copy
@@ -283,7 +302,9 @@ public class Filezoo : DrawingArea
   }
 
   void SetCursor (Gdk.ModifierType state) {
-    if ((state & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
+    if (dragInProgress) {
+      GdkWindow.Cursor = dragCursor;
+    } else if ((state & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
       GdkWindow.Cursor = shiftCopyCursor;
     } else if ((state & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask) {
       GdkWindow.Cursor = clearSelCursor;
@@ -1209,6 +1230,13 @@ public class Filezoo : DrawingArea
     } else if (e.Button == 1 && !dragging) {
       DoubleClick = (e.Type == Gdk.EventType.TwoButtonPress);
     }
+    if (e.Button == 1) {
+      int w, h;
+      e.Window.GetSize (out w, out h);
+      DragSourceEntry = FindHit((uint)w, (uint)h, e.X, e.Y, 8).Target;
+      DragSourcePath = DragSourceEntry.FullName;
+      Console.WriteLine ("hey, totally getting a DragSourcePath here! {0}", DragSourcePath);
+    }
     return true;
   }
 
@@ -1235,17 +1263,29 @@ public class Filezoo : DrawingArea
       }
       DoubleClick = false;
     }
+    if (e.Button == 1) {
+      if (!dragInProgress) {
+        DragSourceEntry = null;
+        DragSourcePath = null;
+      }
+      dragInProgress = false;
+    }
     dragging = false;
+    panning = panning && dragInProgress;
     return true;
   }
+
+  bool panning = false;
+  bool dragInProgress = false;
 
   /** FAST */
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
     SetCursor (e.State);
-    if ((e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask ||
-        (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask
-    ) {
+    bool left = (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask;
+    bool middle = (e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask;
+
+    if ((left && !dragInProgress) || middle) {
       InteractionProfiler.Restart ();
       dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
       double dx = e.X - dragX;
@@ -1255,6 +1295,21 @@ public class Filezoo : DrawingArea
         int w, h;
         e.Window.GetSize (out w, out h);
         PanBy (cr, (uint)w, (uint)h, dx, dy);
+      }
+    }
+    if (left) {
+      panning = panning || (Math.Abs(dragY - dragStartY) > 50) || (dragStartX > 128+FilesMarginLeft);
+      if (!panning && e.X < FilesMarginLeft && !dragInProgress) {
+        Gdk.DragAction action = Gdk.DragAction.Move;
+        if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
+          action = Gdk.DragAction.Copy;
+        if ((e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)
+          action = Gdk.DragAction.Copy;
+        if ((e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask)
+          action = Gdk.DragAction.Ask;
+        dragInProgress = true;
+        Drag.Begin (this, new TargetList(targets), action, 1, e);
+        SetCursor (e.State);
       }
     }
     if (SillyFlare) {
