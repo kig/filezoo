@@ -259,6 +259,7 @@ public class Filezoo : DrawingArea
     };
 
     DragEnd += delegate {
+      GetSelectionData ();
       dragInProgress = false;
       DragSourceEntry = null;
       DragSourcePath = null;
@@ -267,7 +268,6 @@ public class Filezoo : DrawingArea
     /** DESCTRUCTIVE */
     DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
-      Helpers.PrintSelectionData(e.SelectionData);
       HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
     };
 
@@ -318,7 +318,14 @@ public class Filezoo : DrawingArea
   public string GetSelectionData ()
   {
     List<string> paths = new List<string> ();
-    foreach(string p in Selection.Keys) paths.Add("file://"+p);
+    List<string> invalids = new List<string> ();
+    foreach(string p in Selection.Keys) {
+      if (Helpers.FileExists(p))
+        paths.Add("file://"+p);
+      else
+        invalids.Add(p);
+    }
+    invalids.ForEach(ToggleSelection);
     return String.Join("\r\n", paths.ToArray());
   }
 
@@ -410,6 +417,7 @@ public class Filezoo : DrawingArea
   public void MoveSelectionTo (string targetPath)
   {
     moveUris (new List<string>(Selection.Keys).ToArray (), targetPath);
+    ClearSelection ();
   }
 
   /** DESCTRUCTIVE, BLOCKING */
@@ -1235,7 +1243,6 @@ public class Filezoo : DrawingArea
       e.Window.GetSize (out w, out h);
       DragSourceEntry = FindHit((uint)w, (uint)h, e.X, e.Y, 8).Target;
       DragSourcePath = DragSourceEntry.FullName;
-      Console.WriteLine ("hey, totally getting a DragSourcePath here! {0}", DragSourcePath);
     }
     return true;
   }
