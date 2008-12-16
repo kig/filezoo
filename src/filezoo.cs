@@ -163,6 +163,9 @@ public class Filezoo : DrawingArea
 
   Gdk.Cursor clickCursor = new Gdk.Cursor (Gdk.CursorType.Hand2);
 
+  Gdk.Cursor defaultCursor = new Gdk.Cursor (Gdk.CursorType.Arrow);
+
+  Gdk.Cursor panCursor = new Gdk.Cursor (Gdk.CursorType.Hand1);
   Gdk.Cursor dragCursor = new Gdk.Cursor (Gdk.CursorType.Hand1);
 
   Gdk.Cursor copyCursor = new Gdk.Cursor (Gdk.CursorType.LeftPtr);
@@ -261,6 +264,7 @@ public class Filezoo : DrawingArea
     DragEnd += delegate {
       GetSelectionData ();
       dragInProgress = false;
+      dragStartX = 9999;
       DragSourceEntry = null;
       DragSourcePath = null;
     };
@@ -310,6 +314,10 @@ public class Filezoo : DrawingArea
       GdkWindow.Cursor = clearSelCursor;
     } else if ((state & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask) {
       GdkWindow.Cursor = copyCursor;
+    } else if (!dragging && dragY < FilesMarginTop) {
+      GdkWindow.Cursor = defaultCursor;
+    } else if (dragging || FindHit (Width, Height, dragX, dragY, 8).Target == CurrentDirEntry) {
+      GdkWindow.Cursor = panCursor;
     } else {
       GdkWindow.Cursor = clickCursor;
     }
@@ -974,6 +982,8 @@ public class Filezoo : DrawingArea
   void ClickCurrentDir (Context cr, uint width, uint height, double x, double y)
   {
     Rectangle box = Transform (cr, width, height);
+    if (x < box.X || x > box.X+box.Width || y < box.Y || y > box.Y+box.Height)
+      return;
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
     List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
@@ -1251,6 +1261,8 @@ public class Filezoo : DrawingArea
       AltKeyDown = (e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask;
       CtrlKeyDown = (e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask;
       ShiftKeyDown = (e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask;
+      if (AltKeyDown)
+        ClearSelection ();
       using (Context scr = new Context (CachedSurface)) {
         scr.IdentityMatrix ();
         Click (scr, (uint)w, (uint)h, e.X, e.Y);

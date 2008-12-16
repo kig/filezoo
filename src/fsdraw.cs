@@ -381,16 +381,17 @@ public class FSDraw
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
     double rBoxWidth = BoxWidth / target.Height;
-    double h = cr.Matrix.Yy;
+    Matrix matrix = cr.Matrix;
+    double h = matrix.Yy;
     double rfs = GetFontSize(d, h);
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
     cr.Save ();
       cr.Translate(rBoxWidth * 1, 0.02);
-      double be = cr.Matrix.X0;
+      double be = matrix.X0 + rBoxWidth * matrix.Xx;
       cr.Translate(rBoxWidth * 0.1, 0.0);
       if (d.IsDirectory && rfs > 60)
         cr.Translate(0.0, 0.46);
-      double x = cr.Matrix.X0;
+      double x = matrix.X0 + rBoxWidth * 1.1 * matrix.Xx;
       double y = cr.Matrix.Y0;
       if (d.IsDirectory && rfs > 60)
         y -= 60;
@@ -584,19 +585,20 @@ public class FSDraw
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
-      if (d.IsDirectory && (cr.Matrix.Yy > 16) && d.ReadyToDraw)
+      Matrix matrix = cr.Matrix;
+      if (d.IsDirectory && (matrix.Yy > 16) && d.ReadyToDraw)
         retval.AddRange( ClickChildren (d, cr, target, mouseX, mouseY, depth) );
       cr.NewPath ();
+      h = matrix.Yy;
       double rfs = GetFontSize(d, h);
-      double fs = Math.Max(MinFontSize, Math.Min(MaxFontSize, rfs));
-      if (fs < 10) {
-        advance += fs / 2 * (d.Name.Length+15);
+      double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
+      if (fs < 5) {
+        advance += fs / 2 * (d.Name.Length+10) / matrix.Xx;
       } else {
-        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, d.Name).XAdvance;
-        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs*0.7, "  " + GetSubTitle (d)).XAdvance;
+        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, d.Name).XAdvance / matrix.Xx;
       }
       cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);
-      double ys = cr.Matrix.Yy;
+      double ys = matrix.Yy;
       cr.IdentityMatrix ();
       if (cr.InFill(mouseX,mouseY))
         retval.Add(new ClickHit(d, ys));
