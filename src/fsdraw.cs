@@ -65,7 +65,16 @@ public class FSDraw
   }
 
 
-  /* Subtitles */
+  /* Titles */
+
+  /** FAST */
+  public string GetTitle (FSEntry d, Dictionary<string,string> prefixes) {
+    string name = d.Name;
+    if (d.LinkTarget != null) name += " ➞ " + d.LinkTarget;
+    if (prefixes != null && prefixes.ContainsKey(d.FullName))
+      name = prefixes[d.FullName] + " " + name;
+    return name;
+  }
 
   /** FAST */
   /**
@@ -139,7 +148,7 @@ public class FSDraw
     The scaled height is a float between 0 and 1 normalized
     so that the heights of the entries of a directory sum to 1.
     */
-  public double GetScaledHeight (FSEntry d)
+  public double GetScaledHeight (DrawEntry d)
   {
     return d.Height * d.Scale;
   }
@@ -188,7 +197,7 @@ public class FSDraw
     If either is true, returns false, otherwise reckons the DirStats would be
     visible and returns true.
     */
-  public bool IsVisible (FSEntry d, Context cr, Rectangle target)
+  public bool IsVisible (DrawEntry d, Context cr, Rectangle target)
   {
     Matrix matrix = cr.Matrix;
     double h = matrix.Yy * GetScaledHeight (d);
@@ -222,15 +231,15 @@ public class FSDraw
     Dictionary<string, string> prefixes,
     Dictionary<string, bool> selection,
     Context cr, Rectangle target) {
-    return Draw (d, prefixes, selection, cr, target, 0);
+    return Draw (new DrawEntry(d), prefixes, selection, cr, target, 0);
   }
   public uint Draw
-  (FSEntry d, Dictionary<string, string> prefixes,
+  (DrawEntry d, Dictionary<string, string> prefixes,
    Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
   {
-    d.LastDraw = frame;
+    d.F.LastDraw = frame;
     if (depth == 0) {
-      FSEntry o = d;
+      FSEntry o = d.F;
       while ((o = o.ParentDir) != null)
         o.LastDraw = frame;
       FrameProfiler.Restart ();
@@ -250,21 +259,21 @@ public class FSDraw
         cr.Translate (0.005*rBoxWidth, 0);
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
       cr.Fill ();
-      Color co = GetColor (d.FileType, d.Permissions);
+      Color co = GetColor (d.F.FileType, d.F.Permissions);
       Matrix matrix = cr.Matrix;
-      if (!d.Complete && FSCache.Measurer.DependsOnTotals)
+      if (!d.F.Complete && FSCache.Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
-       if (d.IsDirectory) // fade out dir based on size on screen
+       if (d.F.IsDirectory) // fade out dir based on size on screen
         co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
        else
         co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
-      if (d.Thumbnail != null)
-        DrawThumb (d, cr, target);
+      if (d.F.Thumbnail != null)
+        DrawThumb (d.F, cr, target);
       else
         cr.Fill ();
-      if (d.IsDirectory) {
+      if (d.F.IsDirectory) {
         cr.Save ();
           if (matrix.Yy > 8 && matrix.Yy < 4000) {
             Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
@@ -281,7 +290,7 @@ public class FSDraw
             }
           }
           if (matrix.Yy > 2) {
-            cr.Color = (!d.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
+            cr.Color = (!d.F.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
             double lh = (matrix.Yy * 0.02 > 3) ? (3 / matrix.Yy) : 0.02;
             Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
             Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
@@ -294,15 +303,15 @@ public class FSDraw
       co.A = 1.0;
       cr.Color = co;
       if (matrix.Yy > 0.5 || depth < 2)
-        DrawTitle (d, prefixes, cr, target, depth);
-      if (d.IsDirectory) {
+        DrawTitle (d.F, prefixes, cr, target, depth);
+      if (d.F.IsDirectory) {
         bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
-        if (shouldDrawChildren && (d.ReadyToDraw || depth == 0)) {
+        if (shouldDrawChildren) {
           c += DrawChildren(d, prefixes, selection ,cr, target, depth);
         }
       }
-      if (selection.ContainsKey(d.FullName)) {
+      if (selection.ContainsKey(d.F.FullName)) {
         using (LinearGradient g = new LinearGradient (0.0, 0.0, 1.0, 0.0)) {
           Helpers.DrawRectangle (cr, 0.0, 0.02, 1.0, 0.96, target);
           Color co2 = RegularFileColor;
@@ -359,7 +368,7 @@ public class FSDraw
   /**
     Sets up child area transform for the FSEntry.
     */
-  void ChildTransform (FSEntry d, Context cr, Rectangle target)
+  void ChildTransform (DrawEntry d, Context cr, Rectangle target)
   {
     double rBoxWidth = BoxWidth / target.Height;
     double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
@@ -398,10 +407,7 @@ public class FSDraw
       cr.IdentityMatrix ();
       cr.Translate (x, y);
       cr.NewPath ();
-      string name = d.Name;
-      if (d.LinkTarget != null) name += " ➞ " + d.LinkTarget;
-      if (prefixes != null && prefixes.ContainsKey(d.FullName))
-        name = prefixes[d.FullName] + " " + name;
+      string name = GetTitle(d, prefixes);
       if (fs > 4) {
         if (depth == 0)
           cr.Translate (0, -fs*0.5);
@@ -461,13 +467,15 @@ public class FSDraw
     @returns The total amount of subtree files drawn.
     */
   uint DrawChildren
-  (FSEntry d, Dictionary<string, string> prefixes,
+  (DrawEntry d, Dictionary<string, string> prefixes,
    Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
   {
+    List<DrawEntry> entries = d.F.DrawEntries;
+    if (entries == null) return 0;
     cr.Save ();
       ChildTransform (d, cr, target);
       uint c = 0;
-      foreach (FSEntry child in d.Entries) {
+      foreach (DrawEntry child in entries) {
         double h = GetScaledHeight(child);
         c += Draw (child, prefixes, selection, cr, target, depth+1);
         cr.Translate (0.0, h);
@@ -497,11 +505,15 @@ public class FSDraw
   /** ASYNC */
   public bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
   {
+    return PreDraw (new DrawEntry (d), cr, target, depth);
+  }
+  public bool PreDraw (DrawEntry d, Context cr, Rectangle target, uint depth)
+  {
     lock (PreDrawLock) PreDrawInProgress ++;
     bool rv = true;
     try {
-      if (depth == 0  && d.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.Complete || !d.InProgress))
-          FSCache.RequestTraversal(d.FullName);
+      if (depth == 0  && d.F.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.F.Complete || !d.F.InProgress))
+          FSCache.RequestTraversal(d.F.FullName);
       if (depth > 0 && !IsVisible(d, cr, target)) return true;
       double h = depth == 0 ? 1 : GetScaledHeight (d);
       if (PreDrawCancelled) {
@@ -509,9 +521,9 @@ public class FSDraw
       } else {
         cr.Save ();
           cr.Scale (1, h);
-          d.LastDraw = FSDraw.frame;
-          RequestThumbnail (d.FullName, (int)cr.Matrix.Yy);
-          if (d.IsDirectory) {
+          d.F.LastDraw = FSDraw.frame;
+          RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
+          if (d.F.IsDirectory) {
             bool childrenVisible = cr.Matrix.Yy > 2;
             bool shouldDrawChildren = (depth == 0 || childrenVisible);
             if (shouldDrawChildren)
@@ -526,14 +538,13 @@ public class FSDraw
   }
 
   /** ASYNC */
-  bool PreDrawChildren (FSEntry d, Context cr, Rectangle target, uint depth)
+  bool PreDrawChildren (DrawEntry d, Context cr, Rectangle target, uint depth)
   {
     ChildTransform (d, cr, target);
-    FSCache.FilePass(d.FullName);
-    FSCache.SortEntries(d);
-    FSCache.MeasureEntries(d);
+    FSCache.FilePass(d.F.FullName);
+    FSCache.UpdateDrawEntries(d.F);
     if (PreDrawCancelled) return false;
-    foreach (FSEntry ch in d.Entries) {
+    foreach (DrawEntry ch in d.F.DrawEntries) {
       PreDraw (ch, cr, target, depth+1);
       cr.Translate (0.0, GetScaledHeight(ch));
       if (PreDrawCancelled) return false;
@@ -565,10 +576,14 @@ public class FSDraw
     @returns A List<ClickHit> of the hit entries.
     */
   public List<ClickHit> Click
-  (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY)
-  { return Click (d, cr, target, mouseX, mouseY, 0); }
+  (FSEntry d,
+    Dictionary<string, string> prefixes,
+    Context cr, Rectangle target, double mouseX, double mouseY)
+  { return Click (new DrawEntry(d), prefixes, cr, target, mouseX, mouseY, 0); }
   public List<ClickHit> Click
-  (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
+  (DrawEntry d,
+    Dictionary<string, string> prefixes,
+    Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     // return empty list if click outside target or if non-root d is not visible
     if (
@@ -586,22 +601,23 @@ public class FSDraw
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
       Matrix matrix = cr.Matrix;
-      if (d.IsDirectory && (matrix.Yy > 16) && d.ReadyToDraw)
-        retval.AddRange( ClickChildren (d, cr, target, mouseX, mouseY, depth) );
+      if (d.F.IsDirectory && (matrix.Yy > 16) && d.F.DrawEntries != null)
+        retval.AddRange( ClickChildren (d, prefixes, cr, target, mouseX, mouseY, depth) );
       cr.NewPath ();
       h = matrix.Yy;
-      double rfs = GetFontSize(d, h);
+      double rfs = GetFontSize(d.F, h);
       double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
+      string name = GetTitle(d.F, prefixes);
       if (fs < 5) {
-        advance += fs / 2 * (d.Name.Length+10) / matrix.Xx;
+        advance += fs * (name.Length) / matrix.Xx;
       } else {
-        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, d.Name).XAdvance / matrix.Xx;
+        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, name).XAdvance / matrix.Xx;
       }
       cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);
       double ys = matrix.Yy;
       cr.IdentityMatrix ();
       if (cr.InFill(mouseX,mouseY))
-        retval.Add(new ClickHit(d, ys));
+        retval.Add(new ClickHit(d.F, ys));
     cr.Restore ();
     return retval;
   }
@@ -609,18 +625,22 @@ public class FSDraw
   /** BLOCKING */
   /**
     Passes the click check to the children of the FSEntry.
-    Sets up the child area transform and calls Click on each child in d.Entries.
+    Sets up the child area transform and calls Click on each child in d.DrawEntries.
     Returns the first Click return value with one or more entries.
     If nothing was hit, returns an empty List.
     */
   List<ClickHit> ClickChildren
-  (FSEntry d, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
+  (DrawEntry d,
+    Dictionary<string, string> prefixes,
+    Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
+    List<DrawEntry> entries = d.F.DrawEntries;
     List<ClickHit> retval = new List<ClickHit> ();
+    if (entries == null) return retval;
     cr.Save ();
       ChildTransform (d, cr, target);
-      foreach (FSEntry child in d.Entries) {
-        retval = Click (child, cr, target, mouseX, mouseY, depth+1);
+      foreach (DrawEntry child in entries) {
+        retval = Click (child, prefixes, cr, target, mouseX, mouseY, depth+1);
         if (retval.Count > 0) break;
         double h = GetScaledHeight(child);
         cr.Translate (0.0, h);
@@ -642,17 +662,23 @@ public class FSDraw
   public Covering FindCovering
   (FSEntry d, Context cr, Rectangle target, uint depth)
   {
-    Covering retval = (depth == 0 ? GetCovering(d, cr, target) : null);
-    if (!d.IsDirectory || (depth > 0 && !IsVisible(d, cr, target)))
+    return FindCovering (new DrawEntry(d), cr, target, depth);
+  }
+  public Covering FindCovering
+  (DrawEntry d, Context cr, Rectangle target, uint depth)
+  {
+    Covering retval = (depth == 0 ? GetCovering(d.F, cr, target) : null);
+    if (!d.F.IsDirectory || (depth > 0 && !IsVisible(d, cr, target)))
       return retval;
     double h = depth == 0 ? 1 : GetScaledHeight (d);
     cr.Save ();
       cr.Scale (1, h);
       if (cr.Matrix.Y0 <= target.Y && cr.Matrix.Y0+cr.Matrix.Yy >= target.Y+target.Height) {
-        retval = GetCovering (d, cr, target);
-        if (d.ReadyToDraw) {
+        retval = GetCovering (d.F, cr, target);
+        List<DrawEntry> entries = d.F.DrawEntries;
+        if (entries != null) {
           ChildTransform (d, cr, target);
-          foreach (FSEntry ch in d.Entries) {
+          foreach (DrawEntry ch in entries) {
             Covering c = FindCovering (ch, cr, target, depth+1);
             if (c != null) {
               retval = c;
@@ -661,23 +687,22 @@ public class FSDraw
             cr.Translate (0.0, GetScaledHeight(ch));
           }
         }
-      } else if (depth == 0 && d.FullName != Helpers.RootDir) { // navigating upwards
+      } else if (depth == 0 && d.F.FullName != Helpers.RootDir) { // navigating upwards
         double scale = 1.0;
         double position = 0.48; // stupidity with magic numbers
         int i = 0;
-        if (FSCache.NeedFilePass( d.ParentDir.FullName ))
-          FSCache.FilePass ( d.ParentDir.FullName );
-        FSCache.MeasureEntries( d.ParentDir );
-        FSCache.SortEntries ( d.ParentDir );
-        foreach (FSEntry ch in d.ParentDir.Entries) {
-          if (ch.FullName == d.FullName) {
+        if (FSCache.NeedFilePass( d.F.ParentDir.FullName ))
+          FSCache.FilePass ( d.F.ParentDir.FullName );
+        FSCache.UpdateDrawEntries ( d.F.ParentDir );
+        foreach (DrawEntry ch in d.F.ParentDir.DrawEntries) {
+          if (ch.F.FullName == d.F.FullName) {
             scale = 1.0 / (0.44 * GetScaledHeight (ch));
             break;
           }
           i++;
           position += 0.44 * GetScaledHeight (ch);
         }
-        retval = new Covering (d.ParentDir, scale, -position);
+        retval = new Covering (d.F.ParentDir, scale, -position);
       }
     cr.Restore ();
     return retval;

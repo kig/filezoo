@@ -986,7 +986,7 @@ public class Filezoo : DrawingArea
       return;
     cr.Scale (1, Zoomer.Z);
     cr.Translate (0.0, Zoomer.Y);
-    List<ClickHit> hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
+    List<ClickHit> hits = Renderer.Click (CurrentDirEntry, Prefixes, cr, box, x, y);
     foreach (ClickHit c in hits) {
       if (c.Height < 15.9) {
         if (c.Target.ParentDir == CurrentDirEntry) {
@@ -1128,7 +1128,7 @@ public class Filezoo : DrawingArea
         Rectangle box = Transform (cr, width, height);
         cr.Scale (1, Zoomer.Z);
         cr.Translate (0.0, Zoomer.Y);
-        hits = Renderer.Click (CurrentDirEntry, cr, box, x, y);
+        hits = Renderer.Click (CurrentDirEntry, Prefixes, cr, box, x, y);
         hits.Add (new ClickHit(CurrentDirEntry, cr.Matrix.Yy));
       cr.Restore ();
     }

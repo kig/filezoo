@@ -176,7 +176,8 @@ public static class FSCache
         count++;
       }
       lock (Cache) {
-        f.Entries = entries;
+        f.Entries.Clear ();
+        foreach(FSEntry e in entries) f.Entries.Add(e);
         f.Size = size;
         f.Count = count;
         f.FilePassDone = true;
@@ -188,52 +189,53 @@ public static class FSCache
   }
 
   /** ASYNC */
-  public static void SortEntries (FSEntry f)
+  public static void UpdateDrawEntries (FSEntry f)
   { lock (Cache) {
     if (!f.IsDirectory) return;
-    if (
+    bool needRefresh = false;
+    // measure entries
+    if (!(f.Measurer == Measurer && f.LastMeasure == f.LastChange)) {
+      DateTime lc = f.LastChange;
+      f.Measurer = Measurer;
+      double totalHeight = 0.0;
+      foreach (FSEntry e in f.Entries) {
+        if (Measurer.DependsOnEntries && !e.FilePassDone)
+          FilePass (e);
+        e.Height = Measurer.Measure(e);
+        totalHeight += e.Height;
+      }
+      double scale = 1.0 / totalHeight;
+      foreach (FSEntry e in f.Entries) {
+        e.Scale = scale;
+      }
+      f.LastMeasure = lc;
+      //Console.WriteLine("Measured {0}", f.FullName);
+      needRefresh = true;
+    }
+    // sort entries
+    if (!(
       f.Comparer == Comparer
       && f.SortDirection == SortDirection
       && f.LastSort == f.LastChange
-    ) return;
-    DateTime lc = f.LastChange;
-    f.Comparer = Comparer;
-    f.SortDirection = SortDirection;
-    List<FSEntry> entries = new List<FSEntry> (f.Entries);
-    entries.Sort(Comparer);
-    if (SortDirection == SortingDirection.Descending)
-      entries.Reverse();
-    f.Entries = entries;
-    f.LastSort = lc;
-    //Console.WriteLine("Sorted {0}", f.FullName);
-    f.ReadyToDraw = (f.Measurer == Measurer && f.LastMeasure == f.LastChange);
+    )) {
+      DateTime lc = f.LastChange;
+      f.Comparer = Comparer;
+      f.SortDirection = SortDirection;
+      f.Entries.Sort(Comparer);
+      if (SortDirection == SortingDirection.Descending)
+        f.Entries.Reverse();
+      f.LastSort = lc;
+      //Console.WriteLine("Sorted {0}", f.FullName);
+      needRefresh = true;
+    }
+    if (needRefresh) {
+      List<DrawEntry> entries = new List<DrawEntry> ();
+      foreach (FSEntry e in f.Entries)
+        entries.Add(new DrawEntry(e));
+      f.DrawEntries = entries;
+    }
   } }
 
-  /** ASYNC */
-  public static void MeasureEntries (FSEntry f)
-  { lock (Cache) {
-    if (!f.IsDirectory) return;
-    if (f.Measurer == Measurer && f.LastMeasure == f.LastChange)
-      return;
-    DateTime lc = f.LastChange;
-    f.Measurer = Measurer;
-    double totalHeight = 0.0;
-    foreach (FSEntry e in f.Entries) {
-      if (Measurer.DependsOnEntries && !e.FilePassDone)
-        FilePass (e);
-      e.Height = Measurer.Measure(e);
-      totalHeight += e.Height;
-    }
-    double scale = 1.0 / totalHeight;
-    foreach (FSEntry e in f.Entries) {
-      e.Scale = scale;
-    }
-    f.LastMeasure = lc;
-    //Console.WriteLine("Measured {0}", f.FullName);
-    f.ReadyToDraw = ( f.Comparer == Comparer
-                      && f.SortDirection == SortDirection
-                      && f.LastSort == f.LastChange);
-  } }
 
   /** ASYNC */
   public static void Invalidate (string path)
@@ -312,10 +314,12 @@ public static class FSCache
     foreach (FSEntry d in Cache.Values) {
       if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
         DestroyThumbnail(d);
-        d.ParentDir.ReadyToDraw = false;
         d.ParentDir.LastChange = d.ParentDir.LastFileChange = DateTime.Now;
         d.ParentDir.FilePassDone = false;
-        d.ParentDir.Entries = new List<FSEntry> ();
+        if (d.ParentDir.Entries != null)
+          d.ParentDir.Entries.Clear ();
+        d.Entries = null;
+        d.DrawEntries = null;
         deletions.Add(d.FullName);
       }
     }
@@ -451,9 +455,7 @@ public static class FSCache
     LastChange = DateTime.Now;
     DestroyThumbnail(d);
     DeleteChildren (path);
-    List<FSEntry> e = new List<FSEntry> (d.ParentDir.Entries);
-    e.Remove(d);
-    d.ParentDir.Entries = e;
+    d.ParentDir.Entries.Remove(d);
     if (d.IsDirectory)
       AddCountAndSize (d.ParentDir.FullName, -d.SubTreeCount, -d.SubTreeSize);
     else
@@ -473,9 +475,12 @@ public static class FSCache
       lock (TraversalCache)
         if (TraversalCache.ContainsKey(path))
           TraversalCache.Remove(path);
-      if (d.Entries != null)
+      if (d.Entries != null) {
         foreach (FSEntry c in d.Entries)
           DeleteChildren (c.FullName);
+        d.Entries.Clear ();
+      }
+      d.DrawEntries = null;
     }
   } }
 

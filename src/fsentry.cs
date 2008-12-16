@@ -27,6 +27,7 @@ public class FSEntry
 {
   public FSEntry ParentDir;
   public List<FSEntry> Entries;
+  public List<DrawEntry> DrawEntries = null;
 
   public IMeasurer Measurer;
   public IComparer<FSEntry> Comparer;
@@ -40,8 +41,6 @@ public class FSEntry
   // rolling 64-bit frame counter around the time the sun burns out at 100fps
   // 63-bit like we have here takes just 3 billion years
   public Int64 LastDraw = 0;
-
-  public bool ReadyToDraw = false;
 
   public string Name;
   public string LCName;
@@ -110,10 +109,24 @@ public class FSEntry
       SubTreeCount = 1;
       Complete = true;
       FilePassDone = true;
-      ReadyToDraw = true;
     } else {
       Entries = new List<FSEntry> ();
     }
   }
 
+  public FSEntry Copy() {
+    return (FSEntry) MemberwiseClone();
+  }
+}
+
+public class DrawEntry {
+  public double Height;
+  public double Scale;
+  public FSEntry F;
+
+  public DrawEntry (FSEntry f) {
+    Height = f.Height;
+    Scale = f.Scale;
+    F = f;
+  }
 }
