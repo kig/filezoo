@@ -68,7 +68,7 @@ public class DateComparer : IComparer<FSEntry> {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    int rv = a.LastModified.CompareTo(b.LastModified);
+    int rv = b.LastModified.CompareTo(a.LastModified);
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv;
   }
