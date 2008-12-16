@@ -335,7 +335,7 @@ public class Filezoo : DrawingArea
     if (type == "application/x-color") {
       /** DESCTRUCTIVE */
       Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
-    } else if (type == "text/uri-list" || (type == "text/plain" && Helpers.IsURI(sd.Text))) {
+    } else if (type == "text/uri-list" || ((type == "text/plain" || type == "STRING") && Helpers.IsURI(sd.Text))) {
       /** DESCTRUCTIVE */
       string data = Helpers.BytesToASCII(sd.Data);
       string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
@@ -379,6 +379,7 @@ public class Filezoo : DrawingArea
     bool handled = false;
     clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
       if (data.Length > -1) {
+        Helpers.PrintSelectionData(data);
         handled = true;
         HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
         if (cut) ClearSelection ();
@@ -387,12 +388,21 @@ public class Filezoo : DrawingArea
     });
     clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
       if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
         handled = true;
         HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
       }
     });
     clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
       if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("STRING", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
         handled = true;
         HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
       }
@@ -478,9 +488,9 @@ public class Filezoo : DrawingArea
   void DragDataToCreateFileMenu (string target, byte[] data)
   {
     Menu menu = new Menu();
-    MenuItem newfile = new MenuItem("_Create file from dragged data");
+    MenuItem newfile = new MenuItem("Create file from data");
     newfile.Activated += delegate {
-      Helpers.TextPrompt ("Create file", "Filename for dragged data",
+      Helpers.TextPrompt ("Create file", "Filename for data",
         target + Helpers.DirSepS + "new_file", "Create",
         target.Length+1, target.Length+1, -1,
         delegate (string filename) {
@@ -496,10 +506,10 @@ public class Filezoo : DrawingArea
   void DragDataToFileMenu (string targetFile, byte[] data)
   {
     Menu menu = new Menu();
-    MenuItem newfile = new MenuItem("_Create file from dragged data");
+    MenuItem newfile = new MenuItem("Create file from data");
     string target = Helpers.Dirname(targetFile);
     newfile.Activated += delegate {
-      Helpers.TextPrompt ("Create file", "Filename for dragged data",
+      Helpers.TextPrompt ("Create file", "Filename for data",
         target + Helpers.DirSepS + "new_file", "Create",
         target.Length+1, target.Length+1, -1,
         delegate (string filename) {
@@ -736,12 +746,12 @@ public class Filezoo : DrawingArea
       DrawClear (cr, width, height);
       double t = DateTime.Now.ToFileTime() / 1e7;
       cr.Save ();
-        Color ca = Renderer.DirectoryBGColor;
+        Color ca = Renderer.DirectoryFGColor;
         ca.A = 0.3;
         cr.Color = ca;
         cr.LineWidth = 0.5;
-        cr.Translate (250, -50);
-        cr.Rotate (0.1);
+        cr.Translate (270, -50);
+        cr.Rotate (0.15);
         for (double y=0; y<6; y++) {
         for (double i=0; i<6-y; i++) {
           cr.Save ();
@@ -749,7 +759,7 @@ public class Filezoo : DrawingArea
             double iscale = Math.Sin(-i/20 * Math.PI*2 + CylinderRotation);
             double xscale = Math.Cos(-i/20 * Math.PI*2 + 0.1 + CylinderRotation);
             cr.Translate (iscale * hr * 3, -100 + y*hr*(2*1.732) + hr*(i%2)*1.732);
-            hr = 40;
+            hr = 45;
             cr.Scale (xscale, 1);
             cr.NewPath ();
             cr.MoveTo (0, -hr);
@@ -884,9 +894,6 @@ public class Filezoo : DrawingArea
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
-    cr.Color = ActiveColor;
-    bool SortDesc = (SortDirection == SortingDirection.Descending);
-    Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
   }
 
   /** FAST */
@@ -1065,13 +1072,7 @@ public class Filezoo : DrawingArea
       te = Helpers.GetTextExtents (
         cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
       if (Helpers.CheckTextExtents(cr, te, x, y)) {
-        if (sf == SortField) {
-          SortDirection = (SortDirection == SortingDirection.Ascending) ?
-                          SortingDirection.Descending :
-                          SortingDirection.Ascending;
-        } else {
-          SortField = sf;
-        }
+        SortField = sf;
         ResetZoom ();
         UpdateLayout ();
         return true;
@@ -1079,20 +1080,6 @@ public class Filezoo : DrawingArea
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, sf.Name);
       Helpers.DrawText (cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " ");
     }
-    cr.Color = ActiveColor;
-    bool SortDesc = (SortDirection == SortingDirection.Descending);
-    te = Helpers.GetTextExtents (
-      cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
-    if (Helpers.CheckTextExtents(cr, te, x, y)) {
-      SortDirection = (SortDirection == SortingDirection.Ascending) ?
-                      SortingDirection.Descending :
-                      SortingDirection.Ascending;
-      ResetZoom ();
-      UpdateLayout ();
-      return true;
-    }
-    Helpers.DrawText (
-      cr, ToolbarLabelFontFamily, ToolbarLabelFontSize, " " + (SortDesc ? "▾" : "▴") + "  ");
     return false;
   }
 
