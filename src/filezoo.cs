@@ -1183,16 +1183,7 @@ public class Filezoo : DrawingArea
       double npy = (yr / nz) - (yr / Zoomer.Z) + Zoomer.Y;
       Zoomer.SetZoom (0.0, npy, nz);
     cr.Restore ();
-    cr.Save ();
-      Rectangle r = Transform (cr, width, height);
-      cr.Scale (1, Zoomer.Z);
-      cr.Translate (0.0, Zoomer.Y);
-      Covering c = Renderer.FindCovering(CurrentDirEntry, cr, r, 0);
-      if (c.Directory.FullName != CurrentDirPath) {
-        SetCurrentDir(c.Directory.FullName);
-        Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
-      }
-    cr.Restore ();
+    CheckZoomNavigation(cr, width, height);
     UpdateLayout();
   }
 
@@ -1215,7 +1206,22 @@ public class Filezoo : DrawingArea
       cr.InverseTransformDistance(ref xr, ref yr);
       Zoomer.Y += yr / Zoomer.Z;
     cr.Restore ();
+    CheckZoomNavigation(cr, width, height);
     UpdateLayout();
+  }
+
+  void CheckZoomNavigation (Context cr, uint width, uint height)
+  {
+    cr.Save ();
+      Rectangle r = Transform (cr, width, height);
+      cr.Scale (1, Zoomer.Z);
+      cr.Translate (0.0, Zoomer.Y);
+      Covering c = Renderer.FindCovering(CurrentDirEntry, cr, r, 0);
+      if (c.Directory.FullName != CurrentDirPath) {
+        SetCurrentDir(c.Directory.FullName);
+        Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
+      }
+    cr.Restore ();
   }
 
 
