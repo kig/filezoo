@@ -138,9 +138,9 @@ public class FilezooContextMenu : Menu {
 
 
     /** DESTRUCTIVE */
-    AddItem (menu, "_Copy to…", delegate {
-      ShowCopyDialog (targetPath);
-    });
+//     AddItem (menu, "_Copy to…", delegate {
+//       ShowCopyDialog (targetPath);
+//     });
 
     /** DESTRUCTIVE */
     AddItem (menu, "Re_name…", delegate {

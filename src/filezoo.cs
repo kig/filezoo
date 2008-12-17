@@ -1297,7 +1297,7 @@ public class Filezoo : DrawingArea
     }
     if (left) {
       dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
-      panning = panning || (dragStartX > 128+FilesMarginLeft);
+      panning = panning || (dragStartX > 128+FilesMarginLeft) || (DragSourceEntry == CurrentDirEntry);
       if (!dragInProgress && !panning && dragging) {
         Gdk.DragAction action = Gdk.DragAction.Move;
         if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
