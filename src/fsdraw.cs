@@ -364,6 +364,9 @@ public class FSDraw
     }
   }
 
+  double ChildYOffset = 0.48;
+  double ChildBoxHeight = 0.44;
+
   /** FAST */
   /**
     Sets up child area transform for the FSEntry.
@@ -372,8 +375,8 @@ public class FSDraw
   {
     double rBoxWidth = BoxWidth / target.Height;
     double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
-    cr.Translate (0.5*fac*rBoxWidth, 0.48);
-    cr.Scale (1.0-fac, 0.44);
+    cr.Translate (0.5*fac*rBoxWidth, ChildYOffset);
+    cr.Scale (1.0-fac, ChildBoxHeight);
   }
 
   /** BLOCKING */
@@ -690,21 +693,25 @@ public class FSDraw
           }
         }
       } else if (depth == 0 && d.F.FullName != Helpers.RootDir) { // navigating upwards
-        double scale = 1.0;
-        double position = 0.48; // stupidity with magic numbers
+        double scale = 1 / DefaultZoom;
+        double position = ChildYOffset;
         int i = 0;
-        if (FSCache.NeedFilePass( d.F.ParentDir.FullName ))
-          FSCache.FilePass ( d.F.ParentDir.FullName );
-        FSCache.UpdateDrawEntries ( d.F.ParentDir );
-        foreach (DrawEntry ch in d.F.ParentDir.DrawEntries) {
+        List<DrawEntry> entries = d.F.ParentDir.DrawEntries;
+        if (entries == null) {
+          if (FSCache.NeedFilePass( d.F.ParentDir.FullName ))
+            FSCache.FilePass ( d.F.ParentDir.FullName );
+          FSCache.UpdateDrawEntries ( d.F.ParentDir );
+          entries = d.F.ParentDir.DrawEntries;
+        }
+        foreach (DrawEntry ch in entries) {
           if (ch.F.FullName == d.F.FullName) {
-            scale = 1.0 / (0.44 * GetScaledHeight (ch));
+            scale = ChildBoxHeight * GetScaledHeight (ch) / retval.Zoom;
             break;
           }
           i++;
-          position += 0.44 * GetScaledHeight (ch);
+          position += ChildBoxHeight * GetScaledHeight (ch);
         }
-        retval = new Covering (d.F.ParentDir, scale, -position);
+        retval = new Covering (d.F.ParentDir, 1 / scale, -position+(retval.Pan *retval.Zoom* scale));
       }
     cr.Restore ();
     return retval;

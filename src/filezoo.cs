@@ -609,13 +609,14 @@ public class Filezoo : DrawingArea
 
     if (dirname != Helpers.RootDir) dirname = dirname.TrimEnd(Helpers.DirSepC);
     UnixDirectoryInfo d = new UnixDirectoryInfo (dirname);
+    string odp = CurrentDirPath;
     CurrentDirPath = d.FullName;
 
-    FSCache.CancelTraversal ();
-
-    CurrentDirEntry = FSCache.Get (CurrentDirPath);
-    FSCache.FilePass(CurrentDirEntry);
-    FSCache.Watch (CurrentDirPath);
+    if (odp != CurrentDirPath) {
+      FSCache.CancelTraversal ();
+      CurrentDirEntry = FSCache.Get (CurrentDirPath);
+      FSCache.Watch (CurrentDirPath);
+    }
 
     ResetZoom ();
     UpdateLayout ();
@@ -666,7 +667,7 @@ public class Filezoo : DrawingArea
             clearTraversal = false;
             FSCache.ClearTraversalCache ();
           }
-          FSCache.PruneCache (10);
+//           FSCache.PruneCache (10);
           /*
           if (FSDraw.frame % 10 > lastTenframe) {
             lastTenframe = FSDraw.frame % 10;
