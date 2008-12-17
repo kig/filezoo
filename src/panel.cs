@@ -52,7 +52,6 @@ public class FilezooPanel : Window
 
     Fz.Width = 400;
     Fz.Height = 1000;
-    Fz.CompleteInit ();
   }
 }
 

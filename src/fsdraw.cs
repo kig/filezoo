@@ -606,23 +606,28 @@ public class FSDraw
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
       Matrix matrix = cr.Matrix;
-      if (d.F.IsDirectory && (matrix.Yy > 16) && d.F.DrawEntries != null)
-        retval.AddRange( ClickChildren (d, prefixes, cr, target, mouseX, mouseY, depth) );
-      cr.NewPath ();
-      h = matrix.Yy;
-      double rfs = GetFontSize(d.F, h);
-      double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
-      string name = GetTitle(d.F, prefixes);
-      if (fs < 5) {
-        advance += fs * (name.Length) / matrix.Xx;
-      } else if (matrix.Y0 > -fs*4 && matrix.Y0 < target.Y + target.Height + fs*4) {
-        advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, name).XAdvance / matrix.Xx;
+      if (matrix.Y0 < mouseY+1 && matrix.Y0+matrix.Yy > mouseY-1) {
+        if (d.F.IsDirectory && (matrix.Yy > 16) && d.F.DrawEntries != null)
+          retval.AddRange( ClickChildren (d, prefixes, cr, target, mouseX, mouseY, depth) );
+        cr.NewPath ();
+        h = matrix.Yy;
+        double rfs = GetFontSize(d.F, h);
+        double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
+        string name = GetTitle(d.F, prefixes);
+        if (fs < 10) {
+          advance += fs * name.Length / matrix.Xx;
+        } else if (matrix.Y0 > -fs*4 && matrix.Y0 < target.Y + target.Height + fs*4) {
+          cr.Save ();
+            cr.IdentityMatrix ();
+            advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, name).XAdvance / matrix.Xx;
+          cr.Restore ();
+        }
+        cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);
+        double ys = matrix.Yy;
+        cr.IdentityMatrix ();
+        if (cr.InFill(mouseX,mouseY))
+          retval.Add(new ClickHit(d.F, ys));
       }
-      cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);
-      double ys = matrix.Yy;
-      cr.IdentityMatrix ();
-      if (cr.InFill(mouseX,mouseY))
-        retval.Add(new ClickHit(d.F, ys));
     cr.Restore ();
     return retval;
   }

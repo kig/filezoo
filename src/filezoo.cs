@@ -121,18 +121,19 @@ public class Filezoo : DrawingArea
   Profiler dirLatencyProfiler = new Profiler ("----", 100);
 
   // interaction profiler, time from user event to draw complete
-  Profiler InteractionProfiler = new Profiler ("UI", 100);
+  Profiler InteractionProfiler = new Profiler ("UI", 30);
 
   // empty surface for PreDraw context.
   ImageSurface PreDrawSurface = new ImageSurface (Format.A1, 1, 1);
+
+  // empty surface for etc context.
+  ImageSurface EtcSurface = new ImageSurface (Format.A1, 1, 1);
 
 
   // modification monitor
   DateTime LastRedraw = DateTime.Now;
 
   bool PreDrawComplete = true;
-
-  bool InitComplete = false;
 
   Menu ContextMenu;
 
@@ -184,7 +185,9 @@ public class Filezoo : DrawingArea
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
 
-    CurrentDirPath = dirname;
+    SetCurrentDir (dirname);
+
+    Helpers.StartupProfiler.Time ("SetCurrentDir");
 
     CanFocus = true;
     KeyPressEvent += delegate (object o, KeyPressEventArgs args) {
@@ -296,6 +299,15 @@ public class Filezoo : DrawingArea
     Thread t = new Thread(ts);
     t.IsBackground = true;
     t.Start ();
+
+    System.Timers.Timer t1 = new System.Timers.Timer(50);
+    t1.Elapsed += new ElapsedEventHandler (CheckUpdates);
+    System.Timers.Timer t2 = new System.Timers.Timer(1000);
+    t2.Elapsed += new ElapsedEventHandler (LongMonitor);
+    t1.Enabled = true;
+    t2.Enabled = true;
+    GLib.Timeout.Add (16, new GLib.TimeoutHandler(CheckRedraw));
+    Helpers.StartupProfiler.Total ("Pre-drawing startup");
 
   }
 
@@ -537,28 +549,10 @@ public class Filezoo : DrawingArea
     menu.Popup ();
   }
 
-  public void CompleteInit ()
-  {
-    Helpers.StartupProfiler.Time ("First expose");
-    SetCurrentDir (CurrentDirPath);
-    Helpers.StartupProfiler.Time ("SetCurrentDir");
-    System.Timers.Timer t = new System.Timers.Timer(50);
-    t.Elapsed += new ElapsedEventHandler (CheckUpdates);
-    System.Timers.Timer t2 = new System.Timers.Timer(1000);
-    t2.Elapsed += new ElapsedEventHandler (LongMonitor);
-    t.Enabled = true;
-    t2.Enabled = true;
-    InitComplete = true;
-    GLib.Timeout.Add (16, new GLib.TimeoutHandler(CheckRedraw));
-    Helpers.StartupProfiler.Total ("Pre-drawing startup");
-  }
-
   public void MockDraw (uint w, uint h)
   {
-    using (ImageSurface s = new ImageSurface (Format.ARGB32, 1, 1)) {
-      using (Context cr = new Context (s)) {
-        Draw (cr, w, h);
-      }
+    using (Context cr = new Context (EtcSurface)) {
+      Draw (cr, w, h);
     }
   }
 
@@ -613,11 +607,13 @@ public class Filezoo : DrawingArea
     CurrentDirPath = d.FullName;
 
     if (odp != CurrentDirPath) {
-      FSCache.CancelTraversal ();
-      CurrentDirEntry = FSCache.Get (CurrentDirPath);
+      if (CurrentDirEntry != null && CurrentDirEntry.InProgress)
+        FSCache.CancelTraversal ();
+      CurrentDirEntry = FSCache.FastGet (CurrentDirPath);
       FSCache.Watch (CurrentDirPath);
     }
 
+    FSNeedRedraw = true;
     ResetZoom ();
     UpdateLayout ();
     p.Time("SetCurrentDir");
@@ -1119,9 +1115,10 @@ public class Filezoo : DrawingArea
     return false;
   }
 
-
+  /** BLOCKING */
   public List<ClickHit> FindHits (uint width, uint height, double x, double y)
   {
+    Profiler p = new Profiler ("FindHits", 10);
     List<ClickHit> hits;
     using (Context cr = new Context (CachedSurface)) {
       cr.IdentityMatrix ();
@@ -1133,9 +1130,11 @@ public class Filezoo : DrawingArea
         hits.Add (new ClickHit(CurrentDirEntry, cr.Matrix.Yy));
       cr.Restore ();
     }
+    p.Time ("Found {0} hits", hits.Count);
     return hits;
   }
 
+  /** BLOCKING */
   public ClickHit FindHit (uint width, uint height, double x, double y, double minHeight)
   {
     List<ClickHit> hits = FindHits(width, height, x, y);
@@ -1171,6 +1170,8 @@ public class Filezoo : DrawingArea
     Zoomer.SetZoom (0.0, Renderer.DefaultPan, Renderer.DefaultZoom);
   }
 
+  bool NeedZoomCheck = false;
+
   /** BLOCKING */
   void ZoomBy
   (Context cr, uint width, uint height, double x, double y, double factor)
@@ -1183,21 +1184,21 @@ public class Filezoo : DrawingArea
       double npy = (yr / nz) - (yr / Zoomer.Z) + Zoomer.Y;
       Zoomer.SetZoom (0.0, npy, nz);
     cr.Restore ();
-    CheckZoomNavigation(cr, width, height);
+    NeedZoomCheck = true;
     UpdateLayout();
   }
 
-  /** FAST */
+  /** BLOCKING */
   void ZoomToward (Context cr, uint width, uint height, double x, double y) {
     ZoomBy (cr, width, height, x, y, ZoomInSpeed);
   }
 
-  /** FAST */
+  /** BLOCKING */
   void ZoomAway (Context cr, uint width, uint height, double x, double y) {
     ZoomBy (cr, width, height, x, y, 1.0 / ZoomOutSpeed);
   }
 
-  /** FAST */
+  /** BLOCKING */
   void PanBy (Context cr, uint width, uint height, double dx, double dy)
   {
     double xr = dx, yr = dy;
@@ -1206,12 +1207,14 @@ public class Filezoo : DrawingArea
       cr.InverseTransformDistance(ref xr, ref yr);
       Zoomer.Y += yr / Zoomer.Z;
     cr.Restore ();
-    CheckZoomNavigation(cr, width, height);
+    NeedZoomCheck = true;
     UpdateLayout();
   }
 
+  /** BLOCKING */
   void CheckZoomNavigation (Context cr, uint width, uint height)
   {
+    Profiler p = new Profiler ("CheckZoomNavigation");
     cr.Save ();
       Rectangle r = Transform (cr, width, height);
       cr.Scale (1, Zoomer.Z);
@@ -1222,6 +1225,7 @@ public class Filezoo : DrawingArea
         Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
       }
     cr.Restore ();
+    p.Time ("Checked");
   }
 
 
@@ -1230,8 +1234,10 @@ public class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
+    Profiler p = new Profiler ("OnButtonPressEvent", 10);
     GrabFocus ();
     SetCursor (e.State);
+    p.Time ("SetCursor");
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
     dragging = false;
@@ -1248,6 +1254,7 @@ public class Filezoo : DrawingArea
       DragSourceEntry = FindHit((uint)w, (uint)h, e.X, e.Y, 8).Target;
       DragSourcePath = DragSourceEntry.FullName;
     }
+    p.Time ("Handled");
     return true;
   }
 
@@ -1259,10 +1266,12 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
+    Profiler p = new Profiler ("OnButtonReleaseEvent", 10);
     GrabFocus ();
     SetCursor (e.State);
+    p.Time ("SetCursor");
     if (e.Button == 1 && !dragging) {
-      InteractionProfiler.Restart ();
+    InteractionProfiler.Start ();
       int w, h;
       e.Window.GetSize (out w, out h);
       AltKeyDown = (e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask;
@@ -1285,6 +1294,7 @@ public class Filezoo : DrawingArea
     }
     dragging = false;
     panning = panning && dragInProgress;
+    p.Time ("Handled");
     return true;
   }
 
@@ -1294,7 +1304,9 @@ public class Filezoo : DrawingArea
   /** FAST */
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
   {
+    Profiler p = new Profiler ("OnMotionNotifyEvent", 10);
     SetCursor (e.State);
+    p.Time("SetCursor");
     bool left = (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask;
     bool middle = (e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask;
 
@@ -1322,12 +1334,8 @@ public class Filezoo : DrawingArea
       InteractionProfiler.Restart ();
       double dx = e.X - dragX;
       double dy = e.Y - dragY;
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        PanBy (cr, (uint)w, (uint)h, dx, dy);
-      }
+      using ( Context cr = new Context (EtcSurface) )
+        PanBy (cr, Width, Height, dx, dy);
     }
     if (SillyFlare) {
       LimitedRedraw = true;
@@ -1336,30 +1344,26 @@ public class Filezoo : DrawingArea
     dragY = e.Y;
     flareTargetX = Width/2;
     flareTargetY = -100;
+    p.Time("Handled");
     return true;
   }
 
   /** FAST */
   protected override bool OnScrollEvent (Gdk.EventScroll e)
   {
+    InteractionProfiler.Start ();
+    Profiler p = new Profiler ("ScrollEvent", 10);
     SetCursor (e.State);
-    InteractionProfiler.Restart ();
+    p.Time("SetCursor");
     if (e.Direction == Gdk.ScrollDirection.Up) {
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        ZoomToward (cr, (uint)w, (uint)h, e.X, e.Y);
-      }
+      using (Context cr = new Context (EtcSurface))
+        ZoomToward (cr, Width, Height, e.X, e.Y);
     }
     if (e.Direction == Gdk.ScrollDirection.Down) {
-      using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
-      {
-        int w, h;
-        e.Window.GetSize (out w, out h);
-        ZoomAway (cr, (uint)w, (uint)h, e.X, e.Y);
-      }
+      using (Context cr = new Context (EtcSurface))
+        ZoomAway (cr, Width, Height, e.X, e.Y);
     }
+    p.Time("Handled");
     return true;
   }
 
@@ -1378,17 +1382,17 @@ public class Filezoo : DrawingArea
       int w, h;
       e.Window.GetSize (out w, out h);
       bool sizeChanged = false;
+      if (InteractionProfiler.Watch.IsRunning)
+        InteractionProfiler.Time ("From UI action to expose");
       if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
         if (CachedSurface != null) CachedSurface.Destroy ();
         CachedSurface = new ImageSurface(Format.ARGB32, w, h);
         sizeChanged = true;
         Width = (uint) w;
         Height = (uint) h;
-        if (InitComplete) UpdateLayout ();
+        UpdateLayout ();
       }
-      if (!InitComplete) {
-        CompleteInit ();
-      }
+      if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
       if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
         FSNeedRedraw = false;
         using (Context scr = new Context (CachedSurface)) {
@@ -1413,8 +1417,10 @@ public class Filezoo : DrawingArea
       cr.Restore ();
     }
     if (InteractionProfiler.Watch.IsRunning) {
-      InteractionProfiler.Time ("Interaction latency");
+      InteractionProfiler.Total ("Interaction latency");
       InteractionProfiler.Stop ();
+      InteractionProfiler.Reset ();
+      InteractionProfiler.TotalElapsed = 0;
     }
     return true;
   }

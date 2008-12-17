@@ -71,6 +71,7 @@ public static class FSCache
 {
   public static Dictionary<string,FSEntry> Cache = new Dictionary<string,FSEntry> ();
   public static FileSystemWatcher Watcher;
+  static Object WatchLock = new Object ();
 
   static Dictionary<string,bool> Invalids = new Dictionary<string,bool> ();
 
@@ -101,7 +102,7 @@ public static class FSCache
 
   /** BLOCKING */
   public static void Watch (string path)
-  { lock (Cache) {
+  { lock (WatchLock) {
     if (Watcher == null || Watcher.Path != path) {
       if (Watcher != null) Watcher.Dispose ();
       Watcher = MakeWatcher (path);
@@ -113,6 +114,13 @@ public static class FSCache
       }
     }
   } }
+
+  /** BLOCKING */
+  public static FSEntry FastGet (string path)
+  {
+    if (Cache.ContainsKey(path)) return Cache[path];
+    else return Get (path);
+  }
 
   /** BLOCKING */
   public static FSEntry Get (string path)

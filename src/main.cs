@@ -33,7 +33,7 @@ public static class FilezooApp {
     Profiler p = Helpers.StartupProfiler;
     p.Restart ();
     p.MinTime = 0;
-    Profiler.GlobalPrintProfile = true;
+    Profiler.GlobalPrintProfile = false;
     Helpers.ShowTextExtents = false;
 
     Catalog.Init("i18n","./locale");

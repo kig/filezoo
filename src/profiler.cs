@@ -94,7 +94,7 @@ public class Profiler
     Total (String.Format(format, o1, o2));
   }
   public void Total (string message) {
-    PrintTime (message+"\n", TotalElapsed, "\u001b[4mTotal".PadRight(80, ' ')+"\u001b[0m\n");
+    PrintTime (message, TotalElapsed, "Total: ");
   }
 
   /** FAST */
