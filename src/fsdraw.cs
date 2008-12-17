@@ -404,37 +404,39 @@ public class FSDraw
       double y = cr.Matrix.Y0;
       if (d.IsDirectory && rfs > 60)
         y -= 60;
-      cr.IdentityMatrix ();
-      cr.Translate (x, y);
-      cr.NewPath ();
-      string name = GetTitle(d, prefixes);
-      if (fs > 4) {
-        if (depth == 0)
-          cr.Translate (0, -fs*0.5);
-        if (d.IsDirectory && depth < 2)
-          DrawTitleLine (cr, fs, h, be, x, depth);
-        cr.MoveTo (0, -fs*0.2);
-        Helpers.DrawText (cr, FileNameFontFamily, fs, name);
+      if (y > -fs*4) {
+        cr.IdentityMatrix ();
+        cr.Translate (x, y);
+        cr.NewPath ();
+        string name = GetTitle(d, prefixes);
+        if (fs > 4) {
+          if (depth == 0)
+            cr.Translate (0, -fs*0.5);
+          if (d.IsDirectory && depth < 2)
+            DrawTitleLine (cr, fs, h, be, x, depth);
+          cr.MoveTo (0, -fs*0.2);
+          Helpers.DrawText (cr, FileNameFontFamily, fs, name);
 
-        double sfs = Helpers.Clamp(
-          d.IsDirectory ? rfs*0.18 : rfs*0.28,
-          MinFontSize, MaxFontSize*0.6);
-        if (sfs > 1) {
-          double a = sfs / (MaxFontSize*0.6);
-          Color co = GetFontColor (d.FileType, d.Permissions);
-          co.A = a*a;
-          cr.Color = co;
-          cr.MoveTo (0, fs*1.1+sfs*0.7);
-          Helpers.DrawText (cr, FileInfoFontFamily, sfs*1.1, d.LastModified.ToString() + " - " + GetSubTitle (d));
-          cr.MoveTo (0, fs*1.1+sfs*2.1);
-          Helpers.DrawText (cr, FileInfoFontFamily, sfs, PermissionString (d));
+          double sfs = Helpers.Clamp(
+            d.IsDirectory ? rfs*0.18 : rfs*0.28,
+            MinFontSize, MaxFontSize*0.6);
+          if (sfs > 1) {
+            double a = sfs / (MaxFontSize*0.6);
+            Color co = GetFontColor (d.FileType, d.Permissions);
+            co.A = a*a;
+            cr.Color = co;
+            cr.MoveTo (0, fs*1.1+sfs*0.7);
+            Helpers.DrawText (cr, FileInfoFontFamily, sfs*1.1, d.LastModified.ToString() + " - " + GetSubTitle (d));
+            cr.MoveTo (0, fs*1.1+sfs*2.1);
+            Helpers.DrawText (cr, FileInfoFontFamily, sfs, PermissionString (d));
+          }
+        } else if (fs > 1) {
+          cr.MoveTo (0, fs*0.1);
+          Helpers.DrawText (cr, FileNameFontFamily, fs, name);
+        } else {
+          Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2 * name.Length, fs/3, target);
+          cr.Fill ();
         }
-      } else if (fs > 1) {
-        cr.MoveTo (0, fs*0.1);
-        Helpers.DrawText (cr, FileNameFontFamily, fs, name);
-      } else {
-        Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2 * name.Length, fs/3, target);
-        cr.Fill ();
       }
     cr.Restore ();
   }
@@ -610,7 +612,7 @@ public class FSDraw
       string name = GetTitle(d.F, prefixes);
       if (fs < 5) {
         advance += fs * (name.Length) / matrix.Xx;
-      } else {
+      } else if (matrix.Y0 > -fs*4 && matrix.Y0 < target.Y + target.Height + fs*4) {
         advance += Helpers.GetTextExtents (cr, FileNameFontFamily, fs, name).XAdvance / matrix.Xx;
       }
       cr.Rectangle (0.0, 0.0, rBoxWidth * 1.1 + advance, 1.0);

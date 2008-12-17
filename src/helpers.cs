@@ -61,7 +61,7 @@ public static class Helpers {
   static Pango.Layout layout = null;
 
   /** BLOCKING */
-  static Pango.Layout GetLayout(Context cr, string family, double fontSize)
+  static Pango.Layout GetLayout(Context cr, string family, uint fontSize)
   {
     Profiler p = new Profiler ("GetFont");
     if (layout == null)
@@ -72,12 +72,12 @@ public static class Helpers {
     return layout;
   }
 
-  static Pango.FontDescription CreateFont (string family, double fontSize)
+  static Pango.FontDescription CreateFont (string family, uint fontSize)
   {
     string key = family+((int)(fontSize * Pango.Scale.PangoScale)).ToString();
     if (!FontCache.ContainsKey(key)) {
       Pango.FontDescription font = Pango.FontDescription.FromString (family);
-      font.Size = (int)(fontSize * Pango.Scale.PangoScale);
+      font.Size = Math.Max(1, (int)(fontSize * Pango.Scale.PangoScale));
       FontCache[key] = font;
       return font;
     } else {
@@ -86,7 +86,7 @@ public static class Helpers {
   }
 
   /** FAST */
-  static double QuantizeFontSize (double fs) { return Math.Max(0.5, Math.Floor(fs)); }
+  static uint QuantizeFontSize (double fs) { return Math.Max(1, (uint)Math.Floor(fs)); }
 
   public static bool ShowTextExtents = false;
   static TextExtents te = new TextExtents ();
@@ -95,6 +95,7 @@ public static class Helpers {
   /** BLOCKING */
   public static void DrawText (Context cr, string family, double fontSize, string text)
   { lock (FontCache) {
+//   Console.WriteLine("DrawText {0}", text);
     Profiler p = new Profiler ("DrawText");
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
@@ -124,6 +125,7 @@ public static class Helpers {
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
   { lock (FontCache) {
+//   Console.WriteLine("GetTextExtents {0}", text);
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
