@@ -55,24 +55,13 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    AddItem (menu, "_Go to " + c.Target.Name, delegate {
+    AddItem (menu, "Go to " + c.Target.Name, delegate {
       App.SetCurrentDir (targetPath);
-    });
-
-    AddItem (menu, "Open _terminal", delegate { Helpers.OpenTerminal (targetPath); });
-
-    /** DESTRUCTIVE */
-    AddItem (menu, "Create _file…", delegate { ShowCreateDialog (targetPath); });
-
-
-    /** DESTRUCTIVE */
-    AddItem (menu, "Create _directory…", delegate {
-      ShowCreateDirDialog (targetPath);
     });
 
     UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
     if (u.GetEntries(@"^\.git$").Length > 0) {
-      AddItem (menu, "Gitk", delegate {
+      AddItem (menu, "View in gitk", delegate {
         Helpers.RunCommandInDir ("gitk", "", targetPath);
       });
     }
@@ -81,10 +70,9 @@ public class FilezooContextMenu : Menu {
       AddCommandItem(menu, "View images", "gqview", "", targetPath);
     }
 
-    Menu audioMenu = new Menu ();
-    AddCommandItem(audioMenu, "Set as playlist", "amarok", "-p --load", targetPath);
-    AddCommandItem(audioMenu, "Append to playlist", "amarok", "--append", targetPath);
-    AddItem (menu, "Audio", audioMenu);
+    Separator(menu);
+    AddCommandItem(menu, "Set as playlist", "amarok", "-p --load", targetPath);
+    AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
   }
 
   // File menu items
@@ -92,12 +80,8 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    AddItem (menu, "_Open " + c.Target.Name, delegate {
+    AddItem (menu, "Open " + c.Target.Name, delegate {
       Helpers.OpenFile (targetPath);
-    });
-
-    AddItem (menu, "Open _terminal", delegate {
-      Helpers.OpenTerminal (Helpers.Dirname(targetPath));
     });
 
     if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
@@ -119,7 +103,7 @@ public class FilezooContextMenu : Menu {
     }
 
     if ((c.Target.Permissions & FileAccessPermissions.UserExecute) != 0) {
-      AddItem (menu, "Run", delegate {
+      AddItem (menu, "Run " + c.Target.Name, delegate {
         Helpers.RunCommandInDir (targetPath, "", Helpers.Dirname(targetPath));
       });
     }
@@ -128,16 +112,31 @@ public class FilezooContextMenu : Menu {
   void BuildCommonMenu (Menu menu, ClickHit c)
   {
     string targetPath = c.Target.FullName;
+    string targetDir = c.Target.IsDirectory ? targetPath : Helpers.Dirname(targetPath);
 
     BuildCopyPasteMenu (menu, c);
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "Create _file…", delegate { ShowCreateDialog (targetDir); });
+
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "Create _directory…", delegate {
+      ShowCreateDirDialog (targetDir);
+    });
+
+    Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "_Run command…", delegate {
       ShowRunDialog (targetPath);
     });
 
+    AddItem (menu, "Open _terminal", delegate {
+      Helpers.OpenTerminal (targetDir);
+    });
 
-    /** DESTRUCTIVE */
+//    /** DESTRUCTIVE */
 //     AddItem (menu, "_Copy to…", delegate {
 //       ShowCopyDialog (targetPath);
 //     });
@@ -146,6 +145,8 @@ public class FilezooContextMenu : Menu {
     AddItem (menu, "Re_name…", delegate {
       ShowRenameDialog (targetPath);
     });
+
+    Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "Move to trash", delegate {
