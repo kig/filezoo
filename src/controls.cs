@@ -33,11 +33,13 @@ public class FilezooControls : HBox
     Button homeButton = new Button ("<span size=\"small\">Home</span>");
 //     homeButton.Relief = ReliefStyle.None;
     ((Label)(homeButton.Children[0])).UseMarkup = true;
+    homeButton.CanFocus = false;
     homeButton.Clicked += delegate { Go(Helpers.HomeDir); };
 
     Button dlButton = new Button ("<span size=\"small\">Downloads</span>");
 //     dlButton.Relief = ReliefStyle.None;
     ((Label)(dlButton.Children[0])).UseMarkup = true;
+    dlButton.CanFocus = false;
     dlButton.Clicked += delegate {
       Go(Helpers.HomeDir + Helpers.DirSepS + "downloads"); };
 
@@ -59,9 +61,12 @@ public class FilezooControls : HBox
       RecreateEntryCompletion ();
     };
     entry.KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
-      if (args.Event.Key == Gdk.Key.Escape && Fz.Selection.Count > 0) {
-        Fz.ClearSelection ();
-        args.RetVal = true;
+      if (args.Event.Key == Gdk.Key.Escape) {
+        Fz.Cancelled = true;
+        if (Fz.Selection.Count > 0) {
+          Fz.ClearSelection ();
+          args.RetVal = true;
+        }
       }
     };
 

@@ -80,6 +80,7 @@ public class FilezooPanelControls : FilezooControls
 
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape) {
+        Fz.Cancelled = true;
         if (Fz.Selection.Count > 0)
           Fz.ClearSelection ();
         else
@@ -89,6 +90,7 @@ public class FilezooPanelControls : FilezooControls
 
     FilezooWindow.KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
       if (args.Event.Key == Gdk.Key.Escape) {
+        Fz.Cancelled = true;
         if (Fz.Selection.Count > 0)
           Fz.ClearSelection ();
         else

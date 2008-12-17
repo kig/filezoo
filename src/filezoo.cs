@@ -62,8 +62,8 @@ public class Filezoo : DrawingArea
   public double FilesMarginBottom = 0;
 
   // zoom speed settings, must be > 1 to zoom in the right direction
-  public double ZoomInSpeed = 1.5;
-  public double ZoomOutSpeed = 1.5;
+  public double ZoomInSpeed = 2;
+  public double ZoomOutSpeed = 2;
 
   // Available sorts
   public SortHandler[] SortFields = {
@@ -158,6 +158,8 @@ public class Filezoo : DrawingArea
   FSEntry DragSourceEntry;
   string DragSourcePath;
 
+  public bool Cancelled = false;
+
   public Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
 
   Clipboard clipboard;
@@ -191,6 +193,7 @@ public class Filezoo : DrawingArea
 
     CanFocus = true;
     KeyPressEvent += delegate (object o, KeyPressEventArgs args) {
+      Cancelled = true;
       Gdk.ModifierType state = args.Event.State;
       switch (args.Event.Key) {
         case Gdk.Key.Control_L:
@@ -210,6 +213,7 @@ public class Filezoo : DrawingArea
     };
 
     KeyReleaseEvent += delegate (object o, KeyReleaseEventArgs args) {
+      Cancelled = true;
       if (args.Event.Key == Gdk.Key.Escape && Selection.Count > 0) {
         ClearSelection ();
         args.RetVal = true;
@@ -266,14 +270,15 @@ public class Filezoo : DrawingArea
 
     DragEnd += delegate {
       GetSelectionData ();
+      Cancelled = true;
       dragInProgress = false;
-      dragStartX = 9999;
       DragSourceEntry = null;
       DragSourcePath = null;
     };
 
     /** DESCTRUCTIVE */
     DragDataReceived += delegate (object sender, DragDataReceivedArgs e) {
+      Cancelled = true;
       string targetPath = FindHit (Width, Height, e.X, e.Y, 8).Target.FullName;
       HandleSelectionData (e.SelectionData, e.Context.SuggestedAction, targetPath);
     };
@@ -1231,6 +1236,16 @@ public class Filezoo : DrawingArea
 
   /* Event handlers */
 
+  double ThrowVelocity = 0;
+  List<ThrowFrame> ThrowFrames = new List<ThrowFrame> ();
+  struct ThrowFrame {
+    public double X, Y, Time;
+    public ThrowFrame (double x, double y) {
+      X=x; Y=y;
+      Time = DateTime.Now.ToFileTime () / 1e7;
+    }
+  }
+
   /** FAST */
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
@@ -1240,6 +1255,11 @@ public class Filezoo : DrawingArea
     p.Time ("SetCursor");
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
+    ThrowVelocity = 0;
+    ThrowFrames.Clear ();
+    Cancelled = false;
+    if (e.Button == 1 || e.Button == 2)
+      ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
     dragging = false;
     if (e.Button == 3) {
       int w, h;
@@ -1270,20 +1290,41 @@ public class Filezoo : DrawingArea
     GrabFocus ();
     SetCursor (e.State);
     p.Time ("SetCursor");
-    if (e.Button == 1 && !dragging) {
-    InteractionProfiler.Start ();
-      int w, h;
-      e.Window.GetSize (out w, out h);
-      AltKeyDown = (e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask;
-      CtrlKeyDown = (e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask;
-      ShiftKeyDown = (e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask;
-      if (AltKeyDown)
-        ClearSelection ();
-      using (Context scr = new Context (CachedSurface)) {
-        scr.IdentityMatrix ();
-        Click (scr, (uint)w, (uint)h, e.X, e.Y);
+    if (Cancelled) {
+      Cancelled = DoubleClick = false;
+    } else {
+      if (e.Button == 1 && !dragging) {
+      InteractionProfiler.Start ();
+        int w, h;
+        e.Window.GetSize (out w, out h);
+        AltKeyDown = (e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask;
+        CtrlKeyDown = (e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask;
+        ShiftKeyDown = (e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask;
+        if (AltKeyDown)
+          ClearSelection ();
+        using (Context scr = new Context (CachedSurface)) {
+          scr.IdentityMatrix ();
+          Click (scr, (uint)w, (uint)h, e.X, e.Y);
+        }
+        DoubleClick = false;
       }
-      DoubleClick = false;
+      if ((e.Button == 1 || e.Button == 2) && ThrowFrames.Count > 0) {
+        ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
+        int len = Math.Min(10, ThrowFrames.Count-1);
+        double vy = 0;
+        for (int i=ThrowFrames.Count-len; i<ThrowFrames.Count; i++) {
+          vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
+        }
+        vy /= len;
+        // Console.WriteLine("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
+        if (Math.Abs(vy) > 5) {
+          ThrowVelocity = vy*1.5;
+          NeedRedraw = true;
+        } else {
+          ThrowVelocity = 0;
+        }
+        ThrowFrames.Clear ();
+      }
     }
     if (e.Button == 1) {
       if (!dragInProgress) {
@@ -1310,32 +1351,41 @@ public class Filezoo : DrawingArea
     bool left = (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask;
     bool middle = (e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask;
 
-    if (middle) {
-      dragging = true;
-      panning = true;
-    }
-    if (left) {
-      dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
-      panning = panning || (dragStartX > 128+FilesMarginLeft) || (DragSourceEntry == CurrentDirEntry);
-      if (!dragInProgress && !panning && dragging) {
-        Gdk.DragAction action = Gdk.DragAction.Move;
-        if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
-          action = Gdk.DragAction.Copy;
-        if ((e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)
-          action = Gdk.DragAction.Copy;
-        if ((e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask)
-          action = Gdk.DragAction.Ask;
-        dragInProgress = true;
-        Drag.Begin (this, new TargetList(targets), action, 1, e);
-        SetCursor (e.State);
+    if (!Cancelled) {
+      if (left || middle)
+        ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
+      if (middle) {
+        dragging = true;
+        panning = true;
       }
-    }
-    if (panning) {
-      InteractionProfiler.Restart ();
-      double dx = e.X - dragX;
-      double dy = e.Y - dragY;
-      using ( Context cr = new Context (EtcSurface) )
-        PanBy (cr, Width, Height, dx, dy);
+      if (left) {
+        dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
+        panning = panning || (dragStartX > 128+FilesMarginLeft) || (DragSourceEntry == CurrentDirEntry);
+        if (!dragInProgress && !panning && dragging) {
+          Gdk.DragAction action = Gdk.DragAction.Move;
+          if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
+            action = Gdk.DragAction.Copy;
+          if ((e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)
+            action = Gdk.DragAction.Copy;
+          if ((e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask)
+            action = Gdk.DragAction.Ask;
+          dragInProgress = true;
+          Drag.Begin (this, new TargetList(targets), action, 1, e);
+          SetCursor (e.State);
+          Cancelled = true;
+          ThrowVelocity = 0;
+          ThrowFrames.Clear ();
+        }
+      }
+      if (panning) {
+        InteractionProfiler.Restart ();
+        double dx = e.X - dragX;
+        double dy = e.Y - dragY;
+        using ( Context cr = new Context (EtcSurface) )
+          PanBy (cr, Width, Height, dx, dy);
+      }
+    } else {
+      panning = false;
     }
     if (SillyFlare) {
       LimitedRedraw = true;
@@ -1353,8 +1403,6 @@ public class Filezoo : DrawingArea
   {
     InteractionProfiler.Start ();
     Profiler p = new Profiler ("ScrollEvent", 10);
-    SetCursor (e.State);
-    p.Time("SetCursor");
     if (e.Direction == Gdk.ScrollDirection.Up) {
       using (Context cr = new Context (EtcSurface))
         ZoomToward (cr, Width, Height, e.X, e.Y);
@@ -1391,6 +1439,17 @@ public class Filezoo : DrawingArea
         Width = (uint) w;
         Height = (uint) h;
         UpdateLayout ();
+      }
+      if (Cancelled) {
+        ThrowFrames.Clear ();
+        ThrowVelocity = 0;
+      }
+      if (ThrowVelocity != 0) {
+        using ( Context ecr = new Context (EtcSurface) )
+          PanBy (ecr, Width, Height, 0, ThrowVelocity);
+        ThrowVelocity *= 0.99;
+        if (Math.Abs(ThrowVelocity) < 1)
+          ThrowVelocity = 0;
       }
       if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
       if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
