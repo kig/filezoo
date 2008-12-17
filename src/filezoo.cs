@@ -590,7 +590,7 @@ public class Filezoo : DrawingArea
   {
     foreach (FSEntry e in CurrentDirEntry.Entries) {
       DateTime mtime = Helpers.LastChange(e.FullName);
-      if (e.IsDirectory && !(e.LastFileChange == mtime)) {
+      if (e.LastFileChange != mtime) {
         e.LastFileChange = mtime;
         FSCache.Invalidate(e.FullName);
       }
