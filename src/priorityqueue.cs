@@ -36,6 +36,11 @@ public class PriorityQueue
     Entries = new List<PQEntry> ();
   }
 
+  /**
+    Enqueues a string with a priority.
+    Large priorities are at the front of the queue while
+    small priorities are at the end of the queue.
+    */
   public void Enqueue (string value, int priority)
   {
     int i=0;

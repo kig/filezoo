@@ -296,6 +296,22 @@ public static class Helpers {
   }
 
   /** DESTRUCTIVE, BLOCKING */
+  public static bool Delete (string path)
+  {
+    try {
+    Console.WriteLine("Deleting {0}", path);
+      if (IsDir(path))
+        new UnixDirectoryInfo(path).Delete(true);
+      else
+        new UnixFileInfo(path).Delete();
+      return true;
+    } catch (Exception e) {
+      Console.WriteLine(e);
+      return false;
+    }
+  }
+
+  /** DESTRUCTIVE, BLOCKING */
   public static void Move (string src, string dst) { Move (src,dst,false); }
   public static void Move (string src, string dst, bool deleteOverwrite)
   {

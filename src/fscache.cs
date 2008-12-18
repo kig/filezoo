@@ -518,6 +518,7 @@ public static class FSCache
       long oldSize = d.Size;
       d.Setup(u);
       AddCountAndSize(d.ParentDir.FullName, 0, d.Size-oldSize);
+      d.LastChange = LastChange = DateTime.Now;
     }
   } }
 
@@ -701,8 +702,11 @@ public static class FSCache
     }
   } } }
 
-  static void GetThumbnail (string path)
+  /* returns "should retry" */
+  static bool GetThumbnail (string path)
   {
+    if ( DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds <= 1 )
+      return true;
     FSEntry f = Get (path);
     if (f.Thumbnail == null) {
       string uri = "file://"+path;
@@ -710,16 +714,27 @@ public static class FSCache
       ImageSurface tn;
       string tfn = TNF.Lookup(uri, f.LastModified);
       if (tfn != null) {
+        if ( DateTime.Now.Subtract(Helpers.LastModified(tfn)).TotalSeconds <= 1 )
+          return true;
         tn = new ImageSurface (tfn);
       } else {
         Gdk.Pixbuf pbuf = TNF.GenerateThumbnail(uri, mime);
         if (pbuf != null) {
           TNF.SaveThumbnail(pbuf, uri, f.LastModified);
         } else {
-          TNF.CreateFailedThumbnail(uri, f.LastModified);
-          return;
+          double since = DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds;
+          bool fileRecentlyModified = since < 5;
+          if (!fileRecentlyModified)
+            TNF.CreateFailedThumbnail(uri, f.LastModified);
+          return fileRecentlyModified;
         }
         tn = Helpers.ToImageSurface(pbuf);
+      }
+      if (tn.Width < 1 || tn.Height < 1) {
+        tn.Destroy ();
+        tn.Destroy ();
+        bool tnRecentlyModified = ( DateTime.Now.Subtract(Helpers.LastModified(tfn)).TotalSeconds < 2 );
+        return tnRecentlyModified;
       }
       lock (Cache) {
         f.Thumbnail = tn;
@@ -753,6 +768,7 @@ public static class FSCache
       }
       LastChange = DateTime.Now;
     }
+    return false;
   }
 
   static void ThumbnailQueueProcessor ()
@@ -774,7 +790,9 @@ public static class FSCache
       else
         return;
     }
-    GetThumbnail (tn);
+    if (GetThumbnail (tn))
+      lock (ThumbnailQueue)
+        ThumbnailQueue.Enqueue (tn, 0);
   }
 
 }

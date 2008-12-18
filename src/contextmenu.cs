@@ -18,6 +18,7 @@
 
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Linq;
 using System;
 using Gtk;
 using Mono.Unix;
@@ -31,10 +32,10 @@ public class FilezooContextMenu : Menu {
     Build (this, c);
   }
 
-  string[] exSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
-  string[] amarokSuffixes = {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
-  string[] mplayerSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
-  string[] gqviewSuffixes = {"jpg", "jpeg", "png", "gif"};
+  string[] archiveSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
+  string[] audioSuffixes = {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
+  string[] videoSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
+  string[] imageSuffixes = {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
     menu.Title = c.Target.FullName;
@@ -68,7 +69,7 @@ public class FilezooContextMenu : Menu {
       });
     }
 
-    if (HasEntryWithSuffix(u, gqviewSuffixes)) {
+    if (HasEntryWithSuffix(u, imageSuffixes)) {
       AddCommandItem(menu, "View images", "gqview", "", targetPath);
     }
 
@@ -86,21 +87,25 @@ public class FilezooContextMenu : Menu {
       Helpers.OpenFile (targetPath);
     });
 
-    if (Array.IndexOf (mplayerSuffixes, c.Target.Suffix) > -1) {
+    if (Array.IndexOf (videoSuffixes, c.Target.Suffix) > -1) {
       AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
     }
 
-    if (Array.IndexOf (gqviewSuffixes, c.Target.Suffix) > -1) {
+    if (Array.IndexOf (imageSuffixes, c.Target.Suffix) > -1) {
       AddCommandItem(menu, "View image", "gqview", "", targetPath);
+      Separator(menu);
+      AddCommandItem(menu, "Rotate ↱", "mogrify", "-rotate 90", targetPath, true);
+      AddCommandItem(menu, "Rotate ↰", "mogrify", "-rotate 270", targetPath, true);
+      AddCommandItem(menu, "Rotate 180°", "mogrify", "-rotate 180", targetPath, true);
     }
 
-    if (Array.IndexOf (amarokSuffixes, c.Target.Suffix) > -1) {
+    if (Array.IndexOf (audioSuffixes, c.Target.Suffix) > -1) {
       AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
       AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
     }
 
     /** DESTRUCTIVE */
-    if (Array.IndexOf (exSuffixes, c.Target.Suffix) > -1) {
+    if (Array.IndexOf (archiveSuffixes, c.Target.Suffix) > -1) {
       AddItem (menu, "_Extract", delegate { Helpers.ExtractFile (targetPath); });
     }
 
@@ -122,6 +127,11 @@ public class FilezooContextMenu : Menu {
     /** DESTRUCTIVE */
     AddItem (menu, "Re_name…", delegate {
       ShowRenameDialog (targetPath);
+    });
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "Touch", delegate {
+      Helpers.Touch (targetPath);
     });
 
     Separator (menu);
@@ -184,6 +194,40 @@ public class FilezooContextMenu : Menu {
 
     string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
+    IEnumerable<string> keys = App.Selection.Keys;
+
+    if (HasEntryWithSuffix(keys, videoSuffixes)) {
+      Separator (menu);
+      AddMultiArgCommandItem(menu, "Play selected videos", "mplayer", "", keys, videoSuffixes);
+    }
+
+    if (HasEntryWithSuffix(keys, imageSuffixes)) {
+      Separator (menu);
+      AddMultiArgCommandItem(menu, "View selected images", "gqview", "", keys, imageSuffixes);
+      Separator (menu);
+      AddCommandItem(menu, "Rotate selected images ↱", "mogrify", "-rotate 90", keys, imageSuffixes, true);
+      AddCommandItem(menu, "Rotate selected images ↰", "mogrify", "-rotate 270", keys, imageSuffixes, true);
+      AddCommandItem(menu, "Rotate selected images 180°", "mogrify", "-rotate 180", keys, imageSuffixes, true);
+    }
+
+    if (HasEntryWithSuffix(keys, audioSuffixes) || keys.Any(Helpers.IsDir)) {
+      Separator (menu);
+      AddMultiArgCommandItem(menu, "Set selection as playlist", "amarok", "-p --load", keys);
+      AddMultiArgCommandItem(menu, "Append selection to playlist", "amarok", "--append", keys);
+    }
+
+    /** DESTRUCTIVE */
+    if (HasEntryWithSuffix(keys, archiveSuffixes)) {
+      Separator (menu);
+      AddItem (menu, "_Extract selected archives", new EventHandler(delegate {
+        var targets = keys.Where(path => archiveSuffixes.Contains(Helpers.Extname(path).ToLower()));
+        foreach(string path in targets)
+          Helpers.ExtractFile(path);
+      }));
+    }
+
+    Separator (menu);
+
     /** DESTRUCTIVE */
     AddItem (menu, String.Format("_Move selected to {0}/", Helpers.Basename(targetDir).Replace("_", "__")),
       delegate {
@@ -233,10 +277,57 @@ public class FilezooContextMenu : Menu {
   { menu.Append(MkItem(title, subMenu)); }
 
   public static void AddCommandItem (Menu menu, string title, string cmd, string args, string path)
+  { AddCommandItem(menu,title,cmd,args,path,false); }
+  public static void AddCommandItem (Menu menu, string title, string cmd, string args, string path, bool touch)
   {
     AddItem(menu, title, delegate {
       Helpers.RunCommandInDir (cmd, args + " " + Helpers.EscapePath(path), Helpers.Dirname(path));
+      if (touch) {
+        FSCache.Invalidate(path);
+      }
     });
+  }
+
+  public static void AddCommandItem
+  (Menu menu, string title, string cmd, string args, IEnumerable<string> paths, IEnumerable<string> suffixes)
+  { AddCommandItem(menu, title, cmd, args, paths, suffixes, false); }
+
+  public static void AddCommandItem
+  (Menu menu, string title, string cmd, string args, IEnumerable<string> paths, IEnumerable<string> suffixes, bool touch)
+  {
+    AddItem(menu, title, delegate {
+      IEnumerable<string> targets;
+      if (suffixes == null) targets = paths;
+      else targets = paths.Where(path => suffixes.Contains(Helpers.Extname(path).ToLower()));
+/*      string filenames = String.Join(" ", targets.Select(o => Helpers.EscapePath(o)).ToArray ());
+      Console.WriteLine(filenames);*/
+      foreach(string path in targets) {
+        Helpers.RunCommandInDir (cmd, args + " " + Helpers.EscapePath(path), Helpers.Dirname(path));
+        if (touch) {
+          FSCache.Invalidate(path);
+        }
+      }
+    });
+  }
+
+  public static void AddMultiArgCommandItem
+  (Menu menu, string title, string cmd, string args, IEnumerable<string> paths)
+  { AddMultiArgCommandItem(menu, title, cmd, args, paths, null); }
+
+  public static void AddMultiArgCommandItem
+  (Menu menu, string title, string cmd, string args, IEnumerable<string> paths, IEnumerable<string> suffixes)
+  {
+    AddItem(menu, title, new EventHandler(delegate {
+      IEnumerable<string> targets;
+      if (suffixes == null) targets = paths;
+      else targets = paths.Where(path => suffixes.Contains(Helpers.Extname(path).ToLower()));
+      if (targets.Count() > 0) {
+        string fp = targets.First ();
+        string filenames = String.Join(" ", targets.Select(o => Helpers.EscapePath(o)).ToArray ());
+//         Console.WriteLine(filenames);
+        Helpers.RunCommandInDir (cmd, args + " " + filenames, Helpers.Dirname(fp));
+      }
+    }));
   }
 
 
@@ -250,6 +341,10 @@ public class FilezooContextMenu : Menu {
     return false;
   }
 
+  public static bool HasEntryWithSuffix (IEnumerable<string> paths, IEnumerable<string> suffixes)
+  {
+    return paths.Any(path => suffixes.Contains(Helpers.Extname(path).ToLower()));
+  }
 
   /* GTK dialog helpers */
 
