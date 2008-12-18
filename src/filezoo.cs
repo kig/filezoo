@@ -1043,13 +1043,18 @@ public class Filezoo : DrawingArea
       double areaWidth = width-BreadcrumbMarginLeft-BreadcrumbMarginRight;
       cr.Rectangle (0,0,areaWidth, te1.Height);
       cr.Clip ();
-      cr.Translate (Math.Min(0,areaWidth-te1.Width), 0);
+      cr.Translate (Math.Min(0,areaWidth-te1.Width), -BreadcrumbMarginTop);
+      if (areaWidth - te1.Width >= 0)
+        cr.Translate(-(BreadcrumbMarginLeft+1), 0);
       cr.MoveTo (0.0, 0.0);
       int hitIndex = 0;
       string[] segments = CurrentDirPath.Split(Helpers.DirSepC);
       foreach (string s in segments) {
         string name = (s == "") ? rootChar : s+dirSep;
         TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, name);
+        te.Height += BreadcrumbMarginTop;
+        if (s == "")
+          te.Width += BreadcrumbMarginLeft+1;
         if (Helpers.CheckTextExtents(cr, te, x, y)) {
           string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
           if (newDir == "") newDir = Helpers.RootDir;
@@ -1062,8 +1067,16 @@ public class Filezoo : DrawingArea
           cr.Restore ();
           return true;
         }
+        if (s == "" && (areaWidth - te1.Width >= 0))
+          cr.Translate(BreadcrumbMarginLeft+1, 0);
         cr.RelMoveTo( te.XAdvance, 0 );
         hitIndex += 1;
+      }
+      cr.IdentityMatrix ();
+      cr.Rectangle (0,-1,width,2);
+      if (cr.InFill(x,y)) {
+        ResetZoom ();
+        UpdateLayout ();
       }
     cr.Restore ();
     return false;
