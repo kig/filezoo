@@ -40,7 +40,9 @@ public class FilezooContextMenu : Menu {
     menu.Title = c.Target.FullName;
     if (App.Selection.Count > 0) {
       BuildSelectionMenu (menu, c);
-      Separator (menu);
+      Menu smenu = new Menu ();
+      AddItem (menu, c.Target.Name.Replace("_", "__"), smenu);
+      menu = smenu;
     }
     if (c.Target.IsDirectory)
       BuildDirMenu (menu, c);
@@ -55,7 +57,7 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    AddItem (menu, "Go to " + c.Target.Name, delegate {
+    AddItem (menu, "Go to " + c.Target.Name.Replace("_", "__"), delegate {
       App.SetCurrentDir (targetPath);
     });
 
@@ -80,7 +82,7 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    AddItem (menu, "Open " + c.Target.Name, delegate {
+    AddItem (menu, "Open " + c.Target.Name.Replace("_", "__"), delegate {
       Helpers.OpenFile (targetPath);
     });
 
@@ -114,7 +116,15 @@ public class FilezooContextMenu : Menu {
     string targetPath = c.Target.FullName;
     string targetDir = c.Target.IsDirectory ? targetPath : Helpers.Dirname(targetPath);
 
-    BuildCopyPasteMenu (menu, c);
+    if (App.Selection.Count == 0)
+      BuildCopyPasteMenu (menu, c);
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "Re_name…", delegate {
+      ShowRenameDialog (targetPath);
+    });
+
+    Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "Create _file…", delegate { ShowCreateDialog (targetDir); });
@@ -123,6 +133,14 @@ public class FilezooContextMenu : Menu {
     /** DESTRUCTIVE */
     AddItem (menu, "Create _directory…", delegate {
       ShowCreateDirDialog (targetDir);
+    });
+
+    Separator (menu);
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "Move to trash", delegate {
+      Helpers.Trash(targetPath);
+      FSCache.Invalidate (targetPath);
     });
 
     Separator (menu);
@@ -141,18 +159,6 @@ public class FilezooContextMenu : Menu {
 //       ShowCopyDialog (targetPath);
 //     });
 
-    /** DESTRUCTIVE */
-    AddItem (menu, "Re_name…", delegate {
-      ShowRenameDialog (targetPath);
-    });
-
-    Separator (menu);
-
-    /** DESTRUCTIVE */
-    AddItem (menu, "Move to trash", delegate {
-      Helpers.Trash(targetPath);
-      FSCache.Invalidate (targetPath);
-    });
   }
 
   void BuildCopyPasteMenu (Menu menu, ClickHit c)
@@ -179,13 +185,13 @@ public class FilezooContextMenu : Menu {
     string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
     /** DESTRUCTIVE */
-    AddItem (menu, String.Format("_Move selected to {0}/", Helpers.Basename(targetDir)),
+    AddItem (menu, String.Format("_Move selected to {0}/", Helpers.Basename(targetDir).Replace("_", "__")),
       delegate {
         App.MoveSelectionTo(targetDir);
     });
 
     /** DESTRUCTIVE */
-    AddItem (menu, String.Format("_Copy selected to {0}/", Helpers.Basename(targetDir)),
+    AddItem (menu, String.Format("_Copy selected to {0}/", Helpers.Basename(targetDir).Replace("_", "__")),
       delegate {
         App.CopySelectionTo(targetDir);
     });
@@ -194,6 +200,8 @@ public class FilezooContextMenu : Menu {
     AddItem (menu, "Move selected to trash", delegate {
       App.TrashSelection ();
     });
+
+    BuildCopyPasteMenu (menu, c);
   }
 
 
