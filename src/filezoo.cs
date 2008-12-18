@@ -1308,7 +1308,7 @@ public class Filezoo : DrawingArea
         }
         DoubleClick = false;
       }
-      if ((e.Button == 1 || e.Button == 2) && ThrowFrames.Count > 0) {
+      if (e.Button == 1 && ThrowFrames.Count > 0) {
         ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
         int len = Math.Min(10, ThrowFrames.Count-1);
         double vy = 0;
@@ -1333,6 +1333,7 @@ public class Filezoo : DrawingArea
       }
       dragInProgress = false;
     }
+    if (e.Button == 2) ControlLineVisible = false;
     dragging = false;
     panning = panning && dragInProgress;
     p.Time ("Handled");
@@ -1341,6 +1342,7 @@ public class Filezoo : DrawingArea
 
   bool panning = false;
   bool dragInProgress = false;
+  bool ControlLineVisible = false;
 
   /** FAST */
   protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
@@ -1350,6 +1352,8 @@ public class Filezoo : DrawingArea
     p.Time("SetCursor");
     bool left = (e.State & Gdk.ModifierType.Button1Mask) == Gdk.ModifierType.Button1Mask;
     bool middle = (e.State & Gdk.ModifierType.Button2Mask) == Gdk.ModifierType.Button2Mask;
+
+    if (!left && !middle) panning = dragging = false;
 
     if (!Cancelled) {
       if (left || middle)
@@ -1381,8 +1385,24 @@ public class Filezoo : DrawingArea
         InteractionProfiler.Restart ();
         double dx = e.X - dragX;
         double dy = e.Y - dragY;
-        using ( Context cr = new Context (EtcSurface) )
-          PanBy (cr, Width, Height, dx, dy);
+        using ( Context cr = new Context (EtcSurface) ) {
+          if (middle) {
+            ControlLineVisible = true;
+            double z = Math.Pow((dx < 0 ? ZoomInSpeed : (1 / ZoomOutSpeed)), (Math.Abs(dx) / 50));
+            if (Height - e.Y < 50)
+              ThrowVelocity = -(50 - (Height - e.Y)) / 2;
+            else if (e.Y < 50)
+              ThrowVelocity = (50 - e.Y) / 2;
+            else
+              ThrowVelocity = 0;
+            ZoomBy (cr, Width, Height, e.X, e.Y, z);
+            PanBy (cr, Width, Height, dx, -dy);
+          } else {
+            ControlLineVisible = false;
+            ThrowVelocity = 0;
+            PanBy (cr, Width, Height, dx, dy);
+          }
+        }
       }
     } else {
       panning = false;
@@ -1467,6 +1487,13 @@ public class Filezoo : DrawingArea
         using (Pattern p = new Pattern (CachedSurface)) {
           cr.Operator = Operator.Over;
           DrawBackground (cr, Width, Height);
+          if (ControlLineVisible && panning) {
+            cr.Save ();
+              cr.Color = Renderer.DirectoryFGColor;
+              cr.Rectangle (0, dragY, Width, 1);
+              cr.Fill ();
+            cr.Restore ();
+          }
           cr.Source = p;
           cr.Paint ();
           cr.Operator = Operator.Over;
@@ -1518,10 +1545,10 @@ public class Filezoo : DrawingArea
       cr.Translate(flareX, flareY);
       cr.Save ();
         cr.Scale (s, s);
-        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
-/*        cr.Source = BlackGradient;
-        cr.Operator = Operator.Over;
-        cr.FillPreserve ();*/
+/*        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
+        cr.Source = BlackGradient;
+        cr.Operator = Operator.Over;*/
+        cr.FillPreserve ();
         cr.Source = FlareGradient;
         cr.Operator = Operator.Add;
         cr.Fill ();
