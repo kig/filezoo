@@ -1333,7 +1333,7 @@ public class Filezoo : DrawingArea
       }
       dragInProgress = false;
     }
-    if (e.Button == 2) ControlLineVisible = false;
+    if (e.Button == 2) { ControlLineVisible = false; NeedRedraw = true; }
     dragging = false;
     panning = panning && dragInProgress;
     p.Time ("Handled");
