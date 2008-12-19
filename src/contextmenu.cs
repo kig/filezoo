@@ -94,7 +94,7 @@ public class FilezooContextMenu : Menu {
     Separator (menu);
 
     AddItem (menu, "Open " + c.Target.Name.Replace("_", "__"), delegate {
-      App.OpenFile (targetPath);
+      Helpers.OpenFile (targetPath);
     });
 
     if (videoSuffixes.Contains (c.Target.Suffix)) {

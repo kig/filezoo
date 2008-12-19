@@ -1239,7 +1239,7 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   void ZoomToward (Context cr, uint width, uint height, double x, double y) {
     if (ZoomVelocity >= 1)
-      ZoomVelocity *= Math.Pow(ZoomInSpeed, 0.15);
+      ZoomVelocity *= Math.Pow(ZoomInSpeed, 0.3);
     else
       ZoomVelocity = 1;
     NeedRedraw = true;
@@ -1248,7 +1248,7 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   void ZoomAway (Context cr, uint width, uint height, double x, double y) {
     if (ZoomVelocity <= 1)
-      ZoomVelocity *= Math.Pow(1 / ZoomOutSpeed, 0.15);
+      ZoomVelocity *= Math.Pow(1 / ZoomOutSpeed, 0.3);
     else
       ZoomVelocity = 1;
     NeedRedraw = true;
@@ -1365,7 +1365,7 @@ public class Filezoo : DrawingArea
       }
       if (e.Button == 1 && ThrowFrames.Count > 0) {
         ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
-        int len = Math.Min(10, ThrowFrames.Count-1);
+        int len = Math.Min(5, ThrowFrames.Count-1);
         double vy = 0;
         for (int i=ThrowFrames.Count-len; i<ThrowFrames.Count; i++) {
           vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
@@ -1450,11 +1450,11 @@ public class Filezoo : DrawingArea
               ThrowVelocity = (50 + FilesMarginTop - e.Y) / 2;
             else
               ThrowVelocity = 0;
-            if (Width - e.X < 50)
+/*            if (Width - e.X < 50)
               ZoomVelocity = Math.Pow((1/ZoomOutSpeed), (50 - (Width - e.X)) / 250);
             else if (e.X < 50)
               ZoomVelocity = Math.Pow(ZoomInSpeed, (50 - e.X) / 250);
-            else
+            else*/
               ZoomVelocity = 1;
             ZoomBy (cr, Width, Height, e.X, e.Y, z);
             PanBy (cr, Width, Height, dx, -dy);
@@ -1537,8 +1537,8 @@ public class Filezoo : DrawingArea
       if (ZoomVelocity != 1) {
         using ( Context ecr = new Context (EtcSurface) )
           ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
-        ZoomVelocity = Math.Pow(ZoomVelocity, 0.9);
-        if (Math.Abs(1 - ZoomVelocity) < 0.0001)
+        ZoomVelocity = Math.Pow(ZoomVelocity, 0.8);
+        if (Math.Abs(1 - ZoomVelocity) < 0.001)
           ZoomVelocity = 1;
       }
       if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
