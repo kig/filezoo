@@ -1,0 +1,27 @@
+title: unit tests
+status: OPEN
+reported by: 
+date: 2008-12-19 08:37:09+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-19 08:37:09+0200
+
+Problem description:
+
+I don't know if a piece of code works correctly or not.
+
+
+How to reproduce:
+
+Add some method that compiles, wonder if it works right or not.
+
+
+Proposed solution:
+
+Use NUnit to set up tests: http://nunit.org 
+Use mono's code coverage tools: http://www.mono-project.com/Code_Coverage
+Make the tests a part of the build process.
+Run tests automatically before git push.
+Run tests automatically on file change.
+Put a traffic light tests-pass applet into the desktop panel.
