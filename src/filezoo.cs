@@ -623,6 +623,10 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   public void SetCurrentDir (string dirname)
   {
+    SetCurrentDir (dirname, true);
+  }
+  public void SetCurrentDir (string dirname, bool resetZoom)
+  {
     Profiler p = new Profiler ();
     dirLatencyProfiler.Restart ();
     FirstFrameOfDir = true;
@@ -640,7 +644,7 @@ public class Filezoo : DrawingArea
     }
 
     FSNeedRedraw = true;
-    ResetZoom ();
+    if (resetZoom) ResetZoom ();
     UpdateLayout ();
     p.Time("SetCurrentDir");
   }
@@ -1209,6 +1213,9 @@ public class Filezoo : DrawingArea
   void ResetZoom () {
     Zoomer.ResetZoom ();
     Zoomer.SetZoom (0.0, Renderer.DefaultPan, Renderer.DefaultZoom);
+    ZoomVelocity = 1;
+    ThrowVelocity = 0;
+    ThrowFrames.Clear ();
   }
 
   bool NeedZoomCheck = false;
@@ -1231,12 +1238,20 @@ public class Filezoo : DrawingArea
 
   /** BLOCKING */
   void ZoomToward (Context cr, uint width, uint height, double x, double y) {
-    ZoomBy (cr, width, height, x, y, ZoomInSpeed);
+    if (ZoomVelocity >= 1)
+      ZoomVelocity *= Math.Pow(ZoomInSpeed, 0.15);
+    else
+      ZoomVelocity = 1;
+    NeedRedraw = true;
   }
 
   /** BLOCKING */
   void ZoomAway (Context cr, uint width, uint height, double x, double y) {
-    ZoomBy (cr, width, height, x, y, 1.0 / ZoomOutSpeed);
+    if (ZoomVelocity <= 1)
+      ZoomVelocity *= Math.Pow(1 / ZoomOutSpeed, 0.15);
+    else
+      ZoomVelocity = 1;
+    NeedRedraw = true;
   }
 
   /** BLOCKING */
@@ -1262,7 +1277,7 @@ public class Filezoo : DrawingArea
       cr.Translate (0.0, Zoomer.Y);
       Covering c = Renderer.FindCovering(CurrentDirEntry, cr, r, 0);
       if (c.Directory.FullName != CurrentDirPath) {
-        SetCurrentDir(c.Directory.FullName);
+        SetCurrentDir(c.Directory.FullName, false);
         Zoomer.SetZoom (0.0, c.Pan, c.Zoom);
       }
     cr.Restore ();
@@ -1271,6 +1286,8 @@ public class Filezoo : DrawingArea
 
 
   /* Event handlers */
+
+  double ZoomVelocity = 1;
 
   double ThrowVelocity = 0;
   List<ThrowFrame> ThrowFrames = new List<ThrowFrame> ();
@@ -1292,6 +1309,7 @@ public class Filezoo : DrawingArea
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
     ThrowVelocity = 0;
+    ZoomVelocity = 1;
     ThrowFrames.Clear ();
     Cancelled = false;
     if (e.Button == 1 || e.Button == 2)
@@ -1326,6 +1344,7 @@ public class Filezoo : DrawingArea
     GrabFocus ();
     SetCursor (e.State);
     p.Time ("SetCursor");
+    ZoomVelocity = 1;
     if (Cancelled) {
       Cancelled = DoubleClick = false;
     } else {
@@ -1427,10 +1446,16 @@ public class Filezoo : DrawingArea
             double z = Math.Pow((dx < 0 ? ZoomInSpeed : (1 / ZoomOutSpeed)), (Math.Abs(dx) / 50));
             if (Height - e.Y < 50)
               ThrowVelocity = -(50 - (Height - e.Y)) / 2;
-            else if (e.Y < 50)
-              ThrowVelocity = (50 - e.Y) / 2;
+            else if (e.Y < 50 + FilesMarginTop)
+              ThrowVelocity = (50 + FilesMarginTop - e.Y) / 2;
             else
               ThrowVelocity = 0;
+            if (Width - e.X < 50)
+              ZoomVelocity = Math.Pow((1/ZoomOutSpeed), (50 - (Width - e.X)) / 250);
+            else if (e.X < 50)
+              ZoomVelocity = Math.Pow(ZoomInSpeed, (50 - e.X) / 250);
+            else
+              ZoomVelocity = 1;
             ZoomBy (cr, Width, Height, e.X, e.Y, z);
             PanBy (cr, Width, Height, dx, -dy);
           } else {
@@ -1485,6 +1510,8 @@ public class Filezoo : DrawingArea
     {
       int w, h;
       e.Window.GetSize (out w, out h);
+      int x, y;
+      GetPointer(out x, out y);
       bool sizeChanged = false;
       if (InteractionProfiler.Watch.IsRunning)
         InteractionProfiler.Time ("From UI action to expose");
@@ -1506,6 +1533,13 @@ public class Filezoo : DrawingArea
         ThrowVelocity *= 0.99;
         if (Math.Abs(ThrowVelocity) < 1)
           ThrowVelocity = 0;
+      }
+      if (ZoomVelocity != 1) {
+        using ( Context ecr = new Context (EtcSurface) )
+          ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
+        ZoomVelocity = Math.Pow(ZoomVelocity, 0.9);
+        if (Math.Abs(1 - ZoomVelocity) < 0.0001)
+          ZoomVelocity = 1;
       }
       if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
       if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
