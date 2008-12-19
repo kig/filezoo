@@ -81,19 +81,13 @@ public class FilezooControls : HBox
     } else if (url.StartsWith("?")) {
       Helpers.Search(url.Substring(1));
     } else if (url.StartsWith("!")) {
-    /** DESTRUCTIVE */
-      try { Helpers.RunCommandInDir ("sh", "-c "+Helpers.EscapePath(url.Substring(1)), Fz.CurrentDirPath); }
-      catch (Exception) {} // Possibly fails if current dir doesn't exist,
-                           // and doing something destructive in a random dir
-                           // is not a good idea.
+      /** DESTRUCTIVE */
+      Helpers.RunShellCommandInDir (url.Substring(1), "", Fz.CurrentDirPath);
     } else if (url.Contains(".") && !url.Contains(" ")) {
       Helpers.OpenURL(url);
     } else if (Helpers.IsValidCommandLine(url)) {
-    /** DESTRUCTIVE */
-      try { Helpers.RunCommandInDir ("sh", "-c "+ Helpers.EscapePath(url), Fz.CurrentDirPath); }
-      catch (Exception) {} // Possibly fails if current dir doesn't exist,
-                           // and doing something destructive in a random dir
-                           // is not a good idea.
+      /** DESTRUCTIVE */
+      Helpers.RunShellCommandInDir (url, "", Fz.CurrentDirPath);
     }
   }
 

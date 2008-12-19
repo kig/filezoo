@@ -32,10 +32,10 @@ public class FilezooContextMenu : Menu {
     Build (this, c);
   }
 
-  string[] archiveSuffixes = {"bz2", "gz", "rar", "tar", "zip"};
-  string[] audioSuffixes = {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
-  string[] videoSuffixes = {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
-  string[] imageSuffixes = {"jpg", "jpeg", "png", "gif"};
+  public static List<string> archiveSuffixes = new List<string>() {"bz2", "gz", "rar", "tar", "zip"};
+  public static List<string> audioSuffixes = new List<string>() {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
+  public static List<string> videoSuffixes = new List<string>() {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
+  public static List<string> imageSuffixes = new List<string>() {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
     menu.Title = c.Target.FullName;
@@ -84,14 +84,14 @@ public class FilezooContextMenu : Menu {
     string targetPath = c.Target.FullName;
 
     AddItem (menu, "Open " + c.Target.Name.Replace("_", "__"), delegate {
-      Helpers.OpenFile (targetPath);
+      App.OpenFile (targetPath);
     });
 
-    if (Array.IndexOf (videoSuffixes, c.Target.Suffix) > -1) {
+    if (videoSuffixes.Contains (c.Target.Suffix)) {
       AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
     }
 
-    if (Array.IndexOf (imageSuffixes, c.Target.Suffix) > -1) {
+    if (imageSuffixes.Contains (c.Target.Suffix)) {
       AddCommandItem(menu, "View image", "gqview", "", targetPath);
       Separator(menu);
       AddCommandItem(menu, "Rotate ↱", "mogrify", "-rotate 90", targetPath, true);
@@ -99,13 +99,13 @@ public class FilezooContextMenu : Menu {
       AddCommandItem(menu, "Rotate 180°", "mogrify", "-rotate 180", targetPath, true);
     }
 
-    if (Array.IndexOf (audioSuffixes, c.Target.Suffix) > -1) {
+    if (audioSuffixes.Contains (c.Target.Suffix)) {
       AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
       AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
     }
 
     /** DESTRUCTIVE */
-    if (Array.IndexOf (archiveSuffixes, c.Target.Suffix) > -1) {
+    if (archiveSuffixes.Contains (c.Target.Suffix)) {
       AddItem (menu, "_Extract", delegate { Helpers.ExtractFile (targetPath); });
     }
 
@@ -123,6 +123,8 @@ public class FilezooContextMenu : Menu {
 
     if (App.Selection.Count == 0)
       BuildCopyPasteMenu (menu, c);
+    else
+      Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "Re_name…", delegate {
@@ -333,10 +335,10 @@ public class FilezooContextMenu : Menu {
 
   /* Filesystem helpers */
 
-  public static bool HasEntryWithSuffix (UnixDirectoryInfo u, string[] suffixes)
+  public static bool HasEntryWithSuffix (UnixDirectoryInfo u, IEnumerable<string> suffixes)
   {
     foreach (UnixFileSystemInfo f in Helpers.EntriesMaybe(u))
-      if (Array.IndexOf(suffixes, Helpers.Extname(f.FullName).ToLower ()) > -1)
+      if (suffixes.Contains(Helpers.Extname(f.FullName).ToLower ()))
         return true;
     return false;
   }
@@ -391,7 +393,7 @@ public class FilezooContextMenu : Menu {
       " " + Helpers.EscapePath(path), "Run",
       0, 0, 0,
       new Helpers.TextPromptHandler(delegate (string newPath) {
-        Process.Start(newPath);
+        Helpers.RunShellCommandInDir(newPath, "", Helpers.IsDir(path) ? path : Helpers.Dirname(path));
       })
     );
   }

@@ -46,6 +46,8 @@ public static class Helpers {
 
   public static string HomeDir = UnixEnvironment.RealUser.HomeDirectory;
 
+  public static string Shell = UnixEnvironment.RealUser.ShellProgram;
+
   public static string TrashDir = HomeDir + DirSepS + ".Trash";
   public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
   public static string NormalThumbDir = ThumbDir + DirSepS + "normal";
@@ -209,34 +211,49 @@ public static class Helpers {
   }
 
   /** ASYNC */
-  public static void OpenTerminal (string path)
+  public static Process OpenTerminal (string path)
   {
-    RunCommandInDir ("urxvt", "", path);
+    return RunCommandInDir ("urxvt", "", path);
   }
 
   /** ASYNC */
-  public static void RunCommandInDir (string cmd, string args, string path)
+  public static Process RunCommandInDir (string cmd, string args, string path)
   {
     string cd = UnixDirectoryInfo.GetCurrentDirectory ();
-    UnixDirectoryInfo.SetCurrentDirectory (path);
-    Process.Start (cmd, args);
-    UnixDirectoryInfo.SetCurrentDirectory (cd);
+    try {
+      UnixDirectoryInfo.SetCurrentDirectory (path);
+      Process p = Process.Start (cmd, args);
+      UnixDirectoryInfo.SetCurrentDirectory (cd);
+      return p;
+    } catch (Exception) {
+      // SetCurrentDirectory fails when path doesn't exist.
+      // We return null because executing the command in a random
+      // directory is not a good idea and throwing an exception will just
+      // cause unwanted application crashes.
+      return null;
+    }
   }
 
   /** ASYNC */
-  public static void OpenFile (string path)
+  public static Process RunShellCommandInDir (string cmd, string args, string path)
   {
-    Process.Start ("kfmclient exec", EscapePath(path));
+    return Helpers.RunCommandInDir (Shell, "-c " + Helpers.EscapePath(cmd + (args == "" ? args : " " + args)), path);
   }
 
   /** ASYNC */
-  public static void OpenURL (string url) {
-    Process.Start ("firefox", "-new-tab " + Helpers.EscapePath(url));
+  public static Process OpenFile (string path)
+  {
+    return Process.Start ("kfmclient exec", EscapePath(path));
   }
 
   /** ASYNC */
-  public static void Search (string query) {
-    OpenURL ("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
+  public static Process OpenURL (string url) {
+    return Process.Start ("firefox", "-new-tab " + Helpers.EscapePath(url));
+  }
+
+  /** ASYNC */
+  public static Process Search (string query) {
+    return OpenURL ("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
   }
 
   /** BLOCKING */

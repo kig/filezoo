@@ -554,6 +554,27 @@ public class Filezoo : DrawingArea
     menu.Popup ();
   }
 
+
+  /** BLOCKING */
+  public void OpenFile (string path)
+  {
+    string suffix = Helpers.Extname(path).ToLower ();
+    string epath = Helpers.EscapePath(path);
+    string dir = Helpers.IsDir(path) ? path : Helpers.Dirname(path);
+    if (FilezooContextMenu.imageSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("gqview", epath, dir);
+    } else if (FilezooContextMenu.audioSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("amarok", "-p --load " + epath, dir);
+    } else if (FilezooContextMenu.videoSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("mplayer", epath, dir);
+    } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("ex", epath, dir);
+    } else {
+      Helpers.OpenFile(path);
+    }
+  }
+
+
   public void MockDraw (uint w, uint h)
   {
     using (Context cr = new Context (EtcSurface)) {
@@ -1025,7 +1046,7 @@ public class Filezoo : DrawingArea
             SetCurrentDir (c.Target.FullName);
           } else {
             // Console.WriteLine("Open {0}", c.Target.FullName);
-            Helpers.OpenFile(c.Target.FullName);
+            OpenFile(c.Target.FullName);
           }
         }
         UpdateLayout ();
