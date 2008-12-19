@@ -69,6 +69,7 @@ public class FilezooPanelControls : FilezooControls
 
     Toggle = new ToggleButton (ToggleUp);
     ((Label)(Toggle.Children[0])).UseMarkup = true;
+    Toggle.CanFocus = false;
     Toggle.Clicked += delegate { ToggleFilezoo (); };
 
     PackEnd(Toggle, false, false, 0);
