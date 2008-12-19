@@ -58,18 +58,21 @@ public class FilezooContextMenu : Menu {
   {
     string targetPath = c.Target.FullName;
 
-    AddItem (menu, "Go to " + c.Target.Name.Replace("_", "__"), delegate {
-      App.SetCurrentDir (targetPath);
+    string selFormat = App.Selection.ContainsKey(c.Target.FullName) ? "Deselect {0}" : "Select {0}";
+    AddItem (menu, String.Format(selFormat, c.Target.Name.Replace("_", "__")), delegate {
+      App.ToggleSelection (c.Target.FullName);
     });
 
     UnixDirectoryInfo u = new UnixDirectoryInfo (c.Target.FullName);
     if (u.GetEntries(@"^\.git$").Length > 0) {
+      Separator (menu);
       AddItem (menu, "View in gitk", delegate {
         Helpers.RunCommandInDir ("gitk", "", targetPath);
       });
     }
 
     if (HasEntryWithSuffix(u, imageSuffixes)) {
+      Separator (menu);
       AddCommandItem(menu, "View images", "gqview", "", targetPath);
     }
 
@@ -82,6 +85,13 @@ public class FilezooContextMenu : Menu {
   void BuildFileMenu (Menu menu, ClickHit c)
   {
     string targetPath = c.Target.FullName;
+
+    string selFormat = App.Selection.ContainsKey(c.Target.FullName) ? "Deselect {0}" : "Select {0}";
+    AddItem (menu, String.Format(selFormat, c.Target.Name.Replace("_", "__")), delegate {
+      App.ToggleSelection (c.Target.FullName);
+    });
+
+    Separator (menu);
 
     AddItem (menu, "Open " + c.Target.Name.Replace("_", "__"), delegate {
       App.OpenFile (targetPath);
@@ -192,7 +202,10 @@ public class FilezooContextMenu : Menu {
 
   void BuildSelectionMenu (Menu menu, ClickHit c)
   {
-    AddItem (menu, "Clear selection", delegate { App.ClearSelection (); });
+//     string selFormat = App.Selection.ContainsKey(c.Target.FullName) ? "Deselect {0}" : "Select {0}";
+    AddItem (menu, "Toggle selection", delegate {
+      App.ToggleSelection (c.Target.FullName);
+    });
 
     string targetDir = c.Target.IsDirectory ? c.Target.FullName : Helpers.Dirname(c.Target.FullName);
 
@@ -228,6 +241,11 @@ public class FilezooContextMenu : Menu {
       }));
     }
 
+
+    Separator (menu);
+
+    AddItem (menu, "Clear selection", delegate { App.ClearSelection (); });
+
     Separator (menu);
 
     /** DESTRUCTIVE */
@@ -241,6 +259,8 @@ public class FilezooContextMenu : Menu {
       delegate {
         App.CopySelectionTo(targetDir);
     });
+
+    Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "Move selected to trash", delegate {
