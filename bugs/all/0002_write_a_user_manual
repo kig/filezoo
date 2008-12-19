@@ -1,0 +1,20 @@
+title: write a user manual
+status: OPEN
+reported by: 
+date: 2008-12-19 08:50:12+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-19 08:50:12+0200
+
+Problem description:
+
+There is no way to find out which button does what, apart from reading 
+the source, and even that is super duper hard as the functionality is 
+spread all across filezoo.cs's event handling code.
+
+Proposed solution:
+
+Write a manual that describes the available controls.
+Get rid of all controls that require being in the manual.
+Throw away the manual.
