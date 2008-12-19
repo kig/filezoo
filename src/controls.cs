@@ -85,6 +85,8 @@ public class FilezooControls : HBox
       Helpers.RunShellCommandInDir (url.Substring(1), "", Fz.CurrentDirPath);
     } else if (url.Contains(".") && !url.Contains(" ")) {
       Helpers.OpenURL(url);
+    } else if (url.StartsWith("cd ")) { // heh
+      HandleEntry (url.Substring(3));
     } else if (Helpers.IsValidCommandLine(url)) {
       /** DESTRUCTIVE */
       Helpers.RunShellCommandInDir (url, "", Fz.CurrentDirPath);
@@ -112,7 +114,7 @@ public class FilezooControls : HBox
     }
     if (!Helpers.FileExists(newDir)) return true;
     if (!Helpers.IsDir (newDir)) {
-      Helpers.OpenFile (newDir);
+      Fz.OpenFile (newDir);
       return false;
     }
     Fz.SetCurrentDir (newDir);
