@@ -986,6 +986,7 @@ public class Filezoo : DrawingArea
             ToggleSelection(entries[i].FullName);
         }
       }
+      NeedRedraw = true;
     }
   }
 
@@ -993,6 +994,7 @@ public class Filezoo : DrawingArea
   {
     if (Selection.ContainsKey(path)) Selection.Remove(path);
     else Selection[path] = true;
+    NeedRedraw = true;
   }
 
   public void ClearSelection ()
