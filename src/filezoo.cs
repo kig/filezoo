@@ -1367,7 +1367,7 @@ public class Filezoo : DrawingArea
       }
       if (e.Button == 1 && ThrowFrames.Count > 0) {
         ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
-        int len = Math.Min(5, ThrowFrames.Count-1);
+        int len = Math.Min(10, ThrowFrames.Count-1);
         double vy = 0;
         for (int i=ThrowFrames.Count-len; i<ThrowFrames.Count; i++) {
           vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
@@ -1375,7 +1375,7 @@ public class Filezoo : DrawingArea
         vy /= len;
         // Console.WriteLine("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
         if (Math.Abs(vy) > 5) {
-          ThrowVelocity = vy*1.5;
+          ThrowVelocity = vy*2;
           NeedRedraw = true;
         } else {
           ThrowVelocity = 0;
@@ -1531,7 +1531,7 @@ public class Filezoo : DrawingArea
       if (ThrowVelocity != 0) {
         using ( Context ecr = new Context (EtcSurface) )
           PanBy (ecr, Width, Height, 0, ThrowVelocity);
-        ThrowVelocity *= 0.99;
+        ThrowVelocity *= 0.98;
         if (Math.Abs(ThrowVelocity) < 1)
           ThrowVelocity = 0;
       }
