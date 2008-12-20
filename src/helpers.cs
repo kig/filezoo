@@ -95,17 +95,26 @@ public static class Helpers {
   static Pango.Rectangle pe, le;
 
   /** BLOCKING */
-  public static void DrawText (Context cr, string family, double fontSize, string text)
+  public static void DrawText (Context cr, string family, double fontSize, string text) {
+    DrawText (cr, family, fontSize, text, Pango.Alignment.Left);
+  }
+  public static void DrawText (Context cr, string family, double fontSize, string text, Pango.Alignment alignment)
   { lock (FontCache) {
 //   Console.WriteLine("DrawText {0}", text);
     Profiler p = new Profiler ("DrawText");
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
+    layout.Alignment = alignment;
     layout.GetExtents(out pe, out le);
     p.Time ("GetExtents {0}", pe);
     w = (double)le.Width / (double)Pango.Scale.PangoScale;
     h = (double)le.Height / (double)Pango.Scale.PangoScale;
+    if (alignment == Pango.Alignment.Right) {
+      cr.RelMoveTo (-w, 0);
+    } else if (alignment == Pango.Alignment.Center) {
+      cr.RelMoveTo (-w/2, 0);
+    }
     Pango.CairoHelper.ShowLayout (cr, layout);
     p.Time ("ShowLayout");
     if (ShowTextExtents) {

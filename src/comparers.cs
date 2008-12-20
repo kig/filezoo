@@ -19,6 +19,11 @@
 using System;
 using System.Collections.Generic;
 
+public interface IGrouping {
+  bool GroupChanged (FSEntry a, FSEntry b);
+  string GroupTitle (FSEntry a);
+}
+
 public class SortHandler {
   public string Name;
   public IComparer<FSEntry> Comparer;
@@ -28,12 +33,19 @@ public class SortHandler {
   }
 }
 
-public class NullComparer : IComparer<FSEntry> {
+public class NullComparer : IComparer<FSEntry>,IGrouping {
   /** UNIMPORTANT */
   int IComparer<FSEntry>.Compare (FSEntry a, FSEntry b) { return 0; }
+
+  public bool GroupChanged (FSEntry a, FSEntry b) {
+    return (GroupTitle (a) != GroupTitle (b));
+  }
+  public string GroupTitle (FSEntry a) {
+    return "";
+  }
 }
 
-public class SizeComparer : IComparer<FSEntry> {
+public class SizeComparer : IComparer<FSEntry>,IGrouping {
   /** BLOCKING */
   int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
@@ -44,9 +56,17 @@ public class SizeComparer : IComparer<FSEntry> {
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv > 0 ? 1 : (rv < 0 ? -1 : 0);
   }
+
+  public bool GroupChanged ( FSEntry a, FSEntry b ) {
+    return (a.IsDirectory != b.IsDirectory) || (a.Size >= (b.Size * 10) || b.Size >= (a.Size * 10));
+  }
+
+  public string GroupTitle ( FSEntry a ) {
+    return Helpers.FormatSI(Math.Pow (10, Math.Ceiling (Math.Log (a.Size) / Math.Log (10))), "B");
+  }
 }
 
-public class NameComparer : IComparer<FSEntry> {
+public class NameComparer : IComparer<FSEntry>,IGrouping {
   /** BLOCKING */
   int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
@@ -59,9 +79,15 @@ public class NameComparer : IComparer<FSEntry> {
     }
     return String.CompareOrdinal(a.LCName, b.LCName);
   }
+  public bool GroupChanged (FSEntry a, FSEntry b) {
+    return (a.IsDirectory != b.IsDirectory) ||(a.LCName[0] != b.LCName[0]);
+  }
+  public string GroupTitle (FSEntry a) {
+    return a.LCName[0].ToString ();
+  }
 }
 
-public class DateComparer : IComparer<FSEntry> {
+public class DateComparer : IComparer<FSEntry>,IGrouping {
   /** BLOCKING */
   int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
@@ -72,9 +98,15 @@ public class DateComparer : IComparer<FSEntry> {
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv;
   }
+  public bool GroupChanged (FSEntry a, FSEntry b) {
+    return (a.IsDirectory != b.IsDirectory) || (GroupTitle (a) != GroupTitle (b));
+  }
+  public string GroupTitle (FSEntry a) {
+    return a.LastModified.ToString("y");
+  }
 }
 
-public class TypeComparer : IComparer<FSEntry> {
+public class TypeComparer : IComparer<FSEntry>,IGrouping {
   /** BLOCKING */
   int IComparer<FSEntry>.Compare ( FSEntry a, FSEntry b ) {
     if (a.IsDirectory != b.IsDirectory) {
@@ -86,5 +118,11 @@ public class TypeComparer : IComparer<FSEntry> {
     int rv = String.CompareOrdinal(a.Suffix, b.Suffix);
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv;
+  }
+  public bool GroupChanged (FSEntry a, FSEntry b) {
+    return (a.IsDirectory != b.IsDirectory) || (GroupTitle (a) != GroupTitle (b));
+  }
+  public string GroupTitle (FSEntry a) {
+    return a.Suffix;
   }
 }

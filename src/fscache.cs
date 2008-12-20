@@ -232,6 +232,17 @@ public static class FSCache
       f.Entries.Sort(Comparer);
       if (SortDirection == SortingDirection.Descending)
         f.Entries.Reverse();
+      // set group titles (e.g. first letter of name, suffix)
+      if (f.Entries.Count > 0) {
+        f.Entries[0].GroupTitle = ((IGrouping)Comparer).GroupTitle(f.Entries[0]);
+        for (int i=1; i<f.Entries.Count; i++) {
+          if (((IGrouping)Comparer).GroupChanged(f.Entries[i-1], f.Entries[i])) {
+            f.Entries[i].GroupTitle = ((IGrouping)Comparer).GroupTitle(f.Entries[i]);
+          } else {
+            f.Entries[i].GroupTitle = null;
+          }
+        }
+      }
       f.LastSort = lc;
       //Console.WriteLine("Sorted {0}", f.FullName);
       needRefresh = true;

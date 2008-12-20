@@ -42,6 +42,8 @@ public class FSEntry
   // 63-bit like we have here takes just 3 billion years
   public Int64 LastDraw = 0;
 
+  public string GroupTitle;
+
   public string Name;
   public string LCName;
   public string Suffix;
@@ -124,9 +126,12 @@ public class DrawEntry {
   public double Scale;
   public FSEntry F;
 
+  public string GroupTitle;
+
   public DrawEntry (FSEntry f) {
     Height = f.Height;
     Scale = f.Scale;
+    GroupTitle = f.GroupTitle;
     F = f;
   }
 }

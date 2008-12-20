@@ -304,6 +304,8 @@ public class FSDraw
       cr.Color = co;
       if (matrix.Yy > 0.5 || depth < 2)
         DrawTitle (d.F, prefixes, cr, target, depth);
+      if (depth == 1 && d.GroupTitle != null)
+        DrawGroupTitle (d.GroupTitle, cr, target);
       if (d.F.IsDirectory) {
         bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
@@ -440,6 +442,29 @@ public class FSDraw
           Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2 * name.Length, fs/3, target);
           cr.Fill ();
         }
+      }
+    cr.Restore ();
+  }
+
+  void DrawGroupTitle (string title, Context cr, Rectangle target)
+  {
+    Matrix matrix = cr.Matrix;
+    cr.Save ();
+      double x = matrix.X0;
+      double y = matrix.Y0;
+      if (y > -40) {
+        cr.IdentityMatrix ();
+        cr.Translate (x, y);
+        cr.Rectangle (0, 0, target.Width-x, 1);
+        Color co = DirectoryFGColor;
+        co.A = 0.2;
+        cr.Color = co;
+        cr.Fill ();
+        co.A = 1;
+        cr.Color = co;
+        cr.MoveTo(target.Width-x, 0);
+        Helpers.DrawText (cr, FileInfoFontFamily, 10, title, Pango.Alignment.Right);
+        cr.NewPath ();
       }
     cr.Restore ();
   }
