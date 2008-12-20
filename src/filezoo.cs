@@ -1035,6 +1035,7 @@ public class Filezoo : DrawingArea
         } else if (CtrlKeyDown) {
           ToggleSelection(c.Target.FullName);
           spanStart = c.Target;
+          spanEnd = null;
         } else if (ShiftKeyDown) {
           if (spanStart != null) {
             if (spanEnd != null) {
@@ -1045,6 +1046,7 @@ public class Filezoo : DrawingArea
           } else {
             ToggleSelection(c.Target.FullName);
             spanStart = c.Target;
+            spanEnd = null;
           }
         } else {
           if (c.Target.IsDirectory) {
@@ -1418,12 +1420,11 @@ public class Filezoo : DrawingArea
         panning = true;
       }
       if (left) {
+        bool ctrl = (e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask;
         dragging = dragging || ((Math.Abs(dragX - dragStartX) + Math.Abs(dragY - dragStartY)) > 4);
-        panning = panning || (dragStartX > 128+FilesMarginLeft) || (DragSourceEntry == CurrentDirEntry);
+        panning = panning || !ctrl || (DragSourceEntry == CurrentDirEntry);
         if (!dragInProgress && !panning && dragging) {
           Gdk.DragAction action = Gdk.DragAction.Move;
-          if ((e.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)
-            action = Gdk.DragAction.Copy;
           if ((e.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)
             action = Gdk.DragAction.Copy;
           if ((e.State & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask)
