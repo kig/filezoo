@@ -69,7 +69,7 @@ public class FSDraw
 
   /** FAST */
   public string GetTitle (FSEntry d, Dictionary<string,string> prefixes) {
-    string name = d.Name;
+    string name = d.FullName == Helpers.RootDir ? d.FullName : d.Name;
     if (d.LinkTarget != null) name += " ➞ " + d.LinkTarget;
     if (prefixes != null && prefixes.ContainsKey(d.FullName))
       name = prefixes[d.FullName] + " " + name;
