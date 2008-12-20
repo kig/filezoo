@@ -439,6 +439,7 @@ public class FSDraw
   {
     Matrix matrix = cr.Matrix;
     double fs = Math.Min (20.0, matrix.Yy * h * 0.66);
+    double szf = Math.Min(1, 10 * matrix.Yy / target.Height);
     cr.Save ();
       double x = matrix.X0;
       double y = matrix.Y0;
@@ -448,11 +449,11 @@ public class FSDraw
         cr.IdentityMatrix ();
         cr.Rectangle (x, y, w-x, 1);
         Color co = DirectoryFGColor;
-        co.A = 0.2 * (fs/20);
+        co.A = (0.1 + 0.2 * (fs/20)) * szf;
         cr.Color = co;
         cr.Fill ();
         if (fs > 2) {
-          co.A = 0.8 - 0.8 * (Math.Abs(fs-15)/15);
+          co.A = szf * (0.8 - 0.6 * (Math.Abs(fs-15)/15));
           cr.Color = co;
           cr.MoveTo(w, y);
           Helpers.DrawText (cr, FileInfoFontFamily, fs, title, Pango.Alignment.Right);
@@ -719,7 +720,7 @@ public class FSDraw
         double position = ChildYOffset;
         int i = 0;
         List<DrawEntry> entries = d.F.ParentDir.DrawEntries;
-        if (entries == null) {
+        if (entries == null || d.F.ParentDir.Comparer != FSCache.Comparer || d.F.ParentDir.Measurer != FSCache.Measurer) {
           if (FSCache.NeedFilePass( d.F.ParentDir.FullName ))
             FSCache.FilePass ( d.F.ParentDir.FullName );
           FSCache.UpdateDrawEntries ( d.F.ParentDir );

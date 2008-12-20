@@ -658,6 +658,10 @@ public static class Helpers {
   /** FAST */
   public static string FormatSI (double sz, string unit)
   {
+    return FormatSI (sz, unit, 1);
+  }
+  public static string FormatSI (double sz, string unit, uint decimals)
+  {
     string suffix = "";
     if (sz >= 1e9) {
       suffix = "G";
@@ -671,7 +675,7 @@ public static class Helpers {
     } else {
       return String.Format("{0} "+unit, sz.ToString("N0"));
     }
-    return String.Format("{0} {1}"+unit, sz.ToString("N1"), suffix);
+    return String.Format("{0} {1}"+unit, sz.ToString(String.Format("N{0}", decimals)), suffix);
   }
 
 

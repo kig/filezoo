@@ -62,7 +62,7 @@ public class SizeComparer : IComparer<FSEntry>,IGrouping {
   }
 
   public string GroupTitle ( FSEntry a ) {
-    return Helpers.FormatSI(Math.Pow (10, Math.Ceiling (Math.Log (a.Size) / Math.Log (10))), "B");
+    return Helpers.FormatSI(Math.Pow (10, Math.Floor (Math.Log (a.Size) / Math.Log (10))), "B+", 0);
   }
 }
 
@@ -102,7 +102,7 @@ public class DateComparer : IComparer<FSEntry>,IGrouping {
     return (a.IsDirectory != b.IsDirectory) || (GroupTitle (a) != GroupTitle (b));
   }
   public string GroupTitle (FSEntry a) {
-    return a.LastModified.ToString("y");
+    return a.LastModified.ToString("M.yyyy");
   }
 }
 
@@ -123,6 +123,6 @@ public class TypeComparer : IComparer<FSEntry>,IGrouping {
     return (a.IsDirectory != b.IsDirectory) || (GroupTitle (a) != GroupTitle (b));
   }
   public string GroupTitle (FSEntry a) {
-    return a.Suffix;
+    return a.Suffix == "" ? a.LCName[0].ToString().ToUpper() : a.Suffix;
   }
 }

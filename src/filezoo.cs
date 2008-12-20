@@ -1082,7 +1082,7 @@ public class Filezoo : DrawingArea
         string name = (s == "") ? rootChar : s+dirSep;
         TextExtents te = Helpers.GetTextExtents (cr, BreadcrumbFontFamily, BreadcrumbFontSize, name);
         te.Height += BreadcrumbMarginTop;
-        if (s == "")
+        if (s == "" && (areaWidth - te1.Width >= 0))
           te.Width += BreadcrumbMarginLeft+1;
         if (Helpers.CheckTextExtents(cr, te, x, y)) {
           string newDir = String.Join(Helpers.DirSepS, segments, 0, hitIndex+1);
@@ -1096,9 +1096,7 @@ public class Filezoo : DrawingArea
           cr.Restore ();
           return true;
         }
-        if (s == "" && (areaWidth - te1.Width >= 0))
-          cr.Translate(BreadcrumbMarginLeft+1, 0);
-        cr.RelMoveTo( te.XAdvance, 0 );
+        cr.RelMoveTo( te.Width, 0 );
         hitIndex += 1;
       }
       cr.IdentityMatrix ();

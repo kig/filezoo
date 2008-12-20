@@ -2,4 +2,6 @@
 *.exe
 *.so
 test/*.xml
+test/*.mdb
 *.dll
+
