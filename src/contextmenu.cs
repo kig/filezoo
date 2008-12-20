@@ -79,6 +79,8 @@ public class FilezooContextMenu : Menu {
     Separator(menu);
     AddCommandItem(menu, "Set as playlist", "amarok", "-p --load", targetPath);
     AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
+    Separator(menu);
+    AddCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", targetPath);
   }
 
   // File menu items
@@ -219,10 +221,15 @@ public class FilezooContextMenu : Menu {
     if (HasEntryWithSuffix(keys, imageSuffixes)) {
       Separator (menu);
       AddMultiArgCommandItem(menu, "View selected images", "gqview", "", keys, imageSuffixes);
+      Separator(menu);
+      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", keys);
       Separator (menu);
       AddCommandItem(menu, "Rotate selected images ↱", "mogrify", "-rotate 90", keys, imageSuffixes, true);
       AddCommandItem(menu, "Rotate selected images ↰", "mogrify", "-rotate 270", keys, imageSuffixes, true);
       AddCommandItem(menu, "Rotate selected images 180°", "mogrify", "-rotate 180", keys, imageSuffixes, true);
+    } else if (keys.Any(Helpers.IsDir)) {
+      Separator(menu);
+      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", keys);
     }
 
     if (HasEntryWithSuffix(keys, audioSuffixes) || keys.Any(Helpers.IsDir)) {
