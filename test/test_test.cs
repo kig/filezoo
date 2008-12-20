@@ -12,7 +12,7 @@ public class TestTest
     Assert.AreNotEqual( "bar", foo );
   }
 
-  [Test]
+/*  [Test]
   [Ignore("Oh who cares")]
   public void Ignore()
   {
@@ -26,7 +26,7 @@ public class TestTest
     string foo = "foo";
     Assert.AreEqual( "bar", foo );
   }
-
+*/
   [Test]
   [ExpectedException(typeof(ArgumentException))]
   public void Throw()
