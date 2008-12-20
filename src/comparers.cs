@@ -58,7 +58,7 @@ public class SizeComparer : IComparer<FSEntry>,IGrouping {
   }
 
   public bool GroupChanged ( FSEntry a, FSEntry b ) {
-    return (a.IsDirectory != b.IsDirectory) || (a.Size >= (b.Size * 10) || b.Size >= (a.Size * 10));
+    return (a.IsDirectory != b.IsDirectory) || (GroupTitle (a) != GroupTitle (b));
   }
 
   public string GroupTitle ( FSEntry a ) {

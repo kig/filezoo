@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Timers;
+using System.Linq;
 using System.IO;
 using System;
 using Mono.Unix;
@@ -202,24 +203,6 @@ public static class FSCache
     if (!f.IsDirectory) return;
     bool needRefresh = false;
     // measure entries
-    if (!(f.Measurer == Measurer && f.LastMeasure == f.LastChange)) {
-      DateTime lc = f.LastChange;
-      f.Measurer = Measurer;
-      double totalHeight = 0.0;
-      foreach (FSEntry e in f.Entries) {
-        if (Measurer.DependsOnEntries && !e.FilePassDone)
-          FilePass (e);
-        e.Height = Measurer.Measure(e);
-        totalHeight += e.Height;
-      }
-      double scale = 1.0 / totalHeight;
-      foreach (FSEntry e in f.Entries) {
-        e.Scale = scale;
-      }
-      f.LastMeasure = lc;
-      //Console.WriteLine("Measured {0}", f.FullName);
-      needRefresh = true;
-    }
     // sort entries
     if (!(
       f.Comparer == Comparer
@@ -232,25 +215,48 @@ public static class FSCache
       f.Entries.Sort(Comparer);
       if (SortDirection == SortingDirection.Descending)
         f.Entries.Reverse();
-      // set group titles (e.g. first letter of name, suffix)
-      if (f.Entries.Count > 0) {
-        f.Entries[0].GroupTitle = ((IGrouping)Comparer).GroupTitle(f.Entries[0]);
-        for (int i=1; i<f.Entries.Count; i++) {
-          if (((IGrouping)Comparer).GroupChanged(f.Entries[i-1], f.Entries[i])) {
-            f.Entries[i].GroupTitle = ((IGrouping)Comparer).GroupTitle(f.Entries[i]);
-          } else {
-            f.Entries[i].GroupTitle = null;
-          }
-        }
-      }
       f.LastSort = lc;
       //Console.WriteLine("Sorted {0}", f.FullName);
       needRefresh = true;
     }
+    if (!(f.Measurer == Measurer && f.LastMeasure == f.LastChange)) {
+      DateTime lc = f.LastChange;
+      f.Measurer = Measurer;
+      double totalHeight = 0.0;
+      foreach (FSEntry e in f.Entries) {
+        if (Measurer.DependsOnEntries && !e.FilePassDone)
+          FilePass (e);
+        e.Height = Measurer.Measure(e);
+        totalHeight += e.Height;
+      }
+      double scale = 1.0 / totalHeight;
+      foreach (FSEntry e in f.Entries) {
+        e.Height *= scale;
+      }
+      f.LastMeasure = lc;
+      //Console.WriteLine("Measured {0}", f.FullName);
+      needRefresh = true;
+    }
     if (needRefresh) {
-      List<DrawEntry> entries = new List<DrawEntry> ();
-      foreach (FSEntry e in f.Entries)
-        entries.Add(new DrawEntry(e));
+      List<DrawEntry> entries = new List<DrawEntry>(f.Entries.Select(o => new DrawEntry (o)));
+      // set group titles (e.g. first letter of name, suffix)
+      if (entries.Count > 0) {
+        DrawEntry prevGroup = entries[0];
+        double heightSum = prevGroup.Height;
+        prevGroup.GroupTitle = ((IGrouping)Comparer).GroupTitle(prevGroup.F);
+        for (int i=1; i<entries.Count; i++) {
+          DrawEntry current = entries[i];
+          DrawEntry prev = entries[i-1];
+          if (((IGrouping)Comparer).GroupChanged(prev.F, current.F)) {
+            current.GroupTitle = ((IGrouping)Comparer).GroupTitle(current.F);
+            prevGroup.GroupHeight = heightSum;
+            prevGroup = current;
+            heightSum = 0;
+          }
+          heightSum += current.Height;
+        }
+        prevGroup.GroupHeight = heightSum;
+      }
       f.DrawEntries = entries;
     }
   } }
