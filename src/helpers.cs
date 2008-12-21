@@ -373,15 +373,15 @@ public static class Helpers {
   public static void Touch (string path)
   {
     MkdirP (Dirname(path));
-    Process p = Process.Start("touch", EscapePath(path));
-    p.WaitForExit ();
+    FileStream fs = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read);
+    fs.Close ();
+    File.SetLastWriteTime(path, DateTime.Now);
   }
 
   /** DESTRUCTIVE, BLOCKING */
   public static void MkdirP (string path)
   {
-    Process p = Process.Start("mkdir", "-p "+EscapePath(path));
-    p.WaitForExit ();
+    Directory.CreateDirectory(path);
   }
 
   /** DESTRUCTIVE, BLOCKING */
