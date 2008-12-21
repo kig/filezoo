@@ -244,7 +244,7 @@ public class FSDraw
       cr.Scale (1, h);
       Matrix matrix = cr.Matrix;
       double rBoxWidth = BoxWidth / target.Height; // to keep pixel boxwidth the same
-      Color bg = new Color (0,0,0,1);
+      Color bg = DirectoryBGColor;
       bg.A = 0.3;
       bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
       cr.Color = bg;
@@ -274,8 +274,12 @@ public class FSDraw
             using (LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96)) {
               g.AddColorStop (0, new Color (0,0,0,0.8));
               g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
-              g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
-              g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
+              if ((BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88) {
+                g.AddColorStop (1, new Color (0,0,0,0));
+              } else {
+                g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
+                g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
+              }
               cr.Pattern = g;
               cr.Fill ();
               Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);

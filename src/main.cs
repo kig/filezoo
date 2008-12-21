@@ -66,6 +66,9 @@ public static class FilezooApp {
 
     if (panelMode) {
       win = new FilezooPanel (fz);
+//       Gnome.PanelApplet applet = new Gnome.PanelApplet ();
+//       applet.Add (win);
+//       applet.ShowAll ();
       if (panelBg.Length > 0) {
         Gdk.Color c = new Gdk.Color(0,0,0);
         if (Gdk.Color.Parse(panelBg, ref c)) {
