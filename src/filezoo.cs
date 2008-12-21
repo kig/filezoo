@@ -160,6 +160,8 @@ public class Filezoo : DrawingArea
 
   public bool Cancelled = false;
 
+  bool UseRgbaVisuals = false;
+
   public Dictionary<string,bool> Selection = new Dictionary<string,bool> ();
 
   Clipboard clipboard;
@@ -186,6 +188,13 @@ public class Filezoo : DrawingArea
     SortField = SortFields[0];
     SizeField = SizeFields[0];
     Zoomer = new FlatZoomer ();
+
+    Gdk.Colormap cm = Screen.RgbaColormap;
+    if (cm != null && Screen.IsComposited) {
+      Widget.DefaultColormap = cm;
+      Colormap = cm;
+      UseRgbaVisuals = true;
+    }
 
     SetCurrentDir (dirname);
 
@@ -767,9 +776,15 @@ public class Filezoo : DrawingArea
   /** FAST */
   void DrawClear (Context cr, uint width, uint height)
   {
-    cr.Color = Renderer.BackgroundColor;
+    cr.Save ();
+    Color co = Renderer.BackgroundColor;
+//     if (UseRgbaVisuals)
+//       co.A = 0.95;
+    cr.Color = co;
+    cr.Operator = Operator.Source;
     cr.Rectangle (0,0, width, height);
     cr.Fill ();
+    cr.Restore ();
   }
 
   double FirstProgress = 0;

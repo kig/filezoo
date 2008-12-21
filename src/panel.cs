@@ -37,6 +37,11 @@ public class FilezooPanel : Window
     SkipTaskbarHint = true;
 
     FilezooWindow = new Window ("Filezoo");
+    Gdk.Colormap cm = FilezooWindow.Screen.RgbaColormap;
+    if (cm != null && FilezooWindow.Screen.IsComposited) {
+      Widget.DefaultColormap = cm;
+      FilezooWindow.Colormap = cm;
+    }
     FilezooWindow.Decorated = false;
     FilezooWindow.Add (Fz);
     byte r, g, b;

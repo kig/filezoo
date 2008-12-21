@@ -30,6 +30,11 @@ public class FilezooControls : HBox
   {
     Fz = fz;
 
+    Gdk.Colormap cm = Screen.RgbaColormap;
+    if (cm != null && Screen.IsComposited) {
+      Colormap = cm;
+    }
+
     Button homeButton = new Button ("<span size=\"small\">Home</span>");
 //     homeButton.Relief = ReliefStyle.None;
     ((Label)(homeButton.Children[0])).UseMarkup = true;

@@ -191,8 +191,8 @@ public class FSDraw
     Matrix matrix = cr.Matrix;
     double h = matrix.Yy * d.Height;
     double y = matrix.Y0 - target.Y;
-    // rectangle doesn't intersect any quarter-pixel midpoints
-    if (h < 0.5 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
+    // rectangle doesn't intersect any half-pixel midpoints
+    if (h < 0.5 && (Math.Floor(y*2) == Math.Floor((y+h)*2)))
       return false;
     return ((y < target.Height) && ((y+h) > 0.0));
   }
@@ -242,22 +242,25 @@ public class FSDraw
     uint c = 1;
     cr.Save ();
       cr.Scale (1, h);
+      Matrix matrix = cr.Matrix;
       double rBoxWidth = BoxWidth / target.Height; // to keep pixel boxwidth the same
       Color bg = new Color (0,0,0,1);
       bg.A = 0.3;
+      bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
       cr.Color = bg;
-      if (depth == 0)
+      if (depth == 0) {
         cr.Translate (0.005*rBoxWidth, 0);
+        matrix.X0 += 0.005*rBoxWidth*matrix.Xx;
+      }
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
       cr.Fill ();
       Color co = GetColor (d.F.FileType, d.F.Permissions);
-      Matrix matrix = cr.Matrix;
       if (!d.F.Complete && FSCache.Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
        if (d.F.IsDirectory) // fade out dir based on size on screen
-        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
+        co.A *= 0.2 * Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
        else
-        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
+        co.A *= 0.1 + 0.7 * Helpers.Clamp(1-0.5*(matrix.Yy / target.Height), 0.0, 1);
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
       if (d.F.Thumbnail != null)
@@ -291,7 +294,7 @@ public class FSDraw
         co = DirectoryFGColor;
       }
       // Color is a struct, so changing the A doesn't propagate
-      co.A = 1.0;
+      co.A = 1;
       cr.Color = co;
       if (matrix.Yy > 0.5 || depth < 2)
         DrawTitle (d.F, prefixes, cr, target, depth);
@@ -383,11 +386,14 @@ public class FSDraw
   void DrawTitle
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
+    Color co2 = DirectoryFGColor;
     double rBoxWidth = BoxWidth / target.Height;
     Matrix matrix = cr.Matrix;
     double h = matrix.Yy;
     double rfs = GetFontSize(d, h);
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
+    co2.A = Math.Min(1, fs / MaxFontSize);
+    cr.Color = co2;
     cr.Save ();
       cr.Translate(rBoxWidth * 1, 0.02);
       double be = matrix.X0 + rBoxWidth * matrix.Xx;
@@ -416,7 +422,7 @@ public class FSDraw
             MinFontSize, MaxFontSize*0.6);
           if (sfs > 1) {
             double a = sfs / (MaxFontSize*0.6);
-            Color co = GetFontColor (d.FileType, d.Permissions);
+            Color co = DirectoryFGColor; // GetFontColor (d.FileType, d.Permissions);
             co.A = a*a;
             cr.Color = co;
             cr.MoveTo (0, fs*1.1+sfs*0.7);

@@ -77,6 +77,11 @@ public static class FilezooApp {
     } else {
       win = new Window ("Filezoo");
       win.SetDefaultSize (420, 800);
+      Gdk.Colormap cm = win.Screen.RgbaColormap;
+      if (cm != null && win.Screen.IsComposited) {
+        Widget.DefaultColormap = cm;
+        win.Colormap = cm;
+      }
       VBox vbox = new VBox (false, 0);
       FilezooControls controls = new FilezooControls(fz);
       vbox.PackStart (fz, true, true, 0);

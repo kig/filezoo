@@ -79,8 +79,8 @@ public class FilezooContextMenu : Menu {
     Separator(menu);
     AddCommandItem(menu, "Set as playlist", "amarok", "-p --load", targetPath);
     AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
-    Separator(menu);
-/*    AddCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", targetPath);*/
+/*    Separator(menu);
+    AddCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", targetPath);*/
   }
 
   // File menu items
