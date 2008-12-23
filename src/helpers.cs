@@ -408,7 +408,9 @@ public static class Helpers {
   /** DESTRUCTIVE, BLOCKING */
   public static void AppendToFile (string path, byte[] data)
   {
-    File.AppendAllText (path, BytesToASCII(data));
+    using (FileStream fs = new FileStream(path, FileMode.Append, FileAccess.Write)) {
+      fs.Write (data, 0, data.Length);
+    }
   }
 
   /** DESTRUCTIVE, BLOCKING */

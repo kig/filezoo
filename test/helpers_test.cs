@@ -296,8 +296,59 @@ public class HelpersTest
     Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
   }
 
-//   public void ReplaceFileWith (string path, byte[] data)
-//   public void AppendToFile (string path, byte[] data)
+  [Test]
+  public void NewFileWithOverwrite ()
+  {
+    string t1 = testDir+"NewFileWith";
+    byte[] data = new byte[0];
+    Helpers.NewFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+    data = new byte[256];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Helpers.NewFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+  }
+
+  [Test]
+  public void ReplaceFileWith ()
+  {
+    string t1 = testDir+"ReplaceFileWith";
+    byte[] data = new byte[0];
+    Helpers.ReplaceFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+    data = new byte[256];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Helpers.ReplaceFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+  }
+
+  [Test]
+  public void AppendToFile ()
+  {
+    string t1 = testDir+"AppendToFile";
+    byte[] data = new byte[128];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Helpers.AppendToFile(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+    for (int i=0; i<data.Length; i++) data[i] = (byte)(i+128);
+    Helpers.AppendToFile(t1, data);
+    data = new byte[256];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+  }
+
 //   public void CopyURI (string src, string dst)
 //   public void MoveURI (string src, string dst)
 //   public void CopyURIs (string[] src, string dst)
