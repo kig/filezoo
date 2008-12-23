@@ -895,10 +895,9 @@ public static class Helpers {
     }
   }
 
-  static Regex specialChars = new Regex("(?=[^a-zA-Z0-9_.,/-])");
   /** FAST */
   public static string EscapePath (string path) {
-    return specialChars.Replace(path, @"\");
+    return "'" + path.Replace("'", @"'\''") + "'";
   }
 
   /** FAST */

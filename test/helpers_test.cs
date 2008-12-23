@@ -33,6 +33,12 @@ public class HelpersTest
   }
 
   [Test]
+  public void EscapePath ()
+  {
+    Assert.AreEqual ("'foo'\\''s \n\":/\r\t()[]'", Helpers.EscapePath("foo's \n\":/\r\t()[]"));
+  }
+
+  [Test]
   public void MkdirPSimple ()
   {
     Helpers.MkdirP(testDir + "mkdir_p");
@@ -268,9 +274,6 @@ public class HelpersTest
   }
 
 
-//   public void Move (string src, string dst)
-//   public void Move (string src, string dst, bool deleteOverwrite)
-//   public void Copy (string src, string dst)
 //   public void NewFileWith (string path, byte[] data)
 //   public void ReplaceFileWith (string path, byte[] data)
 //   public void AppendToFile (string path, byte[] data)
