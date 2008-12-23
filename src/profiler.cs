@@ -46,7 +46,7 @@ public class Profiler
   {
     Prefix = prefix;
     Watch = new Stopwatch ();
-    Watch.Start ();
+    Restart ();
   }
 
   /** FAST */
@@ -110,5 +110,30 @@ public class Profiler
     Global,
     Always,
     Never
+  }
+}
+
+
+public class MemoryProfiler
+{
+  public double CurrentMemory;
+  public double StartMemory;
+
+  public MemoryProfiler ()
+  {
+    CurrentMemory = StartMemory = GC.GetTotalMemory(false);
+  }
+
+  public void Memory (string message)
+  {
+    double memoryDelta = GC.GetTotalMemory(false) - CurrentMemory;
+    CurrentMemory += memoryDelta;
+    Console.WriteLine("Memory delta: {0}", memoryDelta);
+  }
+
+  public void Total (string message)
+  {
+    double memoryDelta = GC.GetTotalMemory(false) - StartMemory;
+    Console.WriteLine("Total memory delta: {0}", memoryDelta);
   }
 }
