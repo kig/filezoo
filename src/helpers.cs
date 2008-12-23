@@ -317,13 +317,14 @@ public static class Helpers {
   public static void Trash (string path)
   {
     if (!FileExists (TrashDir))
-      new UnixDirectoryInfo(TrashDir).Create();
+      MkdirP(TrashDir);
     Move (path, TrashDir + DirSepS + Basename(path), true);
   }
 
   /** DESTRUCTIVE, BLOCKING */
   public static bool Delete (string path)
   {
+    if (!FileExists(path)) return false;
     try {
     Console.WriteLine("Deleting {0}", path);
       if (IsDir(path))
@@ -338,35 +339,41 @@ public static class Helpers {
   }
 
   /** DESTRUCTIVE, BLOCKING */
-  public static void Move (string src, string dst) { Move (src,dst,false); }
-  public static void Move (string src, string dst, bool deleteOverwrite)
+  public static bool Move (string src, string dst) {
+    return Move (src,dst,false);
+  }
+  public static bool Move (string src, string dst, bool deleteOverwrite)
   {
-    for (int i=0; i<10; i++) {
-      if (FileExists(dst)) {
-        try {
-          if (deleteOverwrite) {
-            if (IsDir(dst))
-              new UnixDirectoryInfo(dst).Delete(true);
-            else
-              new UnixFileInfo(dst).Delete();
-          } else {
-            Trash(dst);
-          }
-        } catch (Exception) {}
-      }
+    if (FileExists(dst)) {
       try {
-        System.IO.File.Move (src, dst);
-        break;
-      } catch (Exception) {}
+        if (deleteOverwrite) Delete(dst);
+        else Trash(dst);
+      } catch (Exception e) { Console.WriteLine(e); }
     }
+    try {
+      MoveURI (src, dst);
+      return true;
+    } catch (Exception e) { Console.WriteLine(e); }
+    return false;
   }
 
   /** DESTRUCTIVE, BLOCKING */
-  public static void Copy (string src, string dst)
+  public static bool Copy (string src, string dst) {
+    return Copy (src,dst,false);
+  }
+  public static bool Copy (string src, string dst, bool deleteOverwrite)
   {
+    if (FileExists(dst)) {
+      try {
+        if (deleteOverwrite) Delete(dst);
+        else Trash(dst);
+      } catch (Exception e) { Console.WriteLine(e); }
+    }
     try {
-      System.IO.File.Copy (src, dst);
-    } catch (Exception) {}
+      CopyURI (src, dst);
+      return true;
+    } catch (Exception e) { Console.WriteLine(e); }
+    return false;
   }
 
   /** DESTRUCTIVE, BLOCKING */
@@ -497,7 +504,7 @@ public static class Helpers {
         Console.WriteLine("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
         return (int)Gnome.Vfs.XferOverwriteAction.Abort;
       default:
-        Console.WriteLine("{0} / {1} {2} -> {3}", info.BytesCopied, info.BytesTotal, info.SourceName, info.TargetName);
+//         Console.WriteLine("{0} / {1} {2} -> {3}", info.BytesCopied, info.BytesTotal, info.SourceName, info.TargetName);
         return 1;
     }
   }
@@ -740,7 +747,7 @@ public static class Helpers {
 
   /** BLOCKING */
   public static bool FileExists (string path) {
-    return (new UnixFileInfo (path)).Exists;
+    return (UnixFileSystemInfo.GetFileSystemEntry (path)).Exists;
   }
 
   public static DateTime DefaultTime = DateTime.Parse ("1900-01-01T00:00:00.0000000Z");
