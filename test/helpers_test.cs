@@ -328,6 +328,12 @@ public class HelpersTest
     Assert.IsTrue (Helpers.FileExists(t1));
     Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
     Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+    data = new byte[128];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Helpers.ReplaceFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
   }
 
   [Test]
@@ -349,11 +355,85 @@ public class HelpersTest
     Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
   }
 
-//   public void CopyURI (string src, string dst)
-//   public void MoveURI (string src, string dst)
-//   public void CopyURIs (string[] src, string dst)
-//   public void MoveURIs (string[] src, string dst)
-//   public void XferURIs
+  [Test]
+  public void CopyURI ()
+  {
+    string t1 = testDir+"copyTest1";
+    string t2 = testDir+"copyTest2";
+    if (Helpers.FileExists(t1)) Helpers.Delete(t1);
+    if (Helpers.FileExists(t2)) Helpers.Delete(t2);
+    Helpers.Touch(t1);
+    Helpers.CopyURI ("file://"+t1, "file://"+t2);
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Helpers.CopyURI ("file://"+t2, "file://"+t1);
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Helpers.Delete(t2);
+    Helpers.MkdirP(t2);
+    Helpers.CopyURI ("file://"+t2, "file://"+t1);
+    Assert.IsTrue(Helpers.IsDir(t1));
+    Assert.IsTrue(Helpers.IsDir(t2));
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Helpers.Delete(t1);
+    Helpers.CopyURI ("http://www.google.com", t1);
+    Assert.IsFalse(Helpers.IsDir(t1));
+    Assert.IsTrue(Helpers.FileExists(t1));
+  }
+
+  [Test]
+  public void MoveURI ()
+  {
+    string t1 = testDir+"moveTest1";
+    string t2 = testDir+"moveTest2";
+    if (Helpers.FileExists(t1)) Helpers.Delete(t1);
+    if (Helpers.FileExists(t2)) Helpers.Delete(t2);
+    Helpers.Touch(t1);
+    Helpers.MoveURI ("file://"+t1, "file://"+t2);
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Assert.IsFalse(Helpers.FileExists(t1));
+    Helpers.MoveURI ("file://"+t2, "file://"+t1);
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsFalse(Helpers.FileExists(t2));
+    Helpers.MkdirP(t2);
+    Helpers.MoveURI ("file://"+t2, "file://"+t1);
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsFalse(Helpers.FileExists(t2));
+  }
+
+  [Test]
+  public void CopyURIs ()
+  {
+    string[] src = new string[10];
+    for (int i=0; i<src.Length; i++) {
+      src[i] = testDir+i.ToString();
+      Helpers.Touch(src[i]);
+    }
+    Helpers.MkdirP(testDir+"dst");
+    Helpers.CopyURIs(src, testDir+"dst");
+    for (int i=0; i<src.Length; i++) {
+      Assert.IsTrue(Helpers.FileExists(src[i]));
+      Assert.IsTrue(Helpers.FileExists(testDir+"dst/"+i.ToString()));
+    }
+  }
+
+  [Test]
+  public void MoveURIs ()
+  {
+    string[] src = new string[10];
+    for (int i=0; i<src.Length; i++) {
+      src[i] = testDir+i.ToString();
+      Helpers.Touch(src[i]);
+    }
+    Helpers.MkdirP(testDir+"dst");
+    Helpers.MoveURIs(src, testDir+"dst");
+    for (int i=0; i<src.Length; i++) {
+      Assert.IsFalse(Helpers.FileExists(src[i]));
+      Assert.IsTrue(Helpers.FileExists(testDir+"dst/"+i.ToString()));
+    }
+  }
+
 //   public ImageSurface GetThumbnail (string path)
 //   public void ExtractFile (string path)
 
