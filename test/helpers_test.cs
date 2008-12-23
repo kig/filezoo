@@ -101,6 +101,46 @@ public class HelpersTest
     Assert.IsFalse(Helpers.FileExists(tfn));
   }
 
+  [Test]
+  public void Move ()
+  {
+    string t1 = testDir+"moveTest1";
+    string t2 = testDir+"moveTest2";
+    Helpers.Delete(t1);
+    Helpers.Delete(t2);
+    Helpers.Touch(t1);
+    Helpers.Move (t1, t2);
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Assert.IsFalse(Helpers.FileExists(t1));
+    Helpers.Move (t2, t1);
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsFalse(Helpers.FileExists(t2));
+    Helpers.MkdirP(t2);
+    Helpers.Move (t2, t1);
+    Assert.IsTrue(Helpers.FileExists(t1));
+    Assert.IsFalse(Helpers.FileExists(t2));
+  }
+
+  [Test]
+  public void MoveOverwrite ()
+  {
+    string t1 = testDir+"moveTest1";
+    string t2 = testDir+"moveTest2";
+    Helpers.Delete(t1);
+    Helpers.Delete(t2);
+    Helpers.Touch(t1);
+    Helpers.Touch(t2);
+    Helpers.Move (t1, t2);
+    Assert.IsTrue(Helpers.FileExists(t2));
+    Assert.IsFalse(Helpers.FileExists(t1));
+    Assert.IsTrue(Helpers.FileExists(Helpers.TrashDir+Helpers.DirSepS + "moveTest2"));
+    Helpers.Delete(Helpers.TrashDir+Helpers.DirSepS + "moveTest2");
+    Helpers.MkdirP(t1);
+    Helpers.Move (t2, t1);
+    Assert.IsTrue(Helpers.FileExists(Helpers.TrashDir+Helpers.DirSepS + "moveTest1"));
+    Helpers.Delete(Helpers.TrashDir+Helpers.DirSepS + "moveTest1");
+  }
+
 //   public void Move (string src, string dst)
 //   public void Move (string src, string dst, bool deleteOverwrite)
 //   public void Copy (string src, string dst)
