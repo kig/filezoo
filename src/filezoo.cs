@@ -1520,8 +1520,10 @@ public class Filezoo : DrawingArea
   */
   protected override bool OnExposeEvent (Gdk.EventExpose e)
   {
+    var fp = new Profiler ("OnExposeEvent", 10);
     using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
     {
+      fp.Time ("Gdk.CairoHelper.Create");
       int w, h;
       e.Window.GetSize (out w, out h);
       int x, y;
@@ -1537,6 +1539,7 @@ public class Filezoo : DrawingArea
         Height = (uint) h;
         UpdateLayout ();
       }
+      fp.Time ("CachedSurface");
       if (Cancelled) {
         ThrowFrames.Clear ();
         ThrowVelocity = 0;
@@ -1556,6 +1559,7 @@ public class Filezoo : DrawingArea
           ZoomVelocity = 1;
       }
       if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
+      fp.Time ("Throw and zoom");
       if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
         FSNeedRedraw = false;
         using (Context scr = new Context (CachedSurface)) {
@@ -1566,11 +1570,13 @@ public class Filezoo : DrawingArea
           scr.Restore ();
           Draw (scr, Width, Height);
         }
+        fp.Time ("FS Draw");
       }
       cr.Save ();
         using (Pattern p = new Pattern (CachedSurface)) {
           cr.Operator = Operator.Over;
           DrawBackground (cr, Width, Height);
+          fp.Time ("DrawBackground");
           if (ControlLineVisible && panning) {
             cr.Save ();
               cr.Color = Renderer.DirectoryFGColor;
@@ -1581,8 +1587,11 @@ public class Filezoo : DrawingArea
           cr.Source = p;
           cr.Paint ();
           cr.Operator = Operator.Over;
-          if (DrawEffects (cr, Width, Height))
+          fp.Time ("Composite");
+          if (DrawEffects (cr, Width, Height)) {
             LimitedRedraw = true;
+            fp.Time ("Effects");
+          }
         }
       cr.Restore ();
     }
@@ -1592,6 +1601,7 @@ public class Filezoo : DrawingArea
       InteractionProfiler.Reset ();
       InteractionProfiler.TotalElapsed = 0;
     }
+    fp.Total ("Frame");
     return true;
   }
 
