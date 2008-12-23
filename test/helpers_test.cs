@@ -67,8 +67,40 @@ public class HelpersTest
       Assert.Less( td.TotalMilliseconds, 1000 );
     });
   }
-//   public void Trash (string path)
-//   public bool Delete (string path)
+
+  [Test]
+  public void Trash ()
+  {
+    string td = Helpers.TrashDir + Helpers.DirSepS;
+    if (Helpers.FileExists(td+"trashTest"))
+      Helpers.Delete(td);
+
+    Helpers.Touch(testDir+"trashTest");
+    Helpers.Trash(testDir+"trashTest");
+    Assert.IsTrue(Helpers.FileExists(td+"trashTest"));
+    Helpers.Delete(td+"trashTest");
+
+    Helpers.MkdirP(testDir+"trashTest");
+    Helpers.Trash(testDir+"trashTest");
+    Assert.IsTrue(Helpers.FileExists(td+"trashTest"));
+    Helpers.Delete(td+"trashTest");
+  }
+
+  [Test]
+  public void Delete ()
+  {
+    string tfn = testDir+"deleteTest";
+    if (Helpers.FileExists(tfn))
+      Helpers.Delete(tfn);
+    Assert.IsFalse(Helpers.FileExists(tfn));
+    Helpers.Touch(tfn);
+    Helpers.Delete(tfn);
+    Assert.IsFalse(Helpers.FileExists(tfn));
+    Helpers.MkdirP(tfn);
+    Helpers.Delete(tfn);
+    Assert.IsFalse(Helpers.FileExists(tfn));
+  }
+
 //   public void Move (string src, string dst)
 //   public void Move (string src, string dst, bool deleteOverwrite)
 //   public void Copy (string src, string dst)
