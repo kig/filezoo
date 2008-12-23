@@ -273,8 +273,29 @@ public class HelpersTest
     Helpers.Delete(t2);
   }
 
+  [Test]
+  public void NewFileWith ()
+  {
+    string t1 = testDir+"NewFileWith";
+    byte[] data = new byte[256];
+    for (int i=0; i<data.Length; i++) data[i] = (byte)i;
+    Helpers.NewFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+  }
 
-//   public void NewFileWith (string path, byte[] data)
+  [Test]
+  public void NewFileWithEmpty ()
+  {
+    string t1 = testDir+"NewFileWith";
+    byte[] data = new byte[0];
+    Helpers.NewFileWith(t1, data);
+    Assert.IsTrue (Helpers.FileExists(t1));
+    Assert.AreEqual ( data.Length, Helpers.FileSize(t1) );
+    Assert.AreEqual ( data, System.IO.File.ReadAllBytes(t1) );
+  }
+
 //   public void ReplaceFileWith (string path, byte[] data)
 //   public void AppendToFile (string path, byte[] data)
 //   public void CopyURI (string src, string dst)

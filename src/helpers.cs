@@ -729,6 +729,10 @@ public static class Helpers {
   }
 
   /** BLOCKING */
+  public static long FileSize (string fn) {
+    try { return UnixFileSystemInfo.GetFileSystemEntry(fn).Length; }
+    catch (System.InvalidOperationException) { return 0; }
+  }
   public static long FileSize (UnixFileSystemInfo f) {
     try { return f.Length; }
     catch (System.InvalidOperationException) { return 0; }
