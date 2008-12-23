@@ -1,9 +1,10 @@
-Filezoo is a minimalistic filesystem browser that has view modes for visualizing
-the disk usage of files and directories both in terms of bytes and file count.
+Filezoo is a zoomable file manager that can be used as an FVWM panel applet.
 
-Filezoo's guiding principles are effective visualization and blinding speed.
+Filezoo's goals are taking care of casual file management and looking cool.
+Its technical goals are effective visualization and a responsive animated UI.
 Most directories open in under 100ms (== time from clicking the directory to
-first frame drawn) on my 2GHz computer.
+first frame drawn) on my 2GHz computer, and the framerate is generally higher
+than 20fps.
 
 Filezoo is written in C# using Mono, Gtk# and Cairo.
 
