@@ -415,11 +415,11 @@ public class FSDraw
       cr.Translate(rBoxWidth * 1, 0.02);
       double be = matrix.X0 + rBoxWidth * matrix.Xx;
       cr.Translate(rBoxWidth * 0.1, 0.0);
-      if (d.IsDirectory && rfs > 60)
-        cr.Translate(0.0, 0.46);
+      if (d.IsDirectory && rfs > 52)
+        cr.Translate(0.0, ChildYOffset-0.02);
       double x = matrix.X0 + rBoxWidth * 1.1 * matrix.Xx;
       double y = cr.Matrix.Y0;
-      if (d.IsDirectory && rfs > 60)
+      if (d.IsDirectory && rfs > 52)
         y -= 60;
       if (y > -fs*4) {
         cr.IdentityMatrix ();
