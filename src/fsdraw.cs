@@ -478,7 +478,7 @@ public class FSDraw
         cr.Color = co;
         cr.Fill ();
         if (fs > 2) {
-          co.A = szf * (0.8 - 0.6 * (Math.Abs(fs-15)/15));
+          co.A = szf * (0.8 - 0.6 * (Math.Abs(fs-10)/10));
           cr.Color = co;
           cr.MoveTo(w, y);
           Helpers.DrawText (cr, FileInfoFontFamily, fs, title, Pango.Alignment.Right);
