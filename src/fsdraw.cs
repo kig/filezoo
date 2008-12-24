@@ -241,12 +241,17 @@ public class FSDraw
     double h = depth == 0 ? 1 : d.Height;
     uint c = 1;
     cr.Save ();
+      bool useLightTheme = (BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88;
       cr.Scale (1, h);
       Matrix matrix = cr.Matrix;
       double rBoxWidth = BoxWidth / target.Height; // to keep pixel boxwidth the same
-      Color bg = DirectoryBGColor;
-      bg.A = 0.3;
-      bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+      Color bg = new Color (0,0,0,0.3);
+//       bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+      if (useLightTheme) {
+        bg = DirectoryBGColor;
+        bg.A = 0.3;
+        bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+      }
       cr.Color = bg;
       if (depth == 0) {
         cr.Translate (0.005*rBoxWidth, 0);
@@ -257,10 +262,18 @@ public class FSDraw
       Color co = GetColor (d.F.FileType, d.F.Permissions);
       if (!d.F.Complete && FSCache.Measurer.DependsOnTotals)
         co = UnfinishedDirectoryColor;
-       if (d.F.IsDirectory) // fade out dir based on size on screen
-        co.A *= 0.2 * Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
-       else
-        co.A *= 0.1 + 0.7 * Helpers.Clamp(1-0.5*(matrix.Yy / target.Height), 0.0, 1);
+
+      if (useLightTheme) {
+        if (d.F.IsDirectory) // fade out dir based on size on screen
+          co.A *= 0.2 * Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+        else
+          co.A *= 0.1 + 0.7 * Helpers.Clamp(1-0.5*(matrix.Yy / target.Height), 0.0, 1);
+      } else {
+        if (d.F.IsDirectory)
+          co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
+        else
+          co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
+      }
       cr.Color = co;
       Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
       if (d.F.Thumbnail != null)
@@ -300,8 +313,7 @@ public class FSDraw
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1;
       cr.Color = co;
-      if (matrix.Yy > 0.5 || depth < 2)
-        DrawTitle (d.F, prefixes, cr, target, depth);
+      DrawTitle (d.F, prefixes, cr, target, depth);
       if (d.F.IsDirectory) {
         bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
@@ -390,13 +402,14 @@ public class FSDraw
   void DrawTitle
   (FSEntry d, Dictionary<string, string> prefixes, Context cr, Rectangle target, uint depth)
   {
-    Color co2 = DirectoryFGColor;
+    bool useLightTheme = (BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88;
+    Color co2 = useLightTheme ? DirectoryFGColor : GetColor(d.FileType, d.Permissions);
     double rBoxWidth = BoxWidth / target.Height;
     Matrix matrix = cr.Matrix;
     double h = matrix.Yy;
     double rfs = GetFontSize(d, h);
     double fs = Helpers.Clamp(rfs, MinFontSize, MaxFontSize);
-    co2.A = Math.Min(1, fs / MaxFontSize);
+/*    co2.A = Math.Min(1, 4*fs / MaxFontSize);*/
     cr.Color = co2;
     cr.Save ();
       cr.Translate(rBoxWidth * 1, 0.02);
@@ -438,7 +451,9 @@ public class FSDraw
           cr.MoveTo (0, fs*0.1);
           Helpers.DrawText (cr, FileNameFontFamily, fs, name);
         } else {
-          Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2 * name.Length, fs/3, target);
+          co2.A = 0.5;
+          cr.Color = co2;
+          Helpers.DrawRectangle (cr, 0.0, 0.0, fs / 2.0 * name.Length, fs / 2.0, target);
           cr.Fill ();
         }
       }

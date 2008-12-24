@@ -35,17 +35,16 @@ public class FilezooConfig
 
     Style s = Widget.DefaultStyle;
 
-    fz.ActiveColor = ToColor(s.Foreground(StateType.Normal));
+//     fz.ActiveColor = ToColor(s.Foreground(StateType.Normal));
 
-    fz.Renderer.BackgroundColor = ToColor(s.Background(StateType.Normal));
-//     new Color (0.2, 0.2, 0.2);
-//     fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
+//     fz.Renderer.BackgroundColor = ToColor(s.Background(StateType.Normal));
+    fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
 
-    fz.Renderer.DirectoryFGColor = ToColor(s.Foreground(StateType.Normal));
-//     fz.Renderer.DirectoryBGColor = ToColor(s.Background(StateType.Normal));
+//     fz.Renderer.DirectoryFGColor = ToColor(s.Foreground(StateType.Normal));
+//     fz.Renderer.DirectoryBGColor = new Color (0.8, 0.95, 1.0);
 
-//     fz.Renderer.DirectoryFGColor = new Color (0.6, 0.65, 0.7);
-    fz.Renderer.DirectoryBGColor = new Color (0.8, 0.95, 1.0);
+    fz.Renderer.DirectoryBGColor = new Color (0.6, 0.65, 0.7);
+    fz.Renderer.DirectoryFGColor = new Color (0.6, 0.65, 0.7);
     fz.Renderer.UnfinishedDirectoryColor = new Color (0.455, 0.4, 1);
 
     fz.Renderer.RegularFileColor = new Color (0.188, 0.755, 1);
@@ -56,7 +55,7 @@ public class FilezooConfig
     fz.Renderer.FifoColor = new Color (0.75,0.1,0.32);
     fz.Renderer.SocketColor = new Color (0.95,0.2,0.52);
 
-//     fz.ActiveColor = fz.Renderer.RegularFileColor;
+    fz.ActiveColor = fz.Renderer.RegularFileColor;
     fz.InActiveColor = fz.ActiveColor;
     fz.InActiveColor.A = 0.5;
   }
