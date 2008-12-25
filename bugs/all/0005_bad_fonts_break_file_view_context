@@ -1,0 +1,23 @@
+title: bad fonts break file view context
+status: OPEN
+reported by: 
+date: 2008-12-25 22:45:28+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-25 22:45:28+0200
+
+Problem description:
+Some fonts with embedded bitmaps may cause a NoMemory error on the Cairo 
+context. 
+
+How to reproduce:
+Draw "第" with "AR PL UMing CN Light" 
+font embedded bitmaps turned on
+font size 1.5 * PANGO_SCALE
+identity matrix
+
+Proposed solution:
+Heck do I know, tell people to not use such fonts? Or use only integer 
+font sizes. Or render big text to an image surface and draw small text 
+by scaling it.
