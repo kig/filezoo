@@ -1,0 +1,28 @@
+title: overly sensitive throw
+status: OPEN
+reported by: 
+date: 2008-12-25 22:27:43+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-25 22:27:43+0200
+
+Problem description:
+The throw-scrolling doesn't sample velocity over time, but velocity over 
+motion events. Which means that stopping the mouse pointer doesn't 
+reduce throw velocity to zero.
+
+How to reproduce:
+Pan with left mouse button, rapidly stop mouse from moving, wait a few 
+seconds, release button.
+
+What happened:
+The view starts scrolling.
+
+What should've happened:
+Nothing.
+
+Proposed solution:
+Add timestamp to motion events, take it into account when computing the 
+velocity. A quick fix would be to keep a LastMotion timestamp and only 
+do a throw if it's larger than DateTime.Now - 0.5 sec or somesuch.
