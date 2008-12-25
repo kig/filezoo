@@ -1569,6 +1569,8 @@ public class Filezoo : DrawingArea
             scr.Paint ();
           scr.Restore ();
           Draw (scr, Width, Height);
+          if (scr.Status != Status.Success)
+            Console.WriteLine("Cairo error: {0}", scr.Status);
         }
         fp.Time ("FS Draw");
       }
