@@ -1,0 +1,24 @@
+title: stopping a throw causes a click
+status: OPEN
+reported by: 
+date: 2008-12-25 22:41:00+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-25 22:41:00+0200
+
+Problem description:
+Stopping a throw scroll by clicking causes a click event.
+
+How to reproduce:
+Throw view in some direction, stop the scrolling by pressing down the 
+mouse button over a file, release mouse button.
+
+What happens:
+The click handler for the file is fired, opening the file.
+
+What should happen:
+Nothing.
+
+Proposed solution:
+If ThrowVelocity > 0 on MousePress, cancel the click event.
