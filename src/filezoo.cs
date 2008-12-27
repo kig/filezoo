@@ -320,7 +320,7 @@ public class Filezoo : DrawingArea
     t2.Elapsed += new ElapsedEventHandler (LongMonitor);
     t1.Enabled = true;
     t2.Enabled = true;
-    GLib.Timeout.Add (16, new GLib.TimeoutHandler(CheckRedraw));
+    GLib.Timeout.Add (10, new GLib.TimeoutHandler(CheckRedraw));
     Helpers.StartupProfiler.Total ("Pre-drawing startup");
 
   }
@@ -1352,6 +1352,8 @@ public class Filezoo : DrawingArea
   bool ShiftKeyDown = false;
   bool DoubleClick = false;
 
+  DateTime LastMotionTime = DateTime.Now;
+
   /** BLOCKING */
   protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
   {
@@ -1379,19 +1381,20 @@ public class Filezoo : DrawingArea
         DoubleClick = false;
       }
       if (e.Button == 1 && ThrowFrames.Count > 0) {
-        ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
-        int len = Math.Min(10, ThrowFrames.Count-1);
-        double vy = 0;
-        for (int i=ThrowFrames.Count-len; i<ThrowFrames.Count; i++) {
-          vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
-        }
-        vy /= len;
-        // Console.WriteLine("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
-        if (Math.Abs(vy) > 5) {
-          ThrowVelocity = vy*2;
-          NeedRedraw = true;
-        } else {
-          ThrowVelocity = 0;
+        ThrowVelocity = 0;
+        if (DateTime.Now.Subtract(LastMotionTime).TotalMilliseconds < 100) {
+          ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
+          int len = Math.Min(10, ThrowFrames.Count-1);
+          double vy = 0;
+          for (int i=ThrowFrames.Count-len; i<ThrowFrames.Count; i++) {
+            vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
+          }
+          vy /= len;
+          // Console.WriteLine("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
+          if (Math.Abs(vy) > 5) {
+            ThrowVelocity = vy*2;
+            NeedRedraw = true;
+          }
         }
         ThrowFrames.Clear ();
       }
@@ -1426,8 +1429,10 @@ public class Filezoo : DrawingArea
     if (!left && !middle) panning = dragging = false;
 
     if (!Cancelled) {
-      if (left || middle)
+      if (left || middle) {
+        LastMotionTime = DateTime.Now;
         ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
+      }
       if (middle) {
         dragging = true;
         panning = true;
@@ -1510,6 +1515,8 @@ public class Filezoo : DrawingArea
     return true;
   }
 
+  ImageSurface TopSurface = null;
+
   /** BLOCKING */
   /**
     The expose event handler. Gets the Cairo.Context for the
@@ -1520,83 +1527,102 @@ public class Filezoo : DrawingArea
   */
   protected override bool OnExposeEvent (Gdk.EventExpose e)
   {
-    var fp = new Profiler ("OnExposeEvent", 10);
-    using ( Context cr = Gdk.CairoHelper.Create (e.Window) )
+    OnDraw ();
+    return true;
+  }
+
+  void OnDraw ()
+  {
+    var fp = new Profiler ("OnDraw");
+    int w, h;
+    GdkWindow.GetSize (out w, out h);
+    fp.Time ("Window.GetSize");
+    double x = dragX, y = dragY;
+    bool sizeChanged = false;
+    fp.Time ("GetPointer");
+    if (InteractionProfiler.Watch.IsRunning)
+      InteractionProfiler.Time ("From UI action to expose");
+    if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
+      if (CachedSurface != null) CachedSurface.Destroy ();
+      if (TopSurface != null) CachedSurface.Destroy ();
+      CachedSurface = new ImageSurface(Format.ARGB32, w, h);
+//       TopSurface = new ImageSurface(Format.ARGB32, w, h);
+      sizeChanged = true;
+      Width = (uint) w;
+      Height = (uint) h;
+      UpdateLayout ();
+      fp.Time ("Recreate CachedSurface");
+    }
+    if (Cancelled) {
+      ThrowFrames.Clear ();
+      ThrowVelocity = 0;
+    }
+    if (ThrowVelocity != 0) {
+      using ( Context ecr = new Context (EtcSurface) )
+        PanBy (ecr, Width, Height, 0, ThrowVelocity);
+      ThrowVelocity *= 0.98;
+      if (Math.Abs(ThrowVelocity) < 1)
+        ThrowVelocity = 0;
+    }
+    if (ZoomVelocity != 1) {
+      using ( Context ecr = new Context (EtcSurface) )
+        ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
+      ZoomVelocity = Math.Pow(ZoomVelocity, 0.8);
+      if (Math.Abs(1 - ZoomVelocity) < 0.001)
+        ZoomVelocity = 1;
+    }
+    if (NeedZoomCheck)
+      using ( Context ecr = new Context (EtcSurface) )
+        CheckZoomNavigation(ecr, Width, Height);
+    fp.Time ("Throw and zoom");
+    if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
+      FSNeedRedraw = false;
+      using (Context scr = new Context (CachedSurface)) {
+        scr.Save ();
+          scr.Operator = Operator.Source;
+          scr.SetSourceRGBA (0,0,0,0);
+          scr.Paint ();
+        scr.Restore ();
+        Draw (scr, Width, Height);
+        if (scr.Status != Status.Success)
+          Console.WriteLine("Cairo error: {0}", scr.Status);
+      }
+      fp.Time ("FS Draw");
+    }
+    using ( Context cr = Gdk.CairoHelper.Create (GdkWindow) )
     {
       fp.Time ("Gdk.CairoHelper.Create");
-      int w, h;
-      e.Window.GetSize (out w, out h);
-      int x, y;
-      GetPointer(out x, out y);
-      bool sizeChanged = false;
-      if (InteractionProfiler.Watch.IsRunning)
-        InteractionProfiler.Time ("From UI action to expose");
-      if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
-        if (CachedSurface != null) CachedSurface.Destroy ();
-        CachedSurface = new ImageSurface(Format.ARGB32, w, h);
-        sizeChanged = true;
-        Width = (uint) w;
-        Height = (uint) h;
-        UpdateLayout ();
+      cr.Operator = Operator.Over;
+      DrawBackground (cr, Width, Height);
+      fp.Time ("DrawBackground");
+      if (ControlLineVisible && panning) {
+        cr.Save ();
+          cr.Color = Renderer.DirectoryFGColor;
+          cr.Rectangle (0, dragY, Width, 1);
+          cr.Fill ();
+        cr.Restore ();
       }
-      fp.Time ("CachedSurface");
-      if (Cancelled) {
-        ThrowFrames.Clear ();
-        ThrowVelocity = 0;
-      }
-      if (ThrowVelocity != 0) {
-        using ( Context ecr = new Context (EtcSurface) )
-          PanBy (ecr, Width, Height, 0, ThrowVelocity);
-        ThrowVelocity *= 0.98;
-        if (Math.Abs(ThrowVelocity) < 1)
-          ThrowVelocity = 0;
-      }
-      if (ZoomVelocity != 1) {
-        using ( Context ecr = new Context (EtcSurface) )
-          ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
-        ZoomVelocity = Math.Pow(ZoomVelocity, 0.8);
-        if (Math.Abs(1 - ZoomVelocity) < 0.001)
-          ZoomVelocity = 1;
-      }
-      if (NeedZoomCheck) CheckZoomNavigation(cr, Width, Height);
-      fp.Time ("Throw and zoom");
-      if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
-        FSNeedRedraw = false;
-        using (Context scr = new Context (CachedSurface)) {
-          scr.Save ();
-            scr.Operator = Operator.Source;
-            scr.SetSourceRGBA (0,0,0,0);
-            scr.Paint ();
-          scr.Restore ();
-          Draw (scr, Width, Height);
-          if (scr.Status != Status.Success)
-            Console.WriteLine("Cairo error: {0}", scr.Status);
+      using (Pattern p = new Pattern (CachedSurface)) {
+        cr.Source = p;
+        cr.Paint ();
+        cr.Operator = Operator.Over;
+        fp.Time ("Composite");
+        if (DrawEffects (cr, Width, Height)) {
+          LimitedRedraw = true;
+          fp.Time ("Effects");
         }
-        fp.Time ("FS Draw");
       }
-      cr.Save ();
-        using (Pattern p = new Pattern (CachedSurface)) {
-          cr.Operator = Operator.Over;
-          DrawBackground (cr, Width, Height);
-          fp.Time ("DrawBackground");
-          if (ControlLineVisible && panning) {
-            cr.Save ();
-              cr.Color = Renderer.DirectoryFGColor;
-              cr.Rectangle (0, dragY, Width, 1);
-              cr.Fill ();
-            cr.Restore ();
-          }
-          cr.Source = p;
-          cr.Paint ();
-          cr.Operator = Operator.Over;
-          fp.Time ("Composite");
-          if (DrawEffects (cr, Width, Height)) {
-            LimitedRedraw = true;
-            fp.Time ("Effects");
-          }
-        }
-      cr.Restore ();
     }
+/*    using ( Context cr = Gdk.CairoHelper.Create (GdkWindow) )
+    {
+      fp.Time ("Gdk.CairoHelper.Create");
+      using (Pattern p = new Pattern (TopSurface)) {
+        cr.Source = p;
+        cr.Operator = Operator.Source;
+        cr.Paint ();
+        fp.Time ("TopComposite");
+      }
+    }*/
     if (InteractionProfiler.Watch.IsRunning) {
       InteractionProfiler.Total ("Interaction latency");
       InteractionProfiler.Stop ();
@@ -1604,7 +1630,6 @@ public class Filezoo : DrawingArea
       InteractionProfiler.TotalElapsed = 0;
     }
     fp.Total ("Frame");
-    return true;
   }
 
   Random rng = new Random ();

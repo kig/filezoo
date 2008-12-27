@@ -99,7 +99,9 @@ public static class Helpers {
     DrawText (cr, family, fontSize, text, Pango.Alignment.Left);
   }
   public static void DrawText (Context cr, string family, double fontSize, string text, Pango.Alignment alignment)
-  { lock (FontCache) {
+  {
+//   return;
+  lock (FontCache) {
 //   LogError("DrawText {0}", text);
     Profiler p = new Profiler ("DrawText");
     double w,h;
@@ -135,7 +137,9 @@ public static class Helpers {
 
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
-  { lock (FontCache) {
+  {
+//   return te;
+  lock (FontCache) {
 //   LogError("GetTextExtents {0}", text);
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
@@ -195,6 +199,7 @@ public static class Helpers {
     if (h_a < 0.25 && (Math.Floor(y*4) == Math.Floor((y+h)*4)))
       return;
     h_a = Math.Max(0.5, y2_a - y_a);
+//   return;
     cr.Save ();
       cr.IdentityMatrix ();
       cr.Rectangle (x_a, y_a, w_a, h_a);

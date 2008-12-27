@@ -63,8 +63,8 @@ public class Profiler
       ((PrintProfile == Print.Global) && GlobalPrintProfile))
     ) {
       string time = String.Format ("{0} ms ", elapsedMilliseconds.ToString("N1"));
-      int barLength = Math.Max((int)Math.Min(10, Math.Round(elapsedMilliseconds / 20)), 0);
-      string barStart = (elapsedMilliseconds > 200 ? "─" : (barLength < 1 ? "" : "╾"));
+      int barLength = Math.Max((int)Math.Min(10, Math.Round(elapsedMilliseconds)), 0);
+      string barStart = (elapsedMilliseconds > 10 ? "─" : (barLength < 1 ? "" : "╾"));
       string bar = barStart.PadRight(barLength, '─');
       Console.WriteLine (prefix + bar.PadLeft(10) + "╼ " + time.PadLeft(10) + Prefix + "  " + message);
     }
