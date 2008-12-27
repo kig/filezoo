@@ -778,8 +778,8 @@ public class Filezoo : DrawingArea
   {
     cr.Save ();
     Color co = Renderer.BackgroundColor;
-//     if (UseRgbaVisuals)
-//       co.A = 0.95;
+    if (UseRgbaVisuals)
+      co.A = 1;
     cr.Color = co;
     cr.Operator = Operator.Source;
     cr.Rectangle (0,0, width, height);

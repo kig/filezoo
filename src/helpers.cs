@@ -100,7 +100,7 @@ public static class Helpers {
   }
   public static void DrawText (Context cr, string family, double fontSize, string text, Pango.Alignment alignment)
   { lock (FontCache) {
-//   Console.WriteLine("DrawText {0}", text);
+//   LogError("DrawText {0}", text);
     Profiler p = new Profiler ("DrawText");
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
@@ -136,7 +136,7 @@ public static class Helpers {
   /** BLOCKING */
   public static TextExtents GetTextExtents (Context cr, string family, double fontSize, string text)
   { lock (FontCache) {
-//   Console.WriteLine("GetTextExtents {0}", text);
+//   LogError("GetTextExtents {0}", text);
     double w,h;
     Pango.Layout layout = GetLayout (cr, family, QuantizeFontSize(fontSize));
     layout.SetText (text);
@@ -326,14 +326,14 @@ public static class Helpers {
   {
     if (!FileExists(path)) return false;
     try {
-    Console.WriteLine("Deleting {0}", path);
+    LogError("Deleting {0}", path);
       if (IsDir(path))
         new UnixDirectoryInfo(path).Delete(true);
       else
         new UnixFileInfo(path).Delete();
       return true;
     } catch (Exception e) {
-      Console.WriteLine(e);
+      LogError(e);
       return false;
     }
   }
@@ -348,12 +348,12 @@ public static class Helpers {
       try {
         if (deleteOverwrite) Delete(dst);
         else Trash(dst);
-      } catch (Exception e) { Console.WriteLine(e); }
+      } catch (Exception e) { LogError(e); }
     }
     try {
       MoveURI (src, dst);
       return true;
-    } catch (Exception e) { Console.WriteLine(e); }
+    } catch (Exception e) { LogError(e); }
     return false;
   }
 
@@ -367,12 +367,12 @@ public static class Helpers {
       try {
         if (deleteOverwrite) Delete(dst);
         else Trash(dst);
-      } catch (Exception e) { Console.WriteLine(e); }
+      } catch (Exception e) { LogError(e); }
     }
     try {
       CopyURI (src, dst);
       return true;
-    } catch (Exception e) { Console.WriteLine(e); }
+    } catch (Exception e) { LogError(e); }
     return false;
   }
 
@@ -387,13 +387,13 @@ public static class Helpers {
       fs.Close ();
       File.SetLastWriteTime(path, DateTime.Now);
     }
-  } catch (Exception e) { Console.WriteLine(e); } }
+  } catch (Exception e) { LogError(e); } }
 
   /** DESTRUCTIVE, BLOCKING */
   public static void MkdirP (string path)
-  {
+  { try {
     Directory.CreateDirectory(path);
-  }
+  } catch (Exception e) { LogError(e); } }
 
   /** DESTRUCTIVE, BLOCKING */
   public static void NewFileWith (string path, byte[] data)
@@ -432,7 +432,7 @@ public static class Helpers {
   /** DESTRUCTIVE, BLOCKING */
   public static void CopyURIs (string[] src, string dst)
   {
-    Console.WriteLine ("Copy {0} to {1}", String.Join(", ", src), dst);
+    LogError ("Copy {0} to {1}", String.Join(", ", src), dst);
     CopyURIs (src, ExpandDsts(src, dst));
   }
   public static void CopyURIs (string[] src, string[] dst)
@@ -447,7 +447,7 @@ public static class Helpers {
   /** DESTRUCTIVE, BLOCKING */
   public static void MoveURIs (string[] src, string dst)
   {
-    Console.WriteLine ("Move {0} to {1}", String.Join(", ", src), dst);
+    LogError ("Move {0} to {1}", String.Join(", ", src), dst);
     MoveURIs (src, ExpandDsts(src, dst));
   }
   public static void MoveURIs (string[] src, string[] dst)
@@ -504,13 +504,13 @@ public static class Helpers {
   {
     switch (info.Status) {
       case Gnome.Vfs.XferProgressStatus.Vfserror:
-        Console.WriteLine("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
+        LogError("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
         return (int)Gnome.Vfs.XferErrorAction.Abort;
       case Gnome.Vfs.XferProgressStatus.Overwrite:
-        Console.WriteLine("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
+        LogError("{0}: {1} in {2} -> {3}", info.Status, info.VfsStatus, info.SourceName, info.TargetName);
         return (int)Gnome.Vfs.XferOverwriteAction.Abort;
       default:
-//         Console.WriteLine("{0} / {1} {2} -> {3}", info.BytesCopied, info.BytesTotal, info.SourceName, info.TargetName);
+//         LogError("{0} / {1} {2} -> {3}", info.BytesCopied, info.BytesTotal, info.SourceName, info.TargetName);
         return 1;
     }
   }
@@ -555,7 +555,7 @@ public static class Helpers {
       pr.Time ("load as ImageSurface");
       return thumb;
     } catch (Exception e) {
-      Console.WriteLine ("Thumbnailing failed for {0}: {1}", path, e);
+      LogError ("Thumbnailing failed for {0}: {1}", path, e);
       ImageSurface thumb = new ImageSurface (Format.ARGB32, 1, 1);
       using (Context cr = new Context(thumb)) {
         cr.Color = new Color (1,0,0);
@@ -976,7 +976,7 @@ public static class Helpers {
       if (args.ResponseId == ResponseType.Ok) {
         onOk(e.Text);
       } else {
-        Console.WriteLine (args.ResponseId);
+        LogError (args.ResponseId);
       }
       d.Unrealize ();
       d.Destroy ();
@@ -988,27 +988,48 @@ public static class Helpers {
   }
 
   public static void PrintDragData (DragDataReceivedArgs e) {
-    Console.WriteLine("SuggestedAction: {0}, X:{1} Y:{2}", e.Context.SuggestedAction, e.X, e.Y);
+    LogError("SuggestedAction: {0}, X:{1} Y:{2}", e.Context.SuggestedAction, e.X, e.Y);
     PrintSelectionData(e.SelectionData);
   }
 
   public static void PrintSelectionData (SelectionData sd) {
-    Console.WriteLine ();
-    Console.WriteLine("Selection: {0}", sd.Selection.Name);
-    Console.WriteLine("Target: {0}", sd.Target.Name);
+    LogError ();
+    LogError("Selection: {0}", sd.Selection.Name);
+    LogError("Target: {0}", sd.Target.Name);
     string[] targets = new string[sd.Targets.Length];
     for (int i=0; i<targets.Length; i++) targets[i] = sd.Targets[i].Name;
-    Console.WriteLine("Targets: {0}", String.Join(", ", targets));
-    Console.WriteLine("Format: {0}", sd.Format);
-    Console.WriteLine("Length: {0}", sd.Length);
+    LogError("Targets: {0}", String.Join(", ", targets));
+    LogError("Format: {0}", sd.Format);
+    LogError("Length: {0}", sd.Length);
     if (sd.Length < 0) return;
-    Console.WriteLine("Data: {0}", BitConverter.ToString(sd.Data));
-    Console.WriteLine("Pixbuf: {0}", sd.Pixbuf);
-    Console.WriteLine("Text: {0}", sd.Text);
-    Console.WriteLine("Type: {0}", sd.Type.Name);
-    Console.WriteLine("Uris: {0}", sd.Uris);
+    LogError("Data: {0}", BitConverter.ToString(sd.Data));
+    LogError("Pixbuf: {0}", sd.Pixbuf);
+    LogError("Text: {0}", sd.Text);
+    LogError("Type: {0}", sd.Type.Name);
+    LogError("Uris: {0}", sd.Uris);
   }
 
+  public static void LogError ()
+  {
+    Console.WriteLine();
+  }
+
+  public static void LogError (string s)
+  {
+    Console.WriteLine(s);
+  }
+  public static void LogError (Exception s)
+  {
+    Console.WriteLine(s);
+  }
+  public static void LogError (object s)
+  {
+    Console.WriteLine(s);
+  }
+  public static void LogError (string s, params object[] list)
+  {
+    Console.WriteLine(s, list);
+  }
 }
 
 

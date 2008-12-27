@@ -35,7 +35,7 @@ public class FilezooConfig
 
     Style s = Widget.DefaultStyle;
 
-//     fz.ActiveColor = ToColor(s.Foreground(StateType.Normal));
+    fz.ActiveColor = ToColor(s.Foreground(StateType.Normal));
 
 //     fz.Renderer.BackgroundColor = ToColor(s.Background(StateType.Normal));
     fz.Renderer.BackgroundColor = new Color (0.2, 0.2, 0.2);
