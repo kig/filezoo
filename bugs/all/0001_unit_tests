@@ -19,9 +19,11 @@ Add some method that compiles, wonder if it works right or not.
 
 Proposed solution:
 
-Use NUnit to set up tests: http://nunit.org 
 Use mono's code coverage tools: http://www.mono-project.com/Code_Coverage
 Make the tests a part of the build process.
 Run tests automatically before git push.
 Run tests automatically on file change.
 Put a traffic light tests-pass applet into the desktop panel.
+
+-- edited by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-27 13:27:59+0200
+
