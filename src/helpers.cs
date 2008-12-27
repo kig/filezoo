@@ -379,10 +379,14 @@ public static class Helpers {
   /** DESTRUCTIVE, BLOCKING */
   public static void Touch (string path)
   {
-    MkdirP (Dirname(path));
-    FileStream fs = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read);
-    fs.Close ();
-    File.SetLastWriteTime(path, DateTime.Now);
+    if (FileExists(path)) {
+      File.SetLastWriteTime(path, DateTime.Now);
+    } else {
+      MkdirP (Dirname(path));
+      FileStream fs = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read);
+      fs.Close ();
+      File.SetLastWriteTime(path, DateTime.Now);
+    }
   }
 
   /** DESTRUCTIVE, BLOCKING */

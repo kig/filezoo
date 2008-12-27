@@ -85,6 +85,24 @@ public class HelpersTest
   }
 
   [Test]
+  public void TouchDir ()
+  {
+    var l = new List<string> { "a", "b", "c", ":h#i:t!h[e]\n\t \rr(e\\" };
+    l.ForEach(s => {
+      Helpers.MkdirP(testDir+s);
+      Assert.IsTrue(Helpers.FileExists(testDir+s));
+    });
+    Thread.Sleep(1000);
+    l.ForEach(s => {
+      var td1 = DateTime.Now.Subtract(Helpers.LastModified(testDir+s));
+      Assert.Greater( td1.TotalMilliseconds, 1000 );
+      Helpers.Touch(testDir+s);
+      var td = DateTime.Now.Subtract(Helpers.LastModified(testDir+s));
+      Assert.Less( td.TotalMilliseconds, 1000 );
+    });
+  }
+
+  [Test]
   public void Trash ()
   {
     string td = Helpers.TrashDir + Helpers.DirSepS + "trashTest";
