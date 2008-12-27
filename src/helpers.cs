@@ -378,7 +378,7 @@ public static class Helpers {
 
   /** DESTRUCTIVE, BLOCKING */
   public static void Touch (string path)
-  {
+  { try {
     if (FileExists(path)) {
       File.SetLastWriteTime(path, DateTime.Now);
     } else {
@@ -387,7 +387,7 @@ public static class Helpers {
       fs.Close ();
       File.SetLastWriteTime(path, DateTime.Now);
     }
-  }
+  } catch (Exception e) { Console.WriteLine(e); } }
 
   /** DESTRUCTIVE, BLOCKING */
   public static void MkdirP (string path)
