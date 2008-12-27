@@ -1,0 +1,33 @@
+title: sometimes directory changes are not noticed
+status: OPEN
+reported by: 
+date: 2008-12-27 10:04:49+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-27 10:04:49+0200
+
+Problem description:
+If you create a subdirectory and add files to it over a period of 
+several seconds, the files of the last second may not be noticed.
+
+How to reproduce:
+Paste to dwim-bar, may take a couple dozen tries:
+mkdir foo; for i in `seq 1 100`; do touch foo/$i; done
+
+What happened:
+Less than 100 entries are shown, can't get more to show.
+
+What should have happened:
+All 100 entries should appear.
+
+Probable cause:
+  - the long monitor and the FSCache use mtime 
+  - mtime accuracy is one second
+  - if changes happen to an unwatched [== i.e. long monitor] 
+    directory during the second after it is updated, the
+    directory mtime stays the same and the changes are not 
+    noticed
+
+How to fix:
+if (DateTime.Now.Subtract(mtime).TotalSeconds < 1) treat as changed
