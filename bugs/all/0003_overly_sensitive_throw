@@ -1,5 +1,5 @@
 title: overly sensitive throw
-status: OPEN
+status: CLOSED
 reported by: 
 date: 2008-12-25 22:27:43+0200
 author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
@@ -26,3 +26,8 @@ Proposed solution:
 Add timestamp to motion events, take it into account when computing the 
 velocity. A quick fix would be to keep a LastMotion timestamp and only 
 do a throw if it's larger than DateTime.Now - 0.5 sec or somesuch.
+-- closed by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-27 23:11:26+0200
+
+FIXED
+
+Added a 100 ms LastMotion timeout
