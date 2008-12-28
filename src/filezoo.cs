@@ -1323,10 +1323,12 @@ public class Filezoo : DrawingArea
     p.Time ("SetCursor");
     dragStartX = dragX = e.X;
     dragStartY = dragY = e.Y;
-    ThrowVelocity = 0;
     ZoomVelocity = 1;
     ThrowFrames.Clear ();
     Cancelled = false;
+    if (ThrowVelocity != 0)
+      Cancelled = true;
+    ThrowVelocity = 0;
     if (e.Button == 1 || e.Button == 2)
       ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
     dragging = false;
