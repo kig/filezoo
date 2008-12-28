@@ -1,0 +1,124 @@
+Filezoo manual
+
+
+Filezoo is a file manager that displays the filesystem hierarchy as a zoomable list of files and directories.
+
+
+Command line:
+
+  filezoo.exe [options] [directory]
+
+    Starts Filezoo in [directory] with the given [options].
+
+  Options
+    --panel      Start in panel mode.
+    --quit       Quit after drawing the first frame.
+    --panel-bg   Set the panel background to the given X color.
+
+
+User interface:
+
+
+Breadcrumb bar: ("/home/username/")
+
+  Click on a directory name to navigate there.
+
+
+Sort bar: (Sort Name Size Date Type)
+
+  Click on a sort label to sort the directory entries by that property.
+  Directories are always before files.
+  There is no need to have a reversed sort as both ends of the list take an
+  equal time to access.
+
+  Name sorts alphabetically.
+  Size sorts largest first.
+  Date sorts newest first.
+  Type sorts alphabetically by the file extension.
+
+
+Size bar: (Size Flat Size Date Entries Total)
+
+  Click on a size label to set the relative sizes of the directory entries
+  according to that property.
+
+  Flat makes the entries equally sized.
+  Size makes large files appear larger.
+  Date makes newer entries appear larger.
+  Entries makes directories with several entries appear larger.
+  Total makes large directories appear larger.
+
+
+Address bar: [                       ][Downloads][Home]
+
+  Click on the Home-button to navigate to the home directory.
+  Click on the Downloads-button to navigate to the $HOME/downloads directory.
+
+  Type a filename to the address bar and press enter to open the file.
+  Enter a directory name to navigate to that directory.
+  Type a shell command to execute that command.
+    Prefix the command with a ! to explicitly execute it in case there is
+    a file having the same name as the command.
+  Type a website address to open it in a new Firefox tab.
+  Type a ? followed by a search query to Google in a new Firefox tab.
+
+
+Mouse:
+
+  Left mouse button
+    Click
+      Unreadable item to zoom it to readable size
+      Directory to navigate in it
+      File to open it
+    Ctrl-click to select files and directories
+    Shift-click to select a range of files in a single directory
+    Alt-click to clear selection
+    Drag to pan
+      Release mouse button when panning to throw
+      Press mouse button to stop throw
+    Ctrl-drag to drag and drop
+      Moves by default
+      Ctrl-shift-drag to copy
+      Ctrl-alt-drag to ask
+
+  Right mouse button
+    Click
+      Show context menu for the clicked item
+
+  Middle mouse button / wheel button
+    Drag up and down to pan
+    Drag left and right to zoom
+
+  Mouse wheel
+    Scroll forwards to zoom in
+    Scroll backwards to zoom out
+
+
+Keyboard:
+
+  Esc
+    Clear selection
+    Close panel window if nothing selected
+
+  Home
+    Navigate to home directory
+
+  Backspace
+    Navigate to parent directory
+
+  Delete
+    Move selection to trash
+
+  Ctrl-c
+    Copy selection to clipboard
+    Use to copy selected files
+
+  Ctrl-x
+    Cut selection to clipboard
+    Use to move selected files
+
+  Ctrl-v
+    Paste clipboard contents to current directory
+    If clipboard doesn't contain files, asks whether to create a new file
+    from the clipboard contents.
+
