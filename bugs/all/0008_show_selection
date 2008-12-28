@@ -1,0 +1,29 @@
+title: show selection
+status: OPEN
+reported by: 
+date: 2008-12-28 12:05:08+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-28 12:05:08+0200
+
+Problem description:
+  I don't know if I have something selected or not.
+  Selection status is not visible.
+  Selected items are not visible if you have navigated them out of sight.
+
+How to reproduce:
+  Select items, zoom out until they vanish.
+  Select items, pan until none are visible.
+
+What happened:
+  There is no selection visible on the screen, 
+  yet there are files in the selection.
+
+What did you expect:
+  For the selection status to be visible regardless
+  of the filesystem view.
+
+Proposed solution:
+  Add a "X files selected [^]" statusbar
+  [clicking which toggles a list of the selected items]
