@@ -52,7 +52,7 @@ public class SizeComparer : IComparer<FSEntry>,IGrouping {
       if (a.IsDirectory) return -1;
       if (b.IsDirectory) return 1;
     }
-    long rv = a.Size - b.Size;
+    long rv = b.Size - a.Size;
     if (rv == 0) rv = String.CompareOrdinal(a.LCName, b.LCName);
     return rv > 0 ? 1 : (rv < 0 ? -1 : 0);
   }

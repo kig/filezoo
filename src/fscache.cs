@@ -177,17 +177,15 @@ public static class FSCache
     f.LastFileChange = Helpers.LastChange(path);
     if (f.IsDirectory) {
       List<FSEntry> entries = new List<FSEntry> ();
-      long size = 0, count = 0;
+      long count = 0;
       foreach (UnixFileSystemInfo u in Helpers.EntriesMaybe (f.FullName)) {
         FSEntry d = Get (u.FullName);
         entries.Add (d);
-        size += d.Size;
         count++;
       }
       lock (Cache) {
         f.Entries.Clear ();
         foreach(FSEntry e in entries) f.Entries.Add(e);
-        f.Size = size;
         f.Count = count;
         f.FilePassDone = true;
         if (AllChildrenComplete(path))
