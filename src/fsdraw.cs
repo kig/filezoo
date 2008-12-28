@@ -275,11 +275,12 @@ public class FSDraw
           co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
       }
       cr.Color = co;
-      Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
-      if (d.F.Thumbnail != null)
+      if (d.F.Thumbnail != null) {
         DrawThumb (d.F, cr, target);
-      else
+      } else {
+        Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
         cr.Fill ();
+      }
       if (d.F.IsDirectory) {
         cr.Save ();
           if (matrix.Yy > 8 && matrix.Yy < 4000) {
@@ -358,15 +359,20 @@ public class FSDraw
             double hr = matrix.Yy * 0.96;
             double wscale = wr / thumb.Width;
             double hscale = hr / thumb.Height;
-            double scale = Math.Max (wscale, hscale);
-            double x = 0.5*rBoxWidth*(1 - (scale/wscale));
-            double y = 0.02 + 0.5*0.48*(1 - (scale/hscale));
+            double y_add = 0;
+            if (hscale > wscale) {
+              y_add = Math.Min(50, matrix.Yy * (1 - wscale / hscale)) / matrix.Yy;
+            }
+            hscale = (matrix.Yy * (0.96-y_add)) / thumb.Height;
+            double fullWidth = (target.Width - matrix.X0) / thumb.Width;
+            double scale = Math.Min(fullWidth, Math.Max (wscale, hscale));
+            double x = Math.Max(0, 0.5*rBoxWidth*(1 - (scale/wscale)));
+            double y = Math.Min(0, 0.02 + 0.5*0.48*(1 - (scale/hscale)));
+            cr.Translate (0, 0.02+y_add);
+          Helpers.DrawRectangle (cr, 0.0, 0.0,
+            rBoxWidth * Helpers.Clamp(scale/wscale, 1, fullWidth), 0.96-y_add, target);
             cr.Translate (x, y);
             cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
-            Matrix pm = p.Matrix;
-            pm.Xx = Math.Max(1, pm.Xx);
-            pm.Yy = Math.Max(1, pm.Yy);
-            p.Matrix = pm;
           cr.Pattern = p;
           cr.Fill ();
         cr.Restore ();
