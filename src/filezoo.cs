@@ -1537,7 +1537,7 @@ public class Filezoo : DrawingArea
 
   void OnDraw ()
   {
-    var fp = new Profiler ("OnDraw", 0);
+    var fp = new Profiler ("OnDraw");
     int w, h;
     GdkWindow.GetSize (out w, out h);
     fp.Time ("Window.GetSize");

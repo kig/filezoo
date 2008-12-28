@@ -70,6 +70,7 @@ public class FSEntry
   public bool InProgress = false;
 
   public ImageSurface Thumbnail = null;
+  public ImageSurface FullSizeThumbnail = null;
 
 
   public FSEntry (string path) : this (new UnixSymbolicLinkInfo(path)) {}

@@ -98,6 +98,10 @@ public static class FSCache
   static PriorityQueue ThumbnailQueue = new PriorityQueue ();
   static Dictionary<string,FSEntry> ThumbnailCache = new Dictionary<string,FSEntry> ();
 
+  static Thread FullSizeThumbnailThread;
+  static PriorityQueue FullSizeThumbnailQueue = new PriorityQueue ();
+  static Dictionary<string,FSEntry> FullSizeThumbnailCache = new Dictionary<string,FSEntry> ();
+
   static Dictionary<string,TraversalInfo> TraversalCache = new Dictionary<string,TraversalInfo> ();
 
 
@@ -325,11 +329,40 @@ public static class FSCache
     }
   }
 
+  static List<string> LoadableTypes = new List<string>() {
+    "image/jpeg",
+    "image/png"
+  };
+
+  /** ASYNC */
+  public static void FetchFullSizeThumbnail (string path, int priority)
+  {
+    FSEntry f = Get (path);
+    if (f.FullSizeThumbnail != null) return;
+    if (f.IsDirectory) return;
+    string uri = "file://" + path;
+    Gnome.Vfs.Vfs.Initialize ();
+    string mime = Gnome.Vfs.MimeType.GetMimeTypeForUri(uri);
+    if (LoadableTypes.Contains(mime))
+    {
+        lock (FullSizeThumbnailQueue)
+          FullSizeThumbnailQueue.Enqueue(f.FullName, priority);
+    }
+    lock (FullSizeThumbnailQueue) {
+      if (FullSizeThumbnailThread == null) {
+        FullSizeThumbnailThread = new Thread(new ThreadStart(FullSizeThumbnailQueueProcessor));
+        FullSizeThumbnailThread.IsBackground = true;
+        FullSizeThumbnailThread.Start ();
+      }
+    }
+  }
+
   /** ASYNC */
   public static void CancelThumbnailing ()
-  { lock (ThumbnailQueue) {
-    ThumbnailQueue.Clear ();
-  } }
+  {
+    lock (ThumbnailQueue) ThumbnailQueue.Clear ();
+    lock (FullSizeThumbnailQueue) FullSizeThumbnailQueue.Clear ();
+  }
 
   /** ASYNC */
   public static void PruneCache (int maxFrameDelta)
@@ -716,6 +749,18 @@ public static class FSCache
       d.Thumbnail = null;
       ThumbnailCache.Remove(d.FullName);
     }
+    DestroyFullSizeThumbnail(d);
+  }}}
+
+  static void DestroyFullSizeThumbnail(FSEntry d)
+  { lock (Cache) { lock (d) {
+    ImageSurface tn = d.FullSizeThumbnail;
+    if (tn != null) {
+      tn.Destroy ();
+      tn.Destroy ();
+      d.FullSizeThumbnail = null;
+      FullSizeThumbnailCache.Remove(d.FullName);
+    }
   } } }
 
   /* returns "should retry" */
@@ -811,6 +856,81 @@ public static class FSCache
         ThumbnailQueue.Enqueue (tn, 0);
   }
 
+  /* returns "should retry" */
+  static bool GetFullSizeThumbnail (string path)
+  {
+    if ( DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds <= 1 )
+      return true;
+    FSEntry f = Get (path);
+    if (f.FullSizeThumbnail == null) {
+      ImageSurface tn = Helpers.ToImageSurface (path);
+      if (tn.Width < 1 || tn.Height < 1) {
+        tn.Destroy ();
+        tn.Destroy ();
+        bool tnRecentlyModified = ( DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds < 2 );
+        return tnRecentlyModified;
+      }
+      ImageSurface ntn = Helpers.ScaleDownSurface(tn, 800);
+      tn.Destroy (); tn.Destroy ();
+      tn = ntn;
+      lock (Cache) {
+        f.FullSizeThumbnail = tn;
+        FullSizeThumbnailCache[f.FullName] = f;
+        bool checkForOld = true;
+        int deletecount = 0;
+        if (FullSizeThumbnailCache.Count > 100) {
+          FSEntry oldest = f;
+          foreach (FSEntry e in FullSizeThumbnailCache.Values) {
+            if (e.LastDraw < oldest.LastDraw) oldest = e;
+          }
+          if (oldest.LastDraw != FSDraw.frame) {
+            DestroyFullSizeThumbnail(oldest);
+            deletecount++;
+            checkForOld = oldest.LastDraw < FSDraw.frame - 10;
+          }
+        }
+        if (checkForOld && FullSizeThumbnailCache.Count > 50) {
+          List<FSEntry> old = new List<FSEntry> ();
+          foreach (FSEntry e in FullSizeThumbnailCache.Values) {
+            if (e.LastDraw < FSDraw.frame - 10) old.Add(e);
+          }
+          foreach (FSEntry e in old) {
+            DestroyFullSizeThumbnail(e);
+            deletecount++;
+          }
+        }
+        if (deletecount > 1) {
+          Console.WriteLine("Expired {0} entries from FullSizeThumbnailCache", deletecount);
+        }
+      }
+      LastChange = DateTime.Now;
+    }
+    return false;
+  }
+
+  static void FullSizeThumbnailQueueProcessor ()
+  {
+    Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+    while (true) {
+      while (FullSizeThumbnailQueue.Count > 0)
+        ProcessFullSizeThumbnailQueue ();
+      Thread.Sleep(100);
+    }
+  }
+
+  static void ProcessFullSizeThumbnailQueue ()
+  {
+    string tn;
+    lock (FullSizeThumbnailQueue) {
+      if (FullSizeThumbnailQueue.Count > 0)
+        tn = FullSizeThumbnailQueue.Dequeue();
+      else
+        return;
+    }
+    if (GetFullSizeThumbnail (tn))
+      lock (FullSizeThumbnailQueue)
+        FullSizeThumbnailQueue.Enqueue (tn, 0);
+  }
 }
 
 

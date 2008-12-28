@@ -349,7 +349,9 @@ public class FSDraw
   void DrawThumb (FSEntry d, Context cr, Rectangle target) {
     ImageSurface thumb;
     lock (d) {
-      thumb = d.Thumbnail;
+      thumb = d.FullSizeThumbnail;
+      if (thumb == null)
+        thumb = d.Thumbnail;
       if (thumb == null) return;
       double rBoxWidth = BoxWidth / target.Height;
       using (Pattern p = new Pattern (thumb)) {
@@ -381,7 +383,7 @@ public class FSDraw
           cr.Translate (0, 0.02+y_add);
           // draw thumb rect
           Helpers.DrawRectangle (cr, 0.0, 0.0,
-            rBoxWidth * Helpers.Clamp(scale/wscale, 1, fullWidth),
+            rBoxWidth * Helpers.Clamp(scale/wscale, 1, fullWidth * matrix.Xx),
             0.96-y_add,
             target);
           // center thumbnail
@@ -593,6 +595,11 @@ public class FSDraw
           cr.Scale (1, h);
           d.F.LastDraw = FSDraw.frame;
           RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
+          ImageSurface thumb = d.F.Thumbnail;
+          if (thumb != null) {
+            if (cr.Matrix.Yy > 64)
+              RequestFullSizeThumbnail(d.F.FullName, (int)cr.Matrix.Yy);
+          }
           if (d.F.IsDirectory) {
             bool childrenVisible = cr.Matrix.Yy > 2;
             bool shouldDrawChildren = (depth == 0 || childrenVisible);
@@ -628,6 +635,10 @@ public class FSDraw
     FSCache.FetchThumbnail (path, priority);
   }
 
+  void RequestFullSizeThumbnail (string path, int priority)
+  {
+    FSCache.FetchFullSizeThumbnail (path, priority);
+  }
 
   /* Click handler */
 
