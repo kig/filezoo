@@ -103,7 +103,9 @@ public class FilezooConfig
     Prefixes["/usr/games"] = Prefixes["/usr/local/games"] = "☺";
     Prefixes[Helpers.HomeDir] = "♜";
     Prefixes[Helpers.HomeDir+"/bin"] = "⌬";
-    Prefixes[Helpers.HomeDir+"/code"] = "◌";
+    Prefixes[Helpers.HomeDir+"/lib"] = "⬡";
+    Prefixes[Helpers.HomeDir+"/include"] = "◌";
+    Prefixes[Helpers.HomeDir+"/code"] = "⚒";
     Prefixes[Helpers.HomeDir+"/Trash"] =
     Prefixes[Helpers.HomeDir+"/.Trash"] = "♻";
     Prefixes[Helpers.HomeDir+"/downloads"] =
@@ -112,13 +114,13 @@ public class FilezooConfig
     Prefixes[Helpers.HomeDir+"/Music"] = "♬";
     Prefixes[Helpers.HomeDir+"/Desktop"] = "▰";
     Prefixes[Helpers.HomeDir+"/documents"] =
-    Prefixes[Helpers.HomeDir+"/Documents"] = "✎";
+    Prefixes[Helpers.HomeDir+"/Documents"] = "✧";
     Prefixes[Helpers.HomeDir+"/photos"] =
     Prefixes[Helpers.HomeDir+"/Photos"] =
     Prefixes[Helpers.HomeDir+"/pictures"] =
     Prefixes[Helpers.HomeDir+"/Pictures"] = "☐";
     Prefixes[Helpers.HomeDir+"/reading"] = "♾";
-    Prefixes[Helpers.HomeDir+"/writing"] = "✍";
+    Prefixes[Helpers.HomeDir+"/writing"] = "✎";
     Prefixes[Helpers.HomeDir+"/movies"] =
     Prefixes[Helpers.HomeDir+"/Movies"] =
     Prefixes[Helpers.HomeDir+"/logs"] = "✇";
