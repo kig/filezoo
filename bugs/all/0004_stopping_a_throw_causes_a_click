@@ -1,5 +1,5 @@
 title: stopping a throw causes a click
-status: OPEN
+status: CLOSED
 reported by: 
 date: 2008-12-25 22:41:00+0200
 author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
@@ -22,3 +22,7 @@ Nothing.
 
 Proposed solution:
 If ThrowVelocity > 0 on MousePress, cancel the click event.
+-- closed by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-28 12:30:57+0200
+
+FIXED
+
