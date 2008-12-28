@@ -173,8 +173,9 @@ public static class FSCache
   public static void FilePass (FSEntry f)
   {
     string path = f.FullName;
-    if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path)) return;
+    if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path) && f.LastFilePass.Subtract(f.LastFileChange).TotalSeconds > 1) return;
     f.LastFileChange = Helpers.LastChange(path);
+    f.LastFilePass = DateTime.Now;
     if (f.IsDirectory) {
       List<FSEntry> entries = new List<FSEntry> ();
       long count = 0;

@@ -36,6 +36,7 @@ public class FSEntry
   public DateTime LastSort = Helpers.DefaultTime;
   public DateTime LastChange = DateTime.Now;
   public DateTime LastFileChange;
+  public DateTime LastFilePass = Helpers.DefaultTime;
 
   // rolling 32-bit frame counter in 497 days at 100fps
   // rolling 64-bit frame counter around the time the sun burns out at 100fps
