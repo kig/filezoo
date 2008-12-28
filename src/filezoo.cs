@@ -1314,6 +1314,8 @@ public class Filezoo : DrawingArea
     }
   }
 
+  bool ClickCancelled = false;
+
   /** FAST */
   protected override bool OnButtonPressEvent (Gdk.EventButton e)
   {
@@ -1325,9 +1327,9 @@ public class Filezoo : DrawingArea
     dragStartY = dragY = e.Y;
     ZoomVelocity = 1;
     ThrowFrames.Clear ();
-    Cancelled = false;
+    ClickCancelled = Cancelled = false;
     if (ThrowVelocity != 0)
-      Cancelled = true;
+      ClickCancelled = true;
     ThrowVelocity = 0;
     if (e.Button == 1 || e.Button == 2)
       ThrowFrames.Add (new ThrowFrame(e.X, e.Y));
@@ -1367,7 +1369,7 @@ public class Filezoo : DrawingArea
     if (Cancelled) {
       Cancelled = DoubleClick = false;
     } else {
-      if (e.Button == 1 && !dragging) {
+      if (e.Button == 1 && !dragging && !ClickCancelled) {
       InteractionProfiler.Start ();
         int w, h;
         e.Window.GetSize (out w, out h);
