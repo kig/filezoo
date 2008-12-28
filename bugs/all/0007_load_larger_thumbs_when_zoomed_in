@@ -1,0 +1,31 @@
+title: load larger thumbs when zoomed in
+status: OPEN
+reported by: 
+date: 2008-12-28 10:14:51+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-28 10:14:51+0200
+
+Problem description:
+  The 128x128 thumbnails get blurry when zoomed in.
+
+How to reproduce:
+  Zoom into an image that is larger than 128x128 in size.
+
+What happened:
+  The image gets blurry.
+
+What should have happened:
+  The image shouldn't get blurry 
+  (before hitting the image's native resolution.)
+
+Proposed solution:
+  Modify PreDraw to load images at view-width size when zoomed in. 
+
+  Modify DrawThumb to use the view-width image when thumb scale > 1.
+
+  Modify FSCache thumbnail caching to keep a very short-lived cache
+  of view-width images.
+
+
