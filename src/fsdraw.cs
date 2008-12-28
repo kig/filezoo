@@ -354,25 +354,40 @@ public class FSDraw
       double rBoxWidth = BoxWidth / target.Height;
       using (Pattern p = new Pattern (thumb)) {
         cr.Save ();
-            Matrix matrix = cr.Matrix;
-            double wr = matrix.Xx * rBoxWidth;
-            double hr = matrix.Yy * 0.96;
-            double wscale = wr / thumb.Width;
-            double hscale = hr / thumb.Height;
-            double y_add = 0;
-            if (hscale > wscale) {
-              y_add = Math.Min(50, matrix.Yy * (1 - wscale / hscale)) / matrix.Yy;
-            }
+          Matrix matrix = cr.Matrix;
+          double wr = matrix.Xx * rBoxWidth;
+          double hr = matrix.Yy * 0.96;
+          double wscale = wr / thumb.Width;
+          double hscale = hr / thumb.Height;
+          double y_add = 0;
+
+          if (hscale > wscale) { // move thumb below title before scaling up
+            y_add = Math.Min(50, matrix.Yy * (1 - wscale / hscale)) / matrix.Yy;
             hscale = (matrix.Yy * (0.96-y_add)) / thumb.Height;
-            double fullWidth = (target.Width - matrix.X0) / thumb.Width;
-            double scale = Math.Min(fullWidth, Math.Max (wscale, hscale));
-            double x = Math.Max(0, 0.5*rBoxWidth*(1 - (scale/wscale)));
-            double y = Math.Min(0, 0.02 + 0.5*0.48*(1 - (scale/hscale)));
-            cr.Translate (0, 0.02+y_add);
+          }
+
+          // view width scale factor
+          double fullWidth = (target.Width - matrix.X0) / thumb.Width;
+          // scale with fill-box until fullWidth, then keep at fullWidth
+          double scale = Math.Min(fullWidth, Math.Max (wscale, hscale));
+          // center horizontally
+          double x = Math.Max(0, 0.5*rBoxWidth*(1 - (scale/wscale)));
+          // show thumb slice at around a quarter down the image since it
+          // usually seems to contain more interesting things than the middle
+          // of the image (rule of thirds and all that)
+          double y = Math.Min(0, 0.02 + 0.5*0.48*(1 - (scale/hscale)));
+
+          // translate so that pattern origin is at rectangle origin
+          cr.Translate (0, 0.02+y_add);
+          // draw thumb rect
           Helpers.DrawRectangle (cr, 0.0, 0.0,
-            rBoxWidth * Helpers.Clamp(scale/wscale, 1, fullWidth), 0.96-y_add, target);
-            cr.Translate (x, y);
-            cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
+            rBoxWidth * Helpers.Clamp(scale/wscale, 1, fullWidth),
+            0.96-y_add,
+            target);
+          // center thumbnail
+          cr.Translate (x, y);
+          // scale thumbnail
+          cr.Scale (scale / matrix.Xx, scale / matrix.Yy);
           cr.Pattern = p;
           cr.Fill ();
         cr.Restore ();
