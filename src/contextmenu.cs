@@ -133,22 +133,21 @@ public class FilezooContextMenu : Menu {
     string targetPath = c.Target.FullName;
     string targetDir = c.Target.IsDirectory ? targetPath : Helpers.Dirname(targetPath);
 
+    Separator (menu);
+
+    AddItem (menu, "Open _terminal", delegate {
+      Helpers.OpenTerminal (targetDir);
+    });
+
+    /** DESTRUCTIVE */
+    AddItem (menu, "_Run command…", delegate {
+      ShowRunDialog (targetPath);
+    });
+
     if (App.Selection.Count == 0)
       BuildCopyPasteMenu (menu, c);
     else
       Separator (menu);
-
-    /** DESTRUCTIVE */
-    AddItem (menu, "Re_name…", delegate {
-      ShowRenameDialog (targetPath);
-    });
-
-    /** DESTRUCTIVE */
-    AddItem (menu, "Touch", delegate {
-      Helpers.Touch (targetPath);
-    });
-
-    Separator (menu);
 
     /** DESTRUCTIVE */
     AddItem (menu, "Create _file…", delegate { ShowCreateDialog (targetDir); });
@@ -170,12 +169,13 @@ public class FilezooContextMenu : Menu {
     Separator (menu);
 
     /** DESTRUCTIVE */
-    AddItem (menu, "_Run command…", delegate {
-      ShowRunDialog (targetPath);
+    AddItem (menu, "Touch", delegate {
+      Helpers.Touch (targetPath);
     });
 
-    AddItem (menu, "Open _terminal", delegate {
-      Helpers.OpenTerminal (targetDir);
+    /** DESTRUCTIVE */
+    AddItem (menu, "Re_name…", delegate {
+      ShowRenameDialog (targetPath);
     });
 
 //    /** DESTRUCTIVE */
