@@ -329,11 +329,7 @@ public static class FSCache
     }
   }
 
-  static List<string> LoadableTypes = new List<string>() {
-    "image/jpeg",
-    "image/png"
-  };
-
+  static Gnome.ThumbnailFactory FTNF = new Gnome.ThumbnailFactory (Gnome.ThumbnailSize.Large);
   /** ASYNC */
   public static void FetchFullSizeThumbnail (string path, int priority)
   {
@@ -343,7 +339,7 @@ public static class FSCache
     string uri = "file://" + path;
     Gnome.Vfs.Vfs.Initialize ();
     string mime = Gnome.Vfs.MimeType.GetMimeTypeForUri(uri);
-    if (LoadableTypes.Contains(mime))
+    if (FTNF.CanThumbnail(uri, mime, f.LastModified))
     {
         lock (FullSizeThumbnailQueue)
           FullSizeThumbnailQueue.Enqueue(f.FullName, priority);
@@ -856,6 +852,12 @@ public static class FSCache
         ThumbnailQueue.Enqueue (tn, 0);
   }
 
+
+  static List<string> LoadableTypes = new List<string>() {
+    "image/jpeg",
+    "image/png"
+  };
+
   /* returns "should retry" */
   static bool GetFullSizeThumbnail (string path)
   {
@@ -863,16 +865,40 @@ public static class FSCache
       return true;
     FSEntry f = Get (path);
     if (f.FullSizeThumbnail == null) {
-      ImageSurface tn = Helpers.ToImageSurface (path);
+      string uri = "file://"+path;
+      string mime = Gnome.Vfs.MimeType.GetMimeTypeForUri(uri);
+      ImageSurface tn;
+      if (LoadableTypes.Contains(mime)) {
+        tn = Helpers.ToImageSurface (path);
+        ImageSurface ntn = Helpers.ScaleDownSurface(tn, 800);
+        tn.Destroy (); tn.Destroy ();
+        tn = ntn;
+      } else {
+        string tfn = FTNF.Lookup(uri, f.LastModified);
+        if (tfn != null) {
+          if ( DateTime.Now.Subtract(Helpers.LastModified(tfn)).TotalSeconds <= 1 )
+            return true;
+          tn = new ImageSurface (tfn);
+        } else {
+          Gdk.Pixbuf pbuf = FTNF.GenerateThumbnail(uri, mime);
+          if (pbuf != null) {
+            FTNF.SaveThumbnail(pbuf, uri, f.LastModified);
+          } else {
+            double since = DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds;
+            bool fileRecentlyModified = since < 5;
+            if (!fileRecentlyModified)
+              FTNF.CreateFailedThumbnail(uri, f.LastModified);
+            return fileRecentlyModified;
+          }
+          tn = Helpers.ToImageSurface(pbuf);
+        }
+      }
       if (tn.Width < 1 || tn.Height < 1) {
         tn.Destroy ();
         tn.Destroy ();
         bool tnRecentlyModified = ( DateTime.Now.Subtract(Helpers.LastModified(path)).TotalSeconds < 2 );
         return tnRecentlyModified;
       }
-      ImageSurface ntn = Helpers.ScaleDownSurface(tn, 800);
-      tn.Destroy (); tn.Destroy ();
-      tn = ntn;
       lock (Cache) {
         f.FullSizeThumbnail = tn;
         FullSizeThumbnailCache[f.FullName] = f;
