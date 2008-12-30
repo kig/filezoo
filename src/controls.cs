@@ -75,7 +75,7 @@ public class FilezooControls : HBox
       }
     };
 
-    PackStart (entry, false, false, 0);
+    PackStart (entry, true, true, 0);
     PackStart (dlButton, false, false, 0);
     PackStart (homeButton, false, false, 0);
   }
