@@ -353,6 +353,7 @@ public class FSDraw
       if (thumb == null)
         thumb = d.Thumbnail;
       if (thumb == null) return;
+      d.LastThumbDraw = FSDraw.frame;
       double rBoxWidth = BoxWidth / target.Height;
       using (Pattern p = new Pattern (thumb)) {
         cr.Save ();
@@ -593,7 +594,7 @@ public class FSDraw
       } else {
         cr.Save ();
           cr.Scale (1, h);
-          d.F.LastDraw = FSDraw.frame;
+          d.F.LastThumbDraw = d.F.LastDraw = FSDraw.frame;
           RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
           ImageSurface thumb = d.F.Thumbnail;
           if (thumb != null) {

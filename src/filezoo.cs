@@ -702,7 +702,7 @@ public class Filezoo : DrawingArea
             clearTraversal = false;
             FSCache.ClearTraversalCache ();
           }
-//           FSCache.PruneCache (10);
+          FSCache.PruneCache (1);
           /*
           if (FSDraw.frame % 10 > lastTenframe) {
             lastTenframe = FSDraw.frame % 10;

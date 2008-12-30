@@ -42,6 +42,7 @@ public class FSEntry
   // rolling 64-bit frame counter around the time the sun burns out at 100fps
   // 63-bit like we have here takes just 3 billion years
   public Int64 LastDraw = 0;
+  public Int64 LastThumbDraw = 0;
 
   public string Name;
   public string LCName;

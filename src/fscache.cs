@@ -798,28 +798,28 @@ public static class FSCache
         ThumbnailCache[f.FullName] = f;
         bool checkForOld = true;
         int deletecount = 0;
-        if (ThumbnailCache.Count > 4000) {
+        if (ThumbnailCache.Count > 2000) {
           FSEntry oldest = f;
           foreach (FSEntry e in ThumbnailCache.Values) {
-            if (e.LastDraw < oldest.LastDraw) oldest = e;
+            if (e.LastThumbDraw < oldest.LastThumbDraw) oldest = e;
           }
-          if (oldest.LastDraw != FSDraw.frame) {
+          if (oldest.LastThumbDraw != FSDraw.frame) {
             DestroyThumbnail(oldest);
             deletecount++;
-            checkForOld = oldest.LastDraw < FSDraw.frame - 1000;
+            checkForOld = oldest.LastThumbDraw < FSDraw.frame - 100;
           }
         }
-        if (checkForOld && ThumbnailCache.Count > 2000) {
+        if (checkForOld && ThumbnailCache.Count > 0) {
           List<FSEntry> old = new List<FSEntry> ();
           foreach (FSEntry e in ThumbnailCache.Values) {
-            if (e.LastDraw < FSDraw.frame - 1000) old.Add(e);
+            if (e.LastThumbDraw < FSDraw.frame - 100) old.Add(e);
           }
           foreach (FSEntry e in old) {
             DestroyThumbnail(e);
             deletecount++;
           }
         }
-        if (deletecount > 1) {
+        if (deletecount > 0) {
           Console.WriteLine("Expired {0} entries from ThumbnailCache", deletecount);
         }
       }
@@ -904,28 +904,28 @@ public static class FSCache
         FullSizeThumbnailCache[f.FullName] = f;
         bool checkForOld = true;
         int deletecount = 0;
-        if (FullSizeThumbnailCache.Count > 100) {
+        if (FullSizeThumbnailCache.Count > 40) {
           FSEntry oldest = f;
           foreach (FSEntry e in FullSizeThumbnailCache.Values) {
-            if (e.LastDraw < oldest.LastDraw) oldest = e;
+            if (e.LastThumbDraw < oldest.LastThumbDraw) oldest = e;
           }
-          if (oldest.LastDraw != FSDraw.frame) {
+          if (oldest.LastThumbDraw != FSDraw.frame) {
             DestroyFullSizeThumbnail(oldest);
             deletecount++;
-            checkForOld = oldest.LastDraw < FSDraw.frame - 10;
+            checkForOld = oldest.LastThumbDraw < FSDraw.frame - 10;
           }
         }
-        if (checkForOld && FullSizeThumbnailCache.Count > 50) {
+        if (checkForOld && FullSizeThumbnailCache.Count > 0) {
           List<FSEntry> old = new List<FSEntry> ();
           foreach (FSEntry e in FullSizeThumbnailCache.Values) {
-            if (e.LastDraw < FSDraw.frame - 10) old.Add(e);
+            if (e.LastThumbDraw < FSDraw.frame - 10) old.Add(e);
           }
           foreach (FSEntry e in old) {
             DestroyFullSizeThumbnail(e);
             deletecount++;
           }
         }
-        if (deletecount > 1) {
+        if (deletecount > 0) {
           Console.WriteLine("Expired {0} entries from FullSizeThumbnailCache", deletecount);
         }
       }
