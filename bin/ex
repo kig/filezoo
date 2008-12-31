@@ -27,8 +27,9 @@ ARGV.each{|fn|
   mt = `file -ib '#{fn.gsub(/'/,"\\\\'")}'`.strip.split(',')[0]
   ex = extractors[mt]
   if ex
-    dirname = File.expand_path(fn + ".dir.0")
-    dirname.succ! while File.exist?(dirname) 
+    dirname = File.expand_path(fn.sub(/\.(tar(\.(gz|bz2))?|zip|rar|gz|bz2)\Z/, ""))
+    dirname += "-2" if File.exist?(dirname)
+    dirname.succ! while File.exist?(dirname)
     FileUtils.mkdir(dirname)
     Dir.chdir(dirname)
     ex[fn]
