@@ -652,9 +652,18 @@ public class FSDraw
   (FSEntry d,
     Dictionary<string, string> prefixes,
     Context cr, Rectangle target, double mouseX, double mouseY)
-  { return Click (new DrawEntry(d), prefixes, cr, target, mouseX, mouseY, 0); }
-  public List<ClickHit> Click
-  (DrawEntry d,
+  {
+    ccount = 0;
+    List<ClickHit> retval = new List<ClickHit> ();
+    _Click (retval, new DrawEntry(d), prefixes, cr, target, mouseX, mouseY, 0);
+//     Console.WriteLine("Considered {0} entries in Click", ccount);
+    return retval;
+  }
+
+  int ccount = 0;
+  public void _Click
+  ( List<ClickHit> retval,
+    DrawEntry d,
     Dictionary<string, string> prefixes,
     Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
@@ -662,21 +671,22 @@ public class FSDraw
     if (
       (depth == 0 &&
         (mouseX < target.X || mouseX > target.X+target.Width ||
-        mouseY < target.Y || mouseY > target.Y+target.Height)) ||
+        mouseY < target.Y || mouseY > target.Y+target.Height)
+      ) ||
       (depth > 0 && !IsVisible(d, cr, target))
     ) {
-      return new List<ClickHit> ();
+      return;
     }
     double h = depth == 0 ? 1 : d.Height;
-    List<ClickHit> retval = new List<ClickHit> ();
     double advance = 0.0;
+    ccount++;
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
       Matrix matrix = cr.Matrix;
       if (matrix.Y0 < mouseY+1 && matrix.Y0+matrix.Yy > mouseY-1) {
         if (d.F.IsDirectory && (matrix.Yy > 16) && d.F.DrawEntries != null)
-          retval.AddRange( ClickChildren (d, prefixes, cr, target, mouseX, mouseY, depth) );
+          ClickChildren (retval, d, prefixes, cr, target, mouseX, mouseY, depth);
         cr.NewPath ();
         h = matrix.Yy;
         double rfs = GetFontSize(d.F, h);
@@ -697,7 +707,6 @@ public class FSDraw
           retval.Add(new ClickHit(d.F, ys));
       }
     cr.Restore ();
-    return retval;
   }
 
   /** BLOCKING */
@@ -707,23 +716,22 @@ public class FSDraw
     Returns the first Click return value with one or more entries.
     If nothing was hit, returns an empty List.
     */
-  List<ClickHit> ClickChildren
-  (DrawEntry d,
+  void ClickChildren
+  ( List<ClickHit> retval,
+    DrawEntry d,
     Dictionary<string, string> prefixes,
     Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     List<DrawEntry> entries = d.F.DrawEntries;
-    List<ClickHit> retval = new List<ClickHit> ();
-    if (entries == null) return retval;
+    if (entries == null) return;
     cr.Save ();
       ChildTransform (d, cr, target);
       foreach (DrawEntry child in entries) {
-        retval = Click (child, prefixes, cr, target, mouseX, mouseY, depth+1);
+        _Click (retval, child, prefixes, cr, target, mouseX, mouseY, depth+1);
         if (retval.Count > 0) break;
         cr.Translate (0.0, child.Height);
       }
     cr.Restore ();
-    return retval;
   }
 
 
