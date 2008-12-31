@@ -188,7 +188,10 @@ public class FSDraw
     */
   public bool IsVisible (DrawEntry d, Context cr, Rectangle target)
   {
-    Matrix matrix = cr.Matrix;
+    return IsVisible (d, cr.Matrix, target);
+  }
+  public bool IsVisible (DrawEntry d, Matrix matrix, Rectangle target)
+  {
     double h = matrix.Yy * d.Height;
     double y = matrix.Y0 - target.Y;
     // rectangle doesn't intersect any half-pixel midpoints
@@ -655,7 +658,7 @@ public class FSDraw
   {
     ccount = 0;
     List<ClickHit> retval = new List<ClickHit> ();
-    _Click (retval, new DrawEntry(d), prefixes, cr, target, mouseX, mouseY, 0);
+    _Click (retval, new DrawEntry(d), prefixes, cr.Matrix, cr, target, mouseX, mouseY, 0);
 //     Console.WriteLine("Considered {0} entries in Click", ccount);
     return retval;
   }
@@ -665,7 +668,7 @@ public class FSDraw
   ( List<ClickHit> retval,
     DrawEntry d,
     Dictionary<string, string> prefixes,
-    Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
+    Matrix matrix, Context cr, Rectangle target, double mouseX, double mouseY, uint depth)
   {
     // return empty list if click outside target or if non-root d is not visible
     if (
@@ -673,7 +676,7 @@ public class FSDraw
         (mouseX < target.X || mouseX > target.X+target.Width ||
         mouseY < target.Y || mouseY > target.Y+target.Height)
       ) ||
-      (depth > 0 && !IsVisible(d, cr, target))
+      (depth > 0 && !IsVisible(d, matrix, target))
     ) {
       return;
     }
@@ -683,7 +686,8 @@ public class FSDraw
     cr.Save ();
       cr.Scale (1, h);
       double rBoxWidth = BoxWidth / target.Height;
-      Matrix matrix = cr.Matrix;
+      double Yy = matrix.Yy;
+      matrix.Yy *= h;
       if (matrix.Y0 < mouseY+1 && matrix.Y0+matrix.Yy > mouseY-1) {
         if (d.F.IsDirectory && (matrix.Yy > 16) && d.F.DrawEntries != null)
           ClickChildren (retval, d, prefixes, cr, target, mouseX, mouseY, depth);
@@ -706,6 +710,7 @@ public class FSDraw
         if (cr.InFill(mouseX,mouseY))
           retval.Add(new ClickHit(d.F, ys));
       }
+      matrix.Yy = Yy;
     cr.Restore ();
   }
 
@@ -726,10 +731,12 @@ public class FSDraw
     if (entries == null) return;
     cr.Save ();
       ChildTransform (d, cr, target);
+      Matrix m = cr.Matrix;
       foreach (DrawEntry child in entries) {
-        _Click (retval, child, prefixes, cr, target, mouseX, mouseY, depth+1);
+        _Click (retval, child, prefixes, m, cr, target, mouseX, mouseY, depth+1);
         if (retval.Count > 0) break;
         cr.Translate (0.0, child.Height);
+        m.Y0 += m.Yy * child.Height;
       }
     cr.Restore ();
   }
