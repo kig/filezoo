@@ -103,15 +103,16 @@ public class FSEntry
 
     Suffix = IsDirectory ? "" : Helpers.Extname(Name).ToLower();
 
-    Count = 1;
     Size = Helpers.FileSize(u);
 
     if (!IsDirectory) {
+      Count = 1;
       SubTreeSize = Size;
       SubTreeCount = 1;
       Complete = true;
       FilePassDone = true;
     } else {
+      Count = 0;
       Entries = new List<FSEntry> ();
     }
   }
