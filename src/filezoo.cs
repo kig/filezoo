@@ -67,10 +67,10 @@ public class Filezoo : DrawingArea
 
   // Available sorts
   public SortHandler[] SortFields = {
+    new SortHandler("Type", new TypeComparer()),
     new SortHandler("Name", new NameComparer()),
     new SortHandler("Size", new SizeComparer()),
-    new SortHandler("Date", new DateComparer()),
-    new SortHandler("Type", new TypeComparer())
+    new SortHandler("Date", new DateComparer())
   };
   // current sort settings
   public SortHandler SortField;
@@ -117,6 +117,8 @@ public class Filezoo : DrawingArea
   public uint Width = 1;
   public uint Height = 1;
 
+  bool EffectInProgress = false;
+
   // first frame latency profiler
   Profiler dirLatencyProfiler = new Profiler ("----", 100);
 
@@ -128,6 +130,9 @@ public class Filezoo : DrawingArea
 
   // empty surface for etc context.
   ImageSurface EtcSurface = new ImageSurface (Format.A1, 1, 1);
+
+  // Surface for main view.
+  ImageSurface CachedSurface;
 
 
   // modification monitor
@@ -324,265 +329,6 @@ public class Filezoo : DrawingArea
     Helpers.StartupProfiler.Total ("Pre-drawing startup");
 
   }
-
-  void GoToParent () {
-    if (CurrentDirPath != Helpers.RootDir) {
-      SetCurrentDir (Helpers.Dirname(CurrentDirPath));
-    }
-  }
-
-  void SetCursor (Gdk.ModifierType state) {
-    if (dragInProgress) {
-      GdkWindow.Cursor = dragCursor;
-    } else if ((state & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
-      GdkWindow.Cursor = shiftCopyCursor;
-    } else if ((state & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask) {
-      GdkWindow.Cursor = clearSelCursor;
-    } else if ((state & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask) {
-      GdkWindow.Cursor = copyCursor;
-    } else if (!dragging && dragY < FilesMarginTop) {
-      GdkWindow.Cursor = defaultCursor;
-    } else if (dragging || FindHit (Width, Height, dragX, dragY, 8).Target == CurrentDirEntry) {
-      GdkWindow.Cursor = panCursor;
-    } else {
-      GdkWindow.Cursor = clickCursor;
-    }
-  }
-
-  public string GetSelectionData ()
-  {
-    List<string> paths = new List<string> ();
-    List<string> invalids = new List<string> ();
-    foreach(string p in Selection.Keys) {
-      if (Helpers.FileExists(p))
-        paths.Add("file://"+p);
-      else
-        invalids.Add(p);
-    }
-    invalids.ForEach(ToggleSelection);
-    return String.Join("\r\n", paths.ToArray());
-  }
-
-  public void HandleSelectionData (SelectionData sd, Gdk.DragAction action, string targetPath)
-  {
-    string type = sd.Type.Name;
-    if (type == "application/x-color") {
-      /** DESCTRUCTIVE */
-      Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
-    } else if (type == "text/uri-list" || ((type == "text/plain" || type == "STRING") && Helpers.IsURI(sd.Text))) {
-      /** DESCTRUCTIVE */
-      string data = Helpers.BytesToASCII(sd.Data);
-      string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
-      if (action == Gdk.DragAction.Move) {
-        moveUris(uris, targetPath);
-      } else if (action == Gdk.DragAction.Copy) {
-        copyUris(uris, targetPath);
-      } else if (action == Gdk.DragAction.Ask) {
-        DragURIMenu(uris, targetPath);
-      }
-    } else {
-      /** DESCTRUCTIVE */
-      if (Helpers.IsDir(targetPath)) {
-        DragDataToCreateFileMenu(targetPath, sd.Data);
-      } else {
-        DragDataToFileMenu(targetPath, sd.Data);
-      }
-    }
-  }
-
-  bool cut = false;
-
-  public void CutSelection (string targetPath)
-  {
-    CopySelection (targetPath);
-    cut = true;
-  }
-
-  public void CopySelection (string targetPath)
-  {
-    string items = "file://" + targetPath;
-    if (Selection.Count > 0)
-      items = GetSelectionData ();
-    SetClipboard (items);
-    cut = false;
-  }
-
-  /** DESTRUCTIVE */
-  public void PasteSelection (string targetPath)
-  {
-    bool handled = false;
-    clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
-      if (data.Length > -1) {
-        Helpers.PrintSelectionData(data);
-        handled = true;
-        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-        if (cut) ClearSelection ();
-        cut = false;
-      }
-    });
-    clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
-      if (data.Length > -1 && !handled) {
-        Helpers.PrintSelectionData(data);
-        handled = true;
-        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-      }
-    });
-    clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
-      if (data.Length > -1 && !handled) {
-        Helpers.PrintSelectionData(data);
-        handled = true;
-        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-      }
-    });
-    clipboard.RequestContents(Gdk.Atom.Intern("STRING", true), delegate(Clipboard cb, SelectionData data) {
-      if (data.Length > -1 && !handled) {
-        Helpers.PrintSelectionData(data);
-        handled = true;
-        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
-      }
-    });
-  }
-
-  void SetClipboard (string items)
-  {
-    clipboard.SetWithData(targets,
-      delegate (Clipboard cb, SelectionData data, uint info) {
-        data.Set(data.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
-        data.Text = items;
-      },
-      delegate (Clipboard cb) {
-        cut = false;
-      }
-    );
-  }
-
-
-  /** DESCTRUCTIVE, BLOCKING */
-  public void MoveSelectionTo (string targetPath)
-  {
-    moveUris (new List<string>(Selection.Keys).ToArray (), targetPath);
-    ClearSelection ();
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  public void CopySelectionTo (string targetPath)
-  {
-    copyUris (new List<string>(Selection.Keys).ToArray (), targetPath);
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  public void TrashSelection ()
-  {
-    foreach (string path in (new List<string>(Selection.Keys))) {
-      Helpers.Trash(path);
-      FSCache.Invalidate (path);
-    }
-    ClearSelection ();
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  void moveUris (string[] uris, string targetPath)
-  {
-    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
-    Helpers.MoveURIs(uris, targetPath);
-    foreach (string u in uris) {
-      if (u.StartsWith ("/")) FSCache.Invalidate (u);
-      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
-    }
-    FSCache.Invalidate (targetPath);
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  void copyUris (string[] uris, string targetPath)
-  {
-    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
-    Helpers.CopyURIs(uris, targetPath);
-    foreach (string u in uris) {
-      if (u.StartsWith ("/")) FSCache.Invalidate (u);
-      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
-    }
-    FSCache.Invalidate (targetPath);
-  }
-
-  /** ASYNC */
-  void DragURIMenu (string[] sources, string target)
-  {
-    Menu menu = new Menu();
-    MenuItem move = new MenuItem("_Move");
-    MenuItem copy = new MenuItem("_Copy");
-    move.Activated += delegate { moveUris (sources, target); };
-    copy.Activated += delegate { copyUris (sources, target); };
-    menu.Append (move);
-    menu.Append (copy);
-    menu.ShowAll ();
-    menu.Popup ();
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  void DragDataToCreateFileMenu (string target, byte[] data)
-  {
-    Menu menu = new Menu();
-    MenuItem newfile = new MenuItem("Create file from data");
-    newfile.Activated += delegate {
-      Helpers.TextPrompt ("Create file", "Filename for data",
-        target + Helpers.DirSepS + "new_file", "Create",
-        target.Length+1, target.Length+1, -1,
-        delegate (string filename) {
-          Helpers.NewFileWith(filename, data);
-        });
-    };
-    menu.Append (newfile);
-    menu.ShowAll ();
-    menu.Popup ();
-  }
-
-  /** DESCTRUCTIVE, BLOCKING */
-  void DragDataToFileMenu (string targetFile, byte[] data)
-  {
-    Menu menu = new Menu();
-    MenuItem newfile = new MenuItem("Create file from data");
-    string target = Helpers.Dirname(targetFile);
-    newfile.Activated += delegate {
-      Helpers.TextPrompt ("Create file", "Filename for data",
-        target + Helpers.DirSepS + "new_file", "Create",
-        target.Length+1, target.Length+1, -1,
-        delegate (string filename) {
-          Helpers.NewFileWith(filename, data);
-        });
-    };
-    MenuItem replace = new MenuItem(String.Format("_Replace contents of {0}", Helpers.Basename(targetFile)));
-    replace.Activated += delegate { Helpers.ReplaceFileWith(targetFile, data); };
-    MenuItem append = new MenuItem(String.Format("_Append to {0}", Helpers.Basename(targetFile)));
-    append.Activated += delegate { Helpers.AppendToFile(targetFile, data); };
-
-    menu.Append (newfile);
-    menu.Append (new SeparatorMenuItem ());
-    menu.Append (replace);
-    menu.Append (append);
-    menu.ShowAll ();
-    menu.Popup ();
-  }
-
-
-  /** BLOCKING */
-  public void OpenFile (string path)
-  {
-    string suffix = Helpers.Extname(path).ToLower ();
-    string epath = Helpers.EscapePath(path);
-    string dir = Helpers.IsDir(path) ? path : Helpers.Dirname(path);
-    if (FilezooContextMenu.imageSuffixes.Contains(suffix)) {
-      Helpers.RunCommandInDir("gqview", epath, dir);
-    } else if (FilezooContextMenu.audioSuffixes.Contains(suffix)) {
-      Helpers.RunCommandInDir("amarok", "-p --load " + epath, dir);
-    } else if (FilezooContextMenu.videoSuffixes.Contains(suffix)) {
-      Helpers.RunCommandInDir("mplayer", epath, dir);
-    } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
-      Helpers.RunCommandInDir("ex", epath, dir);
-    } else {
-      Helpers.OpenFile(path);
-    }
-  }
-
 
   public void MockDraw (uint w, uint h)
   {
@@ -1722,9 +1468,267 @@ public class Filezoo : DrawingArea
   ImageSurface FlareSpike;
   ImageSurface RainbowSprite;
 
-  bool EffectInProgress = false;
 
-  ImageSurface CachedSurface;
+
+  /* Action event handlers */
+
+  void SetCursor (Gdk.ModifierType state) {
+    if (dragInProgress) {
+      GdkWindow.Cursor = dragCursor;
+    } else if ((state & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
+      GdkWindow.Cursor = shiftCopyCursor;
+    } else if ((state & Gdk.ModifierType.Mod1Mask) == Gdk.ModifierType.Mod1Mask) {
+      GdkWindow.Cursor = clearSelCursor;
+    } else if ((state & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask) {
+      GdkWindow.Cursor = copyCursor;
+    } else if (!dragging && dragY < FilesMarginTop) {
+      GdkWindow.Cursor = defaultCursor;
+    } else if (dragging || FindHit (Width, Height, dragX, dragY, 8).Target == CurrentDirEntry) {
+      GdkWindow.Cursor = panCursor;
+    } else {
+      GdkWindow.Cursor = clickCursor;
+    }
+  }
+
+  public string GetSelectionData ()
+  {
+    List<string> paths = new List<string> ();
+    List<string> invalids = new List<string> ();
+    foreach(string p in Selection.Keys) {
+      if (Helpers.FileExists(p))
+        paths.Add("file://"+p);
+      else
+        invalids.Add(p);
+    }
+    invalids.ForEach(ToggleSelection);
+    return String.Join("\r\n", paths.ToArray());
+  }
+
+  public void HandleSelectionData (SelectionData sd, Gdk.DragAction action, string targetPath)
+  {
+    string type = sd.Type.Name;
+    if (type == "application/x-color") {
+      /** DESCTRUCTIVE */
+      Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
+    } else if (type == "text/uri-list" || ((type == "text/plain" || type == "STRING") && Helpers.IsURI(sd.Text))) {
+      /** DESCTRUCTIVE */
+      string data = Helpers.BytesToASCII(sd.Data);
+      string[] uris = data.Split(new char[] {'\r','\n','\0'}, StringSplitOptions.RemoveEmptyEntries);
+      if (action == Gdk.DragAction.Move) {
+        moveUris(uris, targetPath);
+      } else if (action == Gdk.DragAction.Copy) {
+        copyUris(uris, targetPath);
+      } else if (action == Gdk.DragAction.Ask) {
+        DragURIMenu(uris, targetPath);
+      }
+    } else {
+      /** DESCTRUCTIVE */
+      if (Helpers.IsDir(targetPath)) {
+        DragDataToCreateFileMenu(targetPath, sd.Data);
+      } else {
+        DragDataToFileMenu(targetPath, sd.Data);
+      }
+    }
+  }
+
+  bool cut = false;
+
+  public void CutSelection (string targetPath)
+  {
+    CopySelection (targetPath);
+    cut = true;
+  }
+
+  public void CopySelection (string targetPath)
+  {
+    string items = "file://" + targetPath;
+    if (Selection.Count > 0)
+      items = GetSelectionData ();
+    SetClipboard (items);
+    cut = false;
+  }
+
+  /** DESTRUCTIVE */
+  public void PasteSelection (string targetPath)
+  {
+    bool handled = false;
+    clipboard.RequestContents(Gdk.Atom.Intern("text/uri-list", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1) {
+        Helpers.PrintSelectionData(data);
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+        if (cut) ClearSelection ();
+        cut = false;
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("application/x-color", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("text/plain", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+    clipboard.RequestContents(Gdk.Atom.Intern("STRING", true), delegate(Clipboard cb, SelectionData data) {
+      if (data.Length > -1 && !handled) {
+        Helpers.PrintSelectionData(data);
+        handled = true;
+        HandleSelectionData(data, cut ? Gdk.DragAction.Move : Gdk.DragAction.Copy, targetPath);
+      }
+    });
+  }
+
+  void SetClipboard (string items)
+  {
+    clipboard.SetWithData(targets,
+      delegate (Clipboard cb, SelectionData data, uint info) {
+        data.Set(data.Target, 8, System.Text.Encoding.UTF8.GetBytes(items));
+        data.Text = items;
+      },
+      delegate (Clipboard cb) {
+        cut = false;
+      }
+    );
+  }
+
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void MoveSelectionTo (string targetPath)
+  {
+    moveUris (new List<string>(Selection.Keys).ToArray (), targetPath);
+    ClearSelection ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void CopySelectionTo (string targetPath)
+  {
+    copyUris (new List<string>(Selection.Keys).ToArray (), targetPath);
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  public void TrashSelection ()
+  {
+    foreach (string path in (new List<string>(Selection.Keys))) {
+      Helpers.Trash(path);
+      FSCache.Invalidate (path);
+    }
+    ClearSelection ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void moveUris (string[] uris, string targetPath)
+  {
+    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+    Helpers.MoveURIs(uris, targetPath);
+    foreach (string u in uris) {
+      if (u.StartsWith ("/")) FSCache.Invalidate (u);
+      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
+    }
+    FSCache.Invalidate (targetPath);
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void copyUris (string[] uris, string targetPath)
+  {
+    targetPath = Helpers.IsDir ( targetPath ) ? targetPath : Helpers.Dirname (targetPath);
+    Helpers.CopyURIs(uris, targetPath);
+    foreach (string u in uris) {
+      if (u.StartsWith ("/")) FSCache.Invalidate (u);
+      else if (u.StartsWith("file://")) FSCache.Invalidate (u.Substring(7));
+    }
+    FSCache.Invalidate (targetPath);
+  }
+
+  /** ASYNC */
+  void DragURIMenu (string[] sources, string target)
+  {
+    Menu menu = new Menu();
+    MenuItem move = new MenuItem("_Move");
+    MenuItem copy = new MenuItem("_Copy");
+    move.Activated += delegate { moveUris (sources, target); };
+    copy.Activated += delegate { copyUris (sources, target); };
+    menu.Append (move);
+    menu.Append (copy);
+    menu.ShowAll ();
+    menu.Popup ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void DragDataToCreateFileMenu (string target, byte[] data)
+  {
+    Menu menu = new Menu();
+    MenuItem newfile = new MenuItem("Create file from data");
+    newfile.Activated += delegate {
+      Helpers.TextPrompt ("Create file", "Filename for data",
+        target + Helpers.DirSepS + "new_file", "Create",
+        target.Length+1, target.Length+1, -1,
+        delegate (string filename) {
+          Helpers.NewFileWith(filename, data);
+        });
+    };
+    menu.Append (newfile);
+    menu.ShowAll ();
+    menu.Popup ();
+  }
+
+  /** DESCTRUCTIVE, BLOCKING */
+  void DragDataToFileMenu (string targetFile, byte[] data)
+  {
+    Menu menu = new Menu();
+    MenuItem newfile = new MenuItem("Create file from data");
+    string target = Helpers.Dirname(targetFile);
+    newfile.Activated += delegate {
+      Helpers.TextPrompt ("Create file", "Filename for data",
+        target + Helpers.DirSepS + "new_file", "Create",
+        target.Length+1, target.Length+1, -1,
+        delegate (string filename) {
+          Helpers.NewFileWith(filename, data);
+        });
+    };
+    MenuItem replace = new MenuItem(String.Format("_Replace contents of {0}", Helpers.Basename(targetFile)));
+    replace.Activated += delegate { Helpers.ReplaceFileWith(targetFile, data); };
+    MenuItem append = new MenuItem(String.Format("_Append to {0}", Helpers.Basename(targetFile)));
+    append.Activated += delegate { Helpers.AppendToFile(targetFile, data); };
+
+    menu.Append (newfile);
+    menu.Append (new SeparatorMenuItem ());
+    menu.Append (replace);
+    menu.Append (append);
+    menu.ShowAll ();
+    menu.Popup ();
+  }
+
+  /** BLOCKING */
+  void GoToParent () {
+    if (CurrentDirPath != Helpers.RootDir) {
+      SetCurrentDir (Helpers.Dirname(CurrentDirPath));
+    }
+  }
+
+  /** BLOCKING */
+  public void OpenFile (string path)
+  {
+    string suffix = Helpers.Extname(path).ToLower ();
+    string epath = Helpers.EscapePath(path);
+    string dir = Helpers.IsDir(path) ? path : Helpers.Dirname(path);
+    if (FilezooContextMenu.imageSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("gqview", epath, dir);
+    } else if (FilezooContextMenu.sureAudioSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("amarok", "-p --load " + epath, dir);
+    } else if (FilezooContextMenu.videoSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("mplayer", epath, dir);
+    } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
+      Helpers.RunCommandInDir("ex", epath, dir);
+    } else {
+      Helpers.OpenFile(path);
+    }
+  }
 
 }
 

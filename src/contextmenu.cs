@@ -34,7 +34,8 @@ public class FilezooContextMenu : Menu {
 
   public static List<string> archiveSuffixes = new List<string>() {"bz2", "gz", "rar", "tar", "zip"};
   public static List<string> audioSuffixes = new List<string>() {"mp3", "m4a", "ogg", "flac", "wav", "pls", "m3u"};
-  public static List<string> videoSuffixes = new List<string>() {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg"};
+  public static List<string> sureAudioSuffixes = new List<string>() {"mp3", "m4a", "flac", "wav", "pls", "m3u"};
+  public static List<string> videoSuffixes = new List<string>() {"mp4", "mkv", "ogv", "ogm", "divx", "gif", "avi", "mov", "mpg", "wmv", "mpeg"};
   public static List<string> imageSuffixes = new List<string>() {"jpg", "jpeg", "png", "gif"};
 
   public void Build (Menu menu, ClickHit c) {
