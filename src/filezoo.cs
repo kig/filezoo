@@ -357,7 +357,7 @@ public class Filezoo : DrawingArea
   {
     if (LastRedraw != FSCache.LastChange) {
       LastRedraw = FSCache.LastChange;
-      PreDraw ();
+      RequestPreDraw ();
     }
   }
 
@@ -410,14 +410,14 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   void UpdateLayout ()
   {
-    PreDraw ();
+    RequestPreDraw ();
   }
 
   bool PreDrawInProgress = false;
   bool PreDrawRequested = false;
   bool clearTraversal = false;
   /** BLOCKING */
-  void PreDraw ()
+  void RequestPreDraw ()
   {
     /// Tell currently running PreDraw to stop.
     Renderer.CancelPreDraw();
