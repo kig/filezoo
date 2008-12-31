@@ -257,7 +257,7 @@ public static class Helpers {
   /** ASYNC */
   public static Process OpenFile (string path)
   {
-    return Process.Start ("kfmclient exec", EscapePath(path));
+    return Process.Start (EscapePath(path));
   }
 
   /** ASYNC */
