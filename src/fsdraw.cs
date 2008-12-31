@@ -560,19 +560,11 @@ public class FSDraw
 
   /* Visibility */
 
-  System.Object PreDrawCancelLock = new System.Object ();
-  System.Object PreDrawLock = new System.Object ();
-  int PreDrawInProgress = 0;
   bool PreDrawCancelled = false;
 
   public void CancelPreDraw ()
   {
-    lock (PreDrawCancelLock) {
-      PreDrawCancelled = true;
-      while (PreDrawInProgress != 0)
-        Thread.Sleep (5);
-      PreDrawCancelled = false;
-    }
+    PreDrawCancelled = true;
   }
 
   /** ASYNC */
@@ -582,35 +574,31 @@ public class FSDraw
   }
   public bool PreDraw (DrawEntry d, Context cr, Rectangle target, uint depth)
   {
-    lock (PreDrawLock) PreDrawInProgress ++;
+    if (depth == 0) PreDrawCancelled = false;
     bool rv = true;
-    try {
-      if (depth == 0  && d.F.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.F.Complete || !d.F.InProgress))
-          FSCache.RequestTraversal(d.F.FullName);
-      if (depth > 0 && !IsVisible(d, cr, target)) return true;
-      double h = depth == 0 ? 1 : d.Height;
-      if (PreDrawCancelled) {
-        rv = false;
-      } else {
-        cr.Save ();
-          cr.Scale (1, h);
-          d.F.LastThumbDraw = d.F.LastDraw = FSDraw.frame;
-          RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
-          ImageSurface thumb = d.F.Thumbnail;
-          if (thumb != null) {
-            if (cr.Matrix.Yy > 64)
-              RequestFullSizeThumbnail(d.F.FullName, (int)cr.Matrix.Yy);
-          }
-          if (d.F.IsDirectory) {
-            bool childrenVisible = cr.Matrix.Yy > 2;
-            bool shouldDrawChildren = (depth == 0 || childrenVisible);
-            if (shouldDrawChildren)
-              rv &= PreDrawChildren(d, cr, target, depth);
-          }
-        cr.Restore ();
-      }
-    } finally {
-      lock (PreDrawLock) PreDrawInProgress --;
+    if (depth == 0  && d.F.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.F.Complete || !d.F.InProgress))
+        FSCache.RequestTraversal(d.F.FullName);
+    if (depth > 0 && !IsVisible(d, cr, target)) return true;
+    double h = depth == 0 ? 1 : d.Height;
+    if (PreDrawCancelled) {
+      rv = false;
+    } else {
+      cr.Save ();
+        cr.Scale (1, h);
+        d.F.LastThumbDraw = d.F.LastDraw = FSDraw.frame;
+        RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
+        ImageSurface thumb = d.F.Thumbnail;
+        if (thumb != null) {
+          if (cr.Matrix.Yy > 64)
+            RequestFullSizeThumbnail(d.F.FullName, (int)cr.Matrix.Yy);
+        }
+        if (d.F.IsDirectory) {
+          bool childrenVisible = cr.Matrix.Yy > 2;
+          bool shouldDrawChildren = (depth == 0 || childrenVisible);
+          if (shouldDrawChildren)
+            rv &= PreDrawChildren(d, cr, target, depth);
+        }
+      cr.Restore ();
     }
     return rv;
   }
@@ -620,6 +608,9 @@ public class FSDraw
   {
     ChildTransform (d, cr, target);
     FSCache.FilePass(d.F.FullName);
+    // do not put a cancel check here
+    // it will trigger a race loop with large directories
+    // and since it doesn't add anything to DrawEntries, it's invisible
     FSCache.UpdateDrawEntries(d.F);
     if (PreDrawCancelled) return false;
     foreach (DrawEntry ch in d.F.DrawEntries) {

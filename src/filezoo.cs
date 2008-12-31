@@ -595,7 +595,7 @@ public class Filezoo : DrawingArea
 
   bool CheckRedraw ()
   {
-    if (!PreDrawComplete || NeedRedraw) {
+    if (PreDrawInProgress || NeedRedraw) {
       NeedRedraw = false;
       FSNeedRedraw = true;
       LimitedRedraw = false;
@@ -667,24 +667,16 @@ public class Filezoo : DrawingArea
     PreDraw ();
   }
 
-  System.Object PreDrawLock = new System.Object ();
   bool PreDrawInProgress = false;
+  bool PreDrawRequested = false;
   bool clearTraversal = false;
   /** BLOCKING */
   void PreDraw ()
   {
+    /// Tell currently running PreDraw to stop.
     Renderer.CancelPreDraw();
-    lock (PreDrawLock) {
-      if (PreDrawInProgress) return;
-      if (FSCache.Measurer != null && SizeField != null)
-        if (!SizeField.Measurer.DependsOnTotals && FSCache.Measurer.DependsOnTotals)
-          clearTraversal = true;
-      FSCache.Measurer = SizeField.Measurer;
-      FSCache.SortDirection = SortDirection;
-      FSCache.Comparer = SortField.Comparer;
-      PreDrawInProgress = true;
-    }
-    PreDrawComplete = false;
+    /// Tell PreDraw to start a new PreDraw after the current has stopped.
+    PreDrawRequested = PreDrawInProgress = true;
   }
 
 //   long lastTenframe = 0;
@@ -694,8 +686,17 @@ public class Filezoo : DrawingArea
   {
     Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
-      if (PreDrawInProgress) {
+      if (PreDrawInProgress || PreDrawRequested) {
+        // even if PreDrawRequested is set to true here, we still do the predraw
+        // (and CancelPreDraw only affects an already running PreDraw)
+        PreDrawRequested = false;
         try {
+          if (FSCache.Measurer != null && SizeField != null)
+            if (!SizeField.Measurer.DependsOnTotals && FSCache.Measurer.DependsOnTotals)
+              clearTraversal = true;
+          FSCache.Measurer = SizeField.Measurer;
+          FSCache.SortDirection = SortDirection;
+          FSCache.Comparer = SortField.Comparer;
           if (!FSCache.Measurer.DependsOnTotals)
             FSCache.CancelTraversal ();
           if (clearTraversal) {
@@ -719,7 +720,7 @@ public class Filezoo : DrawingArea
             if (PreDrawComplete) NeedRedraw = true;
           }
         } finally {
-          PreDrawInProgress = false;
+          PreDrawInProgress = !PreDrawComplete;
         }
       } else {
         Thread.Sleep (10);
@@ -1633,7 +1634,7 @@ public class Filezoo : DrawingArea
       InteractionProfiler.Reset ();
       InteractionProfiler.TotalElapsed = 0;
     }
-    fp.Total ("Frame");
+//     fp.Total ("Frame");
   }
 
   Random rng = new Random ();
