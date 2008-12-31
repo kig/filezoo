@@ -36,7 +36,18 @@ ARGV.each{|fn|
     files = Dir["*"] - [".", ".."]
     if files.length == 1
       FileUtils.touch(files[0])
-      FileUtils.mv(files[0], "..")
+      if File.exists?(File.join("..",files[0]))
+        Dir.chdir("..")
+        ndirname = dirname + "-#{Process.pid}-#{Time.now.to_f}"
+        ndirname.succ! while File.exist?(ndirname)
+        FileUtils.mv(dirname, ndirname)
+        dirname = ndirname
+        Dir.chdir(dirname)
+      end
+      target_name = File.expand_path(File.join("..", File.basename(files[0])))
+      target_name += "-2" if File.exist?(target_name)
+      target_name.succ! while File.exist?(target_name)
+      FileUtils.mv(files[0], target_name)
       Dir.chdir("..")
       Dir.rmdir(dirname)
     else
