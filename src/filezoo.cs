@@ -432,7 +432,8 @@ public class Filezoo : DrawingArea
   {
     Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
-      if (PreDrawInProgress || PreDrawRequested) {
+      PreDrawInProgress = PreDrawInProgress || PreDrawRequested;
+      if (PreDrawInProgress) {
         // even if PreDrawRequested is set to true here, we still do the predraw
         // (and CancelPreDraw only affects an already running PreDraw)
         PreDrawRequested = false;
