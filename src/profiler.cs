@@ -66,7 +66,7 @@ public class Profiler
       int barLength = Math.Max((int)Math.Min(10, Math.Round(elapsedMilliseconds)), 0);
       string barStart = (elapsedMilliseconds > 10 ? "─" : (barLength < 1 ? "" : "╾"));
       string bar = barStart.PadRight(barLength, '─');
-      Console.WriteLine (prefix + bar.PadLeft(10) + "╼ " + time.PadLeft(10) + Prefix + "  " + message);
+      Helpers.LogDebug (prefix + bar.PadLeft(10) + "╼ " + time.PadLeft(10) + Prefix + "  " + message);
     }
   }
 

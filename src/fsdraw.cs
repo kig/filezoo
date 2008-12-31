@@ -658,7 +658,7 @@ public class FSDraw
   /** ASYNC */
   bool PreDrawChildren (DrawEntry d, Context cr, Rectangle target, uint depth)
   {
-//     Console.WriteLine("PreDrawChildren: {0}", d.F.FullName);
+//     Helpers.LogDebug("PreDrawChildren: {0}", d.F.FullName);
     ChildTransform (d, cr, target);
     Matrix m = cr.Matrix;
 //     Profiler pdp = new Profiler ("PreDrawChildren");
@@ -715,7 +715,7 @@ public class FSDraw
     ccount = 0;
     List<ClickHit> retval = new List<ClickHit> ();
     _Click (retval, new DrawEntry(d), prefixes, cr.Matrix, cr, target, mouseX, mouseY, 0);
-//     Console.WriteLine("Considered {0} entries in Click", ccount);
+//     Helpers.LogDebug("Considered {0} entries in Click", ccount);
     return retval;
   }
 

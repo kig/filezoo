@@ -360,7 +360,7 @@ public class Filezoo : DrawingArea
       DateTime mtime = Helpers.LastChange(e.FullName);
       FSEntry f = FSCache.FastGet(e.FullName);
       if (f.LastFileChange != mtime) {
-      Console.WriteLine("LongMonitor invalidated {0}", e.FullName);
+      Helpers.LogDebug ("LongMonitor invalidated {0}", e.FullName);
         f.LastFileChange = mtime;
         FSCache.Invalidate(e.FullName);
       }
@@ -519,7 +519,7 @@ public class Filezoo : DrawingArea
         scr.Restore ();
         DrawMainView (scr, Width, Height);
         if (scr.Status != Status.Success)
-          Console.WriteLine("Cairo error: {0}", scr.Status);
+          Helpers.LogError("Cairo error: {0}", scr.Status);
       }
       fp.Time ("FS Draw");
     }
@@ -946,7 +946,7 @@ public class Filezoo : DrawingArea
       if (c.Height < 15.9) {
         if (c.Target.ParentDir == CurrentDirEntry) {
           double nz = (c.Target.IsDirectory ? 24 : 18) / c.Height;
-          // Console.WriteLine("ZoomIn {0}x", nz);
+          // Helpers.LogDebug("ZoomIn {0}x", nz);
           cr.Save ();
             cr.IdentityMatrix ();
             ZoomBy(cr, width, height, x, y, nz);
@@ -976,10 +976,10 @@ public class Filezoo : DrawingArea
           }
         } else {
           if (c.Target.IsDirectory) {
-            // Console.WriteLine("Navigate {0}", c.Target.FullName);
+            // Helpers.LogDebug("Navigate {0}", c.Target.FullName);
             SetCurrentDir (c.Target.FullName);
           } else {
-            // Console.WriteLine("Open {0}", c.Target.FullName);
+            // Helpers.LogDebug("Open {0}", c.Target.FullName);
             OpenFile(c.Target.FullName);
           }
         }
@@ -1305,7 +1305,7 @@ public class Filezoo : DrawingArea
             vy += ThrowFrames[i].Y - ThrowFrames[i-1].Y;
           }
           vy /= len;
-          // Console.WriteLine("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
+          // Helpers.LogDebug("ThrowFrames.Count: {0}, vy: {1}", ThrowFrames.Count, vy);
           if (Math.Abs(vy) > 5) {
             ThrowVelocity = vy*2;
             NeedRedraw = true;
@@ -1486,7 +1486,7 @@ public class Filezoo : DrawingArea
     string type = sd.Type.Name;
     if (type == "application/x-color") {
       /** DESCTRUCTIVE */
-      Console.WriteLine ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
+      Helpers.LogError ("Would set {0} color to {1}", targetPath, BitConverter.ToString(sd.Data));
     } else if (type == "text/uri-list" || ((type == "text/plain" || type == "STRING") && Helpers.IsURI(sd.Text))) {
       /** DESCTRUCTIVE */
       string data = Helpers.BytesToASCII(sd.Data);
@@ -1691,17 +1691,23 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   public void OpenFile (string path)
   {
+  // oh screw you xdg-open/kfmclient/gnome-open trifecta of uselessness
     string suffix = Helpers.Extname(path).ToLower ();
     string epath = Helpers.EscapePath(path);
     string dir = Helpers.IsDir(path) ? path : Helpers.Dirname(path);
-    if (FilezooContextMenu.imageSuffixes.Contains(suffix)) {
+    string mime = Helpers.GetMime (path);
+    if (mime.StartsWith("image/")) {
       Helpers.RunCommandInDir("gqview", epath, dir);
-    } else if (FilezooContextMenu.sureAudioSuffixes.Contains(suffix)) {
+    } else if (mime.StartsWith("audio/")) {
       Helpers.RunCommandInDir("amarok", "-p --load " + epath, dir);
-    } else if (FilezooContextMenu.videoSuffixes.Contains(suffix)) {
+    } else if (mime.StartsWith("video/")) {
       Helpers.RunCommandInDir("mplayer", epath, dir);
     } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
       Helpers.RunCommandInDir("ex", epath, dir);
+    } else if (mime == "application/x-bittorrent") {
+      Helpers.RunCommandInDir("transmission", epath, dir);
+    } else if (mime == "text/html") {
+      Helpers.RunCommandInDir("firefox -new-tab", epath, dir);
     } else {
       Helpers.OpenFile(path);
     }

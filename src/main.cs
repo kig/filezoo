@@ -74,7 +74,7 @@ public static class FilezooApp {
         if (Gdk.Color.Parse(panelBg, ref c)) {
           win.ModifyBg (StateType.Normal, c);
         } else {
-          Console.WriteLine("Failed to parse panel bg color: {0}", panelBg);
+          Helpers.LogError("Failed to parse panel bg color: {0}", panelBg);
         }
       }
     } else {

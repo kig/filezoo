@@ -257,7 +257,13 @@ public static class Helpers {
   /** ASYNC */
   public static Process OpenFile (string path)
   {
-    return Process.Start (EscapePath(path));
+    return Process.Start ("kfmclient exec", EscapePath(path));
+  }
+
+  public static string GetMime (string path)
+  {
+    Gnome.Vfs.Vfs.Initialize ();
+    return Gnome.Vfs.MimeType.GetMimeTypeForUri(path);
   }
 
   /** ASYNC */
@@ -1014,27 +1020,67 @@ public static class Helpers {
     LogError("Uris: {0}", sd.Uris);
   }
 
+
+  public static bool PrintErrors = true;
+
   public static void LogError ()
   {
-    Console.WriteLine();
+    if (PrintErrors)
+    Console.Error.WriteLine();
   }
 
   public static void LogError (string s)
   {
-    Console.WriteLine(s);
+    if (PrintErrors)
+    Console.Error.WriteLine(s);
   }
   public static void LogError (Exception s)
   {
-    Console.WriteLine(s);
+    if (PrintErrors)
+    Console.Error.WriteLine(s);
   }
   public static void LogError (object s)
   {
-    Console.WriteLine(s);
+    if (PrintErrors)
+    Console.Error.WriteLine(s);
   }
   public static void LogError (string s, params object[] list)
   {
-    Console.WriteLine(s, list);
+    if (PrintErrors)
+    Console.Error.WriteLine(s, list);
   }
+
+
+
+  public static bool PrintDebugs = false;
+
+  public static void LogDebug ()
+  {
+    if (PrintDebugs)
+    Console.Error.WriteLine();
+  }
+
+  public static void LogDebug (string s)
+  {
+    if (PrintDebugs)
+    Console.Error.WriteLine(s);
+  }
+  public static void LogDebug (Exception s)
+  {
+    if (PrintDebugs)
+    Console.Error.WriteLine(s);
+  }
+  public static void LogDebug (object s)
+  {
+    if (PrintDebugs)
+    Console.Error.WriteLine(s);
+  }
+  public static void LogDebug (string s, params object[] list)
+  {
+    if (PrintDebugs)
+    Console.Error.WriteLine(s, list);
+  }
+
 }
 
 

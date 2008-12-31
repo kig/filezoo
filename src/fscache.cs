@@ -181,7 +181,7 @@ public static class FSCache
     string path = f.FullName;
     DateTime lastChange = Helpers.LastChange(path);
     if (f.FilePassDone && f.LastFileChange == lastChange && f.LastFilePass.Subtract(f.LastFileChange).TotalSeconds > 1) return;
-//     Console.WriteLine("FilePass {0}: f.LFC: {1} H.LC: {2} f.LFP:{3}", path, f.LastFileChange, lastChange, f.LastFilePass);
+//     Helpers.LogDebug("FilePass {0}: f.LFC: {1} H.LC: {2} f.LFP:{3}", path, f.LastFileChange, lastChange, f.LastFilePass);
     f.LastFileChange = lastChange;
     f.LastFilePass = DateTime.Now;
     if (f.IsDirectory) {
@@ -223,7 +223,7 @@ public static class FSCache
       if (SortDirection == SortingDirection.Descending)
         f.Entries.Reverse();
       f.LastSort = lc;
-      //Console.WriteLine("Sorted {0}", f.FullName);
+      //Helpers.LogDebug("Sorted {0}", f.FullName);
       needRefresh = true;
     }
     if (!(f.Measurer == Measurer && f.LastMeasure == f.LastChange)) {
@@ -241,7 +241,7 @@ public static class FSCache
         e.Height *= scale;
       }
       f.LastMeasure = lc;
-      //Console.WriteLine("Measured {0}", f.FullName);
+      //Helpers.LogDebug("Measured {0}", f.FullName);
       needRefresh = true;
     }
     if (needRefresh) {
@@ -272,7 +272,7 @@ public static class FSCache
   /** ASYNC */
   public static void Invalidate (string path)
   { lock (Cache) {
-    //Console.WriteLine("Invalidate on {0}", path);
+    //Helpers.LogDebug("Invalidate on {0}", path);
     if (Cache.ContainsKey(path)) {
       if (Helpers.FileExists(path)) {
         Modified (path);
@@ -386,9 +386,9 @@ public static class FSCache
     foreach (string k in deletions)
       Cache.Remove(k);
     if (deletions.Count > 0) {
-      Console.WriteLine("Pruned {0} entries from FSCache[{1}] (Max: {2})", deletions.Count, Cache.Count, maxCacheSize);
+      Helpers.LogDebug("Pruned {0} entries from FSCache[{1}] (Max: {2})", deletions.Count, Cache.Count, maxCacheSize);
       if (maxCacheSize > Cache.Count * 2) {
-        Console.WriteLine("Rebuilding cache");
+        Helpers.LogDebug("Rebuilding cache");
         Cache = new Dictionary<string,FSEntry> (Cache);
         maxCacheSize = Cache.Count;
         GC.Collect ();
@@ -516,7 +516,7 @@ public static class FSCache
   /** ASYNC */
   static void Deleted (string path)
   { lock (Cache) {
-    //Console.WriteLine("Deleted on {0}", path);
+    //Helpers.LogDebug("Deleted on {0}", path);
     // ditch path's children, ditch path, excise path from parent,
     // set parent complete if path was the only incomplete child in it
     FSEntry d = Get (path);
@@ -555,7 +555,7 @@ public static class FSCache
   /** ASYNC */
   static void Modified (string path)
   { lock (Cache) {
-    //Console.WriteLine("Modified on {0}", path);
+    //Helpers.LogDebug("Modified on {0}", path);
     // excise path data from parent
     // redo path's file pass
     // enter new data to parent
@@ -589,14 +589,14 @@ public static class FSCache
   /** FAST */
   static void WatcherChanged (object source, FileSystemEventArgs e)
   { lock (Invalids) {
-    //Console.WriteLine("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
+    //Helpers.LogDebug("Invalidating {0}: {1}", e.FullPath, e.ChangeType);
     Invalids[e.FullPath] = true;
   } }
 
   /** FAST */
   static void WatcherRenamed (object source, RenamedEventArgs e)
   { lock (Invalids) {
-    //Console.WriteLine("Invalidating {0} -> {1}: renamed", e.FullPath, e.OldFullPath);
+    //Helpers.LogDebug("Invalidating {0} -> {1}: renamed", e.FullPath, e.OldFullPath);
     Invalids[e.FullPath] = true;
     Invalids[e.OldFullPath] = true;
   } }
@@ -617,8 +617,8 @@ public static class FSCache
     try {
       watcher.Path = dirname;
     } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
-      Console.WriteLine("Here's the exception output: {0}", e);
+      Helpers.LogDebug("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
+      Helpers.LogDebug("Here's the exception output: {0}", e);
       return watcher;
     }
     watcher.Filter = "";
@@ -629,8 +629,8 @@ public static class FSCache
     try {
       watcher.EnableRaisingEvents = true;
     } catch (System.ArgumentException e) {
-      Console.WriteLine("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
-      Console.WriteLine("Here's the exception output: {0}", e);
+      Helpers.LogDebug("System.IO.FileSystemWatcher does not like your path: {0}", dirname);
+      Helpers.LogDebug("Here's the exception output: {0}", e);
     }
     return watcher;
   }
@@ -671,7 +671,7 @@ public static class FSCache
   {
     lock (TCLock) TraversalCounter++;
     try { TraverseDir (dirname); }
-    catch (Exception e) { Console.WriteLine("Traverse failed with {0}", e); }
+    catch (Exception e) { Helpers.LogDebug("Traverse failed with {0}", e); }
     lock (TCLock) TraversalCounter--;
     TraversalProfiler.Time("{0} completed", dirname);
   }
@@ -871,7 +871,7 @@ public static class FSCache
       }
     }
     if (deletecount > 0) {
-      Console.WriteLine("Expired {0} entries from {2}[{1}]", deletecount, thumbnailCache.Count, name);
+      Helpers.LogDebug("Expired {0} entries from {2}[{1}]", deletecount, thumbnailCache.Count, name);
     }
   } }
 
