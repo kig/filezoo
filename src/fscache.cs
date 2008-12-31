@@ -123,8 +123,10 @@ public static class FSCache
   /** BLOCKING */
   public static FSEntry FastGet (string path)
   {
-    if (Cache.ContainsKey(path)) return Cache[path];
-    else return Get (path);
+    try {
+      if (Cache.ContainsKey(path)) return Cache[path];
+    } catch (Exception) {}
+    return Get (path);
   }
 
   /** BLOCKING */
@@ -177,8 +179,10 @@ public static class FSCache
   public static void FilePass (FSEntry f)
   {
     string path = f.FullName;
-    if (f.FilePassDone && f.LastFileChange == Helpers.LastChange(path) && f.LastFilePass.Subtract(f.LastFileChange).TotalSeconds > 1) return;
-    f.LastFileChange = Helpers.LastChange(path);
+    DateTime lastChange = Helpers.LastChange(path);
+    if (f.FilePassDone && f.LastFileChange == lastChange && f.LastFilePass.Subtract(f.LastFileChange).TotalSeconds > 1) return;
+//     Console.WriteLine("FilePass {0}: f.LFC: {1} H.LC: {2} f.LFP:{3}", path, f.LastFileChange, lastChange, f.LastFilePass);
+    f.LastFileChange = lastChange;
     f.LastFilePass = DateTime.Now;
     if (f.IsDirectory) {
       List<FSEntry> entries = new List<FSEntry> ();
@@ -360,18 +364,21 @@ public static class FSCache
     lock (FullSizeThumbnailQueue) FullSizeThumbnailQueue.Clear ();
   }
 
+  static int maxCacheSize = 0;
   /** ASYNC */
   public static void PruneCache (int maxFrameDelta)
   { lock (Cache) {
+    if (Cache.Count > maxCacheSize) maxCacheSize = Cache.Count;
     List<string> deletions = new List<string> ();
     foreach (FSEntry d in Cache.Values) {
-      if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta) {
+      if (d.ParentDir != null && FSDraw.frame - d.LastDraw > maxFrameDelta && FSDraw.frame - d.ParentDir.LastDraw > 1) {
         DestroyThumbnail(d);
-        d.ParentDir.LastChange = d.ParentDir.LastFileChange = DateTime.Now;
+        d.ParentDir.LastChange = DateTime.Now;
         d.ParentDir.FilePassDone = false;
         if (d.ParentDir.Entries != null)
           d.ParentDir.Entries.Clear ();
-        d.Entries = null;
+        if (d.Entries != null)
+          d.Entries.Clear ();
         d.DrawEntries = null;
         deletions.Add(d.FullName);
       }
@@ -379,6 +386,13 @@ public static class FSCache
     foreach (string k in deletions)
       Cache.Remove(k);
     if (deletions.Count > 0) {
+      Console.WriteLine("Pruned {0} entries from FSCache[{1}] (Max: {2})", deletions.Count, Cache.Count, maxCacheSize);
+      if (maxCacheSize > Cache.Count * 2) {
+        Console.WriteLine("Rebuilding cache");
+        Cache = new Dictionary<string,FSEntry> (Cache);
+        maxCacheSize = Cache.Count;
+        GC.Collect ();
+      }
       LastChange = DateTime.Now;
     }
   } }
@@ -393,7 +407,8 @@ public static class FSCache
           d.SubTreeCount = d.SubTreeSize = 0;
         }
       }
-      TraversalCache.Clear ();
+      TraversalCache = new Dictionary<string,TraversalInfo> ();
+      GC.Collect ();
     }
   } }
 
@@ -796,32 +811,7 @@ public static class FSCache
       lock (Cache) {
         f.Thumbnail = tn;
         ThumbnailCache[f.FullName] = f;
-        bool checkForOld = true;
-        int deletecount = 0;
-        if (ThumbnailCache.Count > 2000) {
-          FSEntry oldest = f;
-          foreach (FSEntry e in ThumbnailCache.Values) {
-            if (e.LastThumbDraw < oldest.LastThumbDraw) oldest = e;
-          }
-          if (oldest.LastThumbDraw != FSDraw.frame) {
-            DestroyThumbnail(oldest);
-            deletecount++;
-            checkForOld = oldest.LastThumbDraw < FSDraw.frame - 10;
-          }
-        }
-        if (checkForOld && ThumbnailCache.Count > 0) {
-          List<FSEntry> old = new List<FSEntry> ();
-          foreach (FSEntry e in ThumbnailCache.Values) {
-            if (e.LastThumbDraw < FSDraw.frame - 10) old.Add(e);
-          }
-          foreach (FSEntry e in old) {
-            DestroyThumbnail(e);
-            deletecount++;
-          }
-        }
-        if (deletecount > 0) {
-          Console.WriteLine("Expired {0} entries from ThumbnailCache[{1}]", deletecount, ThumbnailCache.Count);
-        }
+        PruneThumbnailCache (10, 2000, ThumbnailCache, DestroyThumbnail, "ThumbnailCache");
       }
       LastChange = DateTime.Now;
     }
@@ -832,6 +822,7 @@ public static class FSCache
   {
     Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
+      PruneThumbnailCache (10, 2000, ThumbnailCache, DestroyThumbnail, "ThumbnailCache");
       while (ThumbnailQueue.Count > 0)
         ProcessThumbnailQueue ();
       Thread.Sleep(100);
@@ -852,6 +843,37 @@ public static class FSCache
         ThumbnailQueue.Enqueue (tn, 0);
   }
 
+  public delegate void ThumbDestroyDelegate (FSEntry f);
+
+  public static void PruneThumbnailCache (uint maxFrameDelta, uint maxSize, Dictionary<string,FSEntry> thumbnailCache, ThumbDestroyDelegate destroyThumbnail, string name)
+  { lock (Cache) {
+    bool checkForOld = true;
+    int deletecount = 0;
+    if (thumbnailCache.Count > maxSize) {
+      FSEntry oldest = thumbnailCache.Values.First();
+      foreach (FSEntry e in thumbnailCache.Values) {
+        if (e.LastThumbDraw < oldest.LastThumbDraw) oldest = e;
+      }
+      if (oldest.LastThumbDraw != FSDraw.frame) {
+        destroyThumbnail(oldest);
+        deletecount++;
+        checkForOld = oldest.LastThumbDraw < FSDraw.frame - maxFrameDelta;
+      }
+    }
+    if (checkForOld && thumbnailCache.Count > 0) {
+      List<FSEntry> old = new List<FSEntry> ();
+      foreach (FSEntry e in thumbnailCache.Values) {
+        if (e.LastThumbDraw < FSDraw.frame - maxFrameDelta) old.Add(e);
+      }
+      foreach (FSEntry e in old) {
+        destroyThumbnail(e);
+        deletecount++;
+      }
+    }
+    if (deletecount > 0) {
+      Console.WriteLine("Expired {0} entries from {2}[{1}]", deletecount, thumbnailCache.Count, name);
+    }
+  } }
 
   static List<string> LoadableTypes = new List<string>() {
     "image/jpeg",
@@ -902,32 +924,7 @@ public static class FSCache
       lock (Cache) {
         f.FullSizeThumbnail = tn;
         FullSizeThumbnailCache[f.FullName] = f;
-        bool checkForOld = true;
-        int deletecount = 0;
-        if (FullSizeThumbnailCache.Count > 20) {
-          FSEntry oldest = f;
-          foreach (FSEntry e in FullSizeThumbnailCache.Values) {
-            if (e.LastThumbDraw < oldest.LastThumbDraw) oldest = e;
-          }
-          if (oldest.LastThumbDraw != FSDraw.frame) {
-            DestroyFullSizeThumbnail(oldest);
-            deletecount++;
-            checkForOld = oldest.LastThumbDraw < FSDraw.frame - 10;
-          }
-        }
-        if (checkForOld && FullSizeThumbnailCache.Count > 0) {
-          List<FSEntry> old = new List<FSEntry> ();
-          foreach (FSEntry e in FullSizeThumbnailCache.Values) {
-            if (e.LastThumbDraw < FSDraw.frame - 10) old.Add(e);
-          }
-          foreach (FSEntry e in old) {
-            DestroyFullSizeThumbnail(e);
-            deletecount++;
-          }
-        }
-        if (deletecount > 0) {
-          Console.WriteLine("Expired {0} entries from FullSizeThumbnailCache[{1}]", deletecount, FullSizeThumbnailCache.Count);
-        }
+        PruneThumbnailCache (10, 20, FullSizeThumbnailCache, DestroyFullSizeThumbnail, "FullsizeThumbnailCache");
       }
       LastChange = DateTime.Now;
     }
@@ -938,6 +935,7 @@ public static class FSCache
   {
     Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
     while (true) {
+      PruneThumbnailCache (10, 20, FullSizeThumbnailCache, DestroyFullSizeThumbnail, "FullsizeThumbnailCache");
       while (FullSizeThumbnailQueue.Count > 0)
         ProcessFullSizeThumbnailQueue ();
       Thread.Sleep(100);

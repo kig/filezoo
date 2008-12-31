@@ -54,6 +54,7 @@ public class PriorityQueue
     if (Entries.Count > 0) {
       string r = Entries[0].Value;
       Entries.RemoveAt(0);
+      if (Entries.Count == 0) Clear ();
       return r;
     } else {
       throw new InvalidOperationException ("Can't Dequeue from an empty PriorityQueue");
@@ -62,7 +63,7 @@ public class PriorityQueue
 
   public void Clear ()
   {
-    Entries.Clear ();
+    Entries = new List<PQEntry> ();
   }
 
   public int Count { get { return Entries.Count; } }

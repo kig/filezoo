@@ -330,13 +330,6 @@ public class Filezoo : DrawingArea
 
   }
 
-  public void MockDraw (uint w, uint h)
-  {
-    using (Context cr = new Context (EtcSurface)) {
-      Draw (cr, w, h);
-    }
-  }
-
   bool LimitedRedraw = false;
 
   bool CheckRedraw ()
@@ -363,10 +356,12 @@ public class Filezoo : DrawingArea
 
   void LongMonitor (object source, ElapsedEventArgs ev)
   {
-    foreach (FSEntry e in CurrentDirEntry.Entries) {
+    foreach (UnixDirectoryInfo e in Helpers.EntriesMaybe(CurrentDirPath)) {
       DateTime mtime = Helpers.LastChange(e.FullName);
-      if (e.LastFileChange != mtime) {
-        e.LastFileChange = mtime;
+      FSEntry f = FSCache.FastGet(e.FullName);
+      if (f.LastFileChange != mtime) {
+      Console.WriteLine("LongMonitor invalidated {0}", e.FullName);
+        f.LastFileChange = mtime;
         FSCache.Invalidate(e.FullName);
       }
     }
@@ -425,8 +420,6 @@ public class Filezoo : DrawingArea
     PreDrawRequested = PreDrawInProgress = true;
   }
 
-//   long lastTenframe = 0;
-
   /** ASYNC */
   void PreDrawCallback ()
   {
@@ -451,12 +444,7 @@ public class Filezoo : DrawingArea
             FSCache.ClearTraversalCache ();
           }
           FSCache.PruneCache (1);
-          /*
-          if (FSDraw.frame % 10 > lastTenframe) {
-            lastTenframe = FSDraw.frame % 10;
-            FSCache.PruneCache (100);
-          }
-          */
+
           FSCache.CancelThumbnailing ();
           using (Context cr = new Context (PreDrawSurface)) {
             cr.IdentityMatrix ();
@@ -479,6 +467,91 @@ public class Filezoo : DrawingArea
 
   /* Drawing */
 
+  void DrawFrame (Context cr)
+  {
+    var fp = new Profiler ("DrawFrame");
+    int w, h;
+    GdkWindow.GetSize (out w, out h);
+    fp.Time ("Window.GetSize");
+    double x = dragX, y = dragY;
+    bool sizeChanged = false;
+    fp.Time ("GetPointer");
+    if (InteractionProfiler.Watch.IsRunning)
+      InteractionProfiler.Time ("From UI action to expose");
+    if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
+      if (CachedSurface != null) CachedSurface.Destroy ();
+      CachedSurface = new ImageSurface(Format.ARGB32, w, h);
+      sizeChanged = true;
+      Width = (uint) w;
+      Height = (uint) h;
+      UpdateLayout ();
+      fp.Time ("Recreate CachedSurface");
+    }
+    if (Cancelled) {
+      ThrowFrames.Clear ();
+      ThrowVelocity = 0;
+    }
+    if (ThrowVelocity != 0) {
+      using ( Context ecr = new Context (EtcSurface) )
+        PanBy (ecr, Width, Height, 0, ThrowVelocity);
+      ThrowVelocity *= 0.98;
+      if (Math.Abs(ThrowVelocity) < 1)
+        ThrowVelocity = 0;
+    }
+    if (ZoomVelocity != 1) {
+      using ( Context ecr = new Context (EtcSurface) )
+        ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
+      ZoomVelocity = Math.Pow(ZoomVelocity, 0.8);
+      if (Math.Abs(1 - ZoomVelocity) < 0.001)
+        ZoomVelocity = 1;
+    }
+    if (NeedZoomCheck)
+      using ( Context ecr = new Context (EtcSurface) )
+        CheckZoomNavigation(ecr, Width, Height);
+    fp.Time ("Throw and zoom");
+    if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
+      FSNeedRedraw = false;
+      using (Context scr = new Context (CachedSurface)) {
+        scr.Save ();
+          scr.Operator = Operator.Source;
+          scr.SetSourceRGBA (0,0,0,0);
+          scr.Paint ();
+        scr.Restore ();
+        DrawMainView (scr, Width, Height);
+        if (scr.Status != Status.Success)
+          Console.WriteLine("Cairo error: {0}", scr.Status);
+      }
+      fp.Time ("FS Draw");
+    }
+    cr.Operator = Operator.Over;
+    DrawBackground (cr, Width, Height);
+    fp.Time ("DrawBackground");
+    if (ControlLineVisible && panning) {
+      cr.Save ();
+        cr.Color = Renderer.DirectoryFGColor;
+        cr.Rectangle (0, dragY, Width, 1);
+        cr.Fill ();
+      cr.Restore ();
+    }
+    using (Pattern p = new Pattern (CachedSurface)) {
+      cr.Source = p;
+      cr.Paint ();
+      cr.Operator = Operator.Over;
+      fp.Time ("Composite");
+      if (DrawEffects (cr, Width, Height)) {
+        LimitedRedraw = true;
+        fp.Time ("Effects");
+      }
+    }
+    if (InteractionProfiler.Watch.IsRunning) {
+      InteractionProfiler.Total ("Interaction latency");
+      InteractionProfiler.Stop ();
+      InteractionProfiler.Reset ();
+      InteractionProfiler.TotalElapsed = 0;
+    }
+//     fp.Total ("Frame");
+  }
+
   /** FAST */
   Rectangle Transform (Context cr, uint width, uint height)
   {
@@ -493,32 +566,6 @@ public class Filezoo : DrawingArea
     cr.Clip ();
     cr.Scale (boxHeight, boxHeight);
     return new Rectangle (x,y,w,h);
-  }
-
-  /** BLOCKING */
-  void Draw (Context cr, uint width, uint height)
-  {
-    cr.Save ();
-      cr.NewPath ();
-      cr.IdentityMatrix ();
-      DrawToolbars (cr, width, height);
-      cr.NewPath ();
-      cr.IdentityMatrix ();
-      Rectangle targetBox = Transform (cr, width, height);
-      DrawCurrentDir(cr, targetBox);
-    cr.Restore ();
-
-    dirLatencyProfiler.Stop ();
-    if (FirstFrameOfDir) {
-      dirLatencyProfiler.Time ("Directory latency");
-      FirstFrameOfDir = false;
-    }
-    if (Helpers.StartupProfiler.Watch.IsRunning) {
-      Helpers.StartupProfiler.Time ("Draw complete");
-      Helpers.StartupProfiler.Total ("Startup complete");
-      Helpers.StartupProfiler.Stop ();
-      if (QuitAfterFirstFrame) Application.Quit ();
-    }
   }
 
   /** FAST */
@@ -538,6 +585,7 @@ public class Filezoo : DrawingArea
   double FirstProgress = 0;
   double LastProgress = 0;
   double CylinderRotation = 0;
+  /** FAST */
   void DrawBackground (Context cr, uint width, uint height)
   {
     cr.Save ();
@@ -616,6 +664,121 @@ public class Filezoo : DrawingArea
 
   double cosScale (double n) {
     return 0.5*(1-Math.Cos(n*Math.PI));
+  }
+
+  bool DrawEffects  (Context cr, uint w, uint h)
+  {
+    if (!SillyFlare) return false;
+    if (FlareGradient == null) {
+      FGRadius = Helpers.ImageWidth(FlareGradientImage);
+      FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
+      BlackGradient = new RadialGradient(0,0,0, 0,0,FGRadius);
+      BlackGradient.AddColorStop(0, new Color(0,0,0,1));
+      BlackGradient.AddColorStop(1, new Color(0,0,0,0));
+      FlareSpike = new ImageSurface(FlareSpikeImage);
+      RainbowSprite = new ImageSurface(RainbowSpriteImage);
+    }
+    cr.Save ();
+//       double t = DateTime.Now.ToFileTime() / 1e7;
+      double dx = flareTargetX - flareX;
+      double dy = flareTargetY - flareY;
+      flareX += dx / 20;
+      flareY += dy / 20;
+      double s = Math.Min(1, Math.Max(0.02, 0.35 / (1 + 0.002*(dx*dx + dy*dy))));
+      if (s < 0.03)
+        s *= 1 + rng.NextDouble();
+      cr.Translate(flareX, flareY);
+      cr.Save ();
+        cr.Scale (s, s);
+/*        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
+        cr.Source = BlackGradient;
+        cr.Operator = Operator.Over;*/
+        cr.FillPreserve ();
+        cr.Source = FlareGradient;
+        cr.Operator = Operator.Add;
+        cr.Fill ();
+      cr.Restore ();
+      cr.Save ();
+        cr.Scale (s, s);
+        cr.Operator = Operator.Add;
+        using (Pattern p = new Pattern(RainbowSprite)) {
+          cr.Save ();
+          cr.Translate (10, -RainbowSprite.Height/2);
+          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
+          cr.Source = p;
+          cr.Fill ();
+          cr.Restore ();
+          cr.Save ();
+          cr.Scale(-1, 1);
+          cr.Translate (10, -RainbowSprite.Height/2);
+          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
+          cr.Source = p;
+          cr.Fill ();
+          cr.Restore ();
+        }
+      cr.Restore ();
+      cr.Save ();
+        cr.Scale (Math.Sqrt(s), Math.Sqrt(s));
+        using (Pattern p = new Pattern(FlareSpike)) {
+          cr.Translate (-FlareSpike.Width/2.0, -FlareSpike.Height/2.0);
+          cr.Rectangle (0, 0, FlareSpike.Width, FlareSpike.Height);
+          cr.Operator = Operator.Add;
+          cr.Source = p;
+          cr.Fill ();
+        }
+      cr.Restore ();
+    cr.Restore ();
+    if (dx*dx < 1 && dy*dy < 1) return false;
+    return true;
+  }
+
+  Random rng = new Random ();
+
+  double flareX = 200;
+  double flareY = -200;
+
+  double flareTargetX = 200;
+  double flareTargetY = -200;
+
+  bool SillyFlare = false;
+
+  string FlareGradientImage = "res/flare_gradient.png";
+  string FlareSpikeImage = "res/flare_spike.png";
+  string RainbowSpriteImage = "res/rainbow_sprite.png";
+  RadialGradient FlareGradient = null;
+  RadialGradient BlackGradient;
+  int FGRadius;
+  ImageSurface FlareSpike;
+  ImageSurface RainbowSprite;
+
+
+
+  /* Draw main view */
+
+  /** BLOCKING */
+  void DrawMainView (Context cr, uint width, uint height)
+  {
+    cr.Save ();
+      cr.NewPath ();
+      cr.IdentityMatrix ();
+      DrawToolbars (cr, width, height);
+      cr.NewPath ();
+      cr.IdentityMatrix ();
+      Rectangle targetBox = Transform (cr, width, height);
+      DrawCurrentDir(cr, targetBox);
+    cr.Restore ();
+
+    dirLatencyProfiler.Stop ();
+    if (FirstFrameOfDir) {
+      dirLatencyProfiler.Time ("Directory latency");
+      FirstFrameOfDir = false;
+    }
+    if (Helpers.StartupProfiler.Watch.IsRunning) {
+      Helpers.StartupProfiler.Time ("Draw complete");
+      Helpers.StartupProfiler.Total ("Startup complete");
+      Helpers.StartupProfiler.Stop ();
+      if (QuitAfterFirstFrame) Application.Quit ();
+    }
   }
 
   /** FAST */
@@ -1267,8 +1430,6 @@ public class Filezoo : DrawingArea
     return true;
   }
 
-  ImageSurface TopSurface = null;
-
   /** BLOCKING */
   /**
     The expose event handler. Gets the Cairo.Context for the
@@ -1279,195 +1440,10 @@ public class Filezoo : DrawingArea
   */
   protected override bool OnExposeEvent (Gdk.EventExpose e)
   {
-    OnDraw ();
+    using (Context cr = Gdk.CairoHelper.Create (GdkWindow))
+      DrawFrame (cr);
     return true;
   }
-
-  void OnDraw ()
-  {
-    var fp = new Profiler ("OnDraw");
-    int w, h;
-    GdkWindow.GetSize (out w, out h);
-    fp.Time ("Window.GetSize");
-    double x = dragX, y = dragY;
-    bool sizeChanged = false;
-    fp.Time ("GetPointer");
-    if (InteractionProfiler.Watch.IsRunning)
-      InteractionProfiler.Time ("From UI action to expose");
-    if (Width != (uint)w || Height != (uint)h || CachedSurface == null) {
-      if (CachedSurface != null) CachedSurface.Destroy ();
-      if (TopSurface != null) CachedSurface.Destroy ();
-      CachedSurface = new ImageSurface(Format.ARGB32, w, h);
-//       TopSurface = new ImageSurface(Format.ARGB32, w, h);
-      sizeChanged = true;
-      Width = (uint) w;
-      Height = (uint) h;
-      UpdateLayout ();
-      fp.Time ("Recreate CachedSurface");
-    }
-    if (Cancelled) {
-      ThrowFrames.Clear ();
-      ThrowVelocity = 0;
-    }
-    if (ThrowVelocity != 0) {
-      using ( Context ecr = new Context (EtcSurface) )
-        PanBy (ecr, Width, Height, 0, ThrowVelocity);
-      ThrowVelocity *= 0.98;
-      if (Math.Abs(ThrowVelocity) < 1)
-        ThrowVelocity = 0;
-    }
-    if (ZoomVelocity != 1) {
-      using ( Context ecr = new Context (EtcSurface) )
-        ZoomBy (ecr, Width, Height, x, y, ZoomVelocity);
-      ZoomVelocity = Math.Pow(ZoomVelocity, 0.8);
-      if (Math.Abs(1 - ZoomVelocity) < 0.001)
-        ZoomVelocity = 1;
-    }
-    if (NeedZoomCheck)
-      using ( Context ecr = new Context (EtcSurface) )
-        CheckZoomNavigation(ecr, Width, Height);
-    fp.Time ("Throw and zoom");
-    if (sizeChanged || (!EffectInProgress && FSNeedRedraw)) {
-      FSNeedRedraw = false;
-      using (Context scr = new Context (CachedSurface)) {
-        scr.Save ();
-          scr.Operator = Operator.Source;
-          scr.SetSourceRGBA (0,0,0,0);
-          scr.Paint ();
-        scr.Restore ();
-        Draw (scr, Width, Height);
-        if (scr.Status != Status.Success)
-          Console.WriteLine("Cairo error: {0}", scr.Status);
-      }
-      fp.Time ("FS Draw");
-    }
-    using ( Context cr = Gdk.CairoHelper.Create (GdkWindow) )
-    {
-      fp.Time ("Gdk.CairoHelper.Create");
-      cr.Operator = Operator.Over;
-      DrawBackground (cr, Width, Height);
-      fp.Time ("DrawBackground");
-      if (ControlLineVisible && panning) {
-        cr.Save ();
-          cr.Color = Renderer.DirectoryFGColor;
-          cr.Rectangle (0, dragY, Width, 1);
-          cr.Fill ();
-        cr.Restore ();
-      }
-      using (Pattern p = new Pattern (CachedSurface)) {
-        cr.Source = p;
-        cr.Paint ();
-        cr.Operator = Operator.Over;
-        fp.Time ("Composite");
-        if (DrawEffects (cr, Width, Height)) {
-          LimitedRedraw = true;
-          fp.Time ("Effects");
-        }
-      }
-    }
-/*    using ( Context cr = Gdk.CairoHelper.Create (GdkWindow) )
-    {
-      fp.Time ("Gdk.CairoHelper.Create");
-      using (Pattern p = new Pattern (TopSurface)) {
-        cr.Source = p;
-        cr.Operator = Operator.Source;
-        cr.Paint ();
-        fp.Time ("TopComposite");
-      }
-    }*/
-    if (InteractionProfiler.Watch.IsRunning) {
-      InteractionProfiler.Total ("Interaction latency");
-      InteractionProfiler.Stop ();
-      InteractionProfiler.Reset ();
-      InteractionProfiler.TotalElapsed = 0;
-    }
-//     fp.Total ("Frame");
-  }
-
-  Random rng = new Random ();
-
-  double flareX = 200;
-  double flareY = -200;
-
-  double flareTargetX = 200;
-  double flareTargetY = -200;
-
-  bool SillyFlare = false;
-
-  bool DrawEffects  (Context cr, uint w, uint h)
-  {
-    if (!SillyFlare) return false;
-    if (FlareGradient == null) {
-      FGRadius = Helpers.ImageWidth(FlareGradientImage);
-      FlareGradient = Helpers.RadialGradientFromImage(FlareGradientImage);
-      BlackGradient = new RadialGradient(0,0,0, 0,0,FGRadius);
-      BlackGradient.AddColorStop(0, new Color(0,0,0,1));
-      BlackGradient.AddColorStop(1, new Color(0,0,0,0));
-      FlareSpike = new ImageSurface(FlareSpikeImage);
-      RainbowSprite = new ImageSurface(RainbowSpriteImage);
-    }
-    cr.Save ();
-//       double t = DateTime.Now.ToFileTime() / 1e7;
-      double dx = flareTargetX - flareX;
-      double dy = flareTargetY - flareY;
-      flareX += dx / 20;
-      flareY += dy / 20;
-      double s = Math.Min(1, Math.Max(0.02, 0.35 / (1 + 0.002*(dx*dx + dy*dy))));
-      if (s < 0.03)
-        s *= 1 + rng.NextDouble();
-      cr.Translate(flareX, flareY);
-      cr.Save ();
-        cr.Scale (s, s);
-/*        cr.Arc(0, 0, FGRadius, 0, Math.PI * 2);
-        cr.Source = BlackGradient;
-        cr.Operator = Operator.Over;*/
-        cr.FillPreserve ();
-        cr.Source = FlareGradient;
-        cr.Operator = Operator.Add;
-        cr.Fill ();
-      cr.Restore ();
-      cr.Save ();
-        cr.Scale (s, s);
-        cr.Operator = Operator.Add;
-        using (Pattern p = new Pattern(RainbowSprite)) {
-          cr.Save ();
-          cr.Translate (10, -RainbowSprite.Height/2);
-          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
-          cr.Source = p;
-          cr.Fill ();
-          cr.Restore ();
-          cr.Save ();
-          cr.Scale(-1, 1);
-          cr.Translate (10, -RainbowSprite.Height/2);
-          cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
-          cr.Source = p;
-          cr.Fill ();
-          cr.Restore ();
-        }
-      cr.Restore ();
-      cr.Save ();
-        cr.Scale (Math.Sqrt(s), Math.Sqrt(s));
-        using (Pattern p = new Pattern(FlareSpike)) {
-          cr.Translate (-FlareSpike.Width/2.0, -FlareSpike.Height/2.0);
-          cr.Rectangle (0, 0, FlareSpike.Width, FlareSpike.Height);
-          cr.Operator = Operator.Add;
-          cr.Source = p;
-          cr.Fill ();
-        }
-      cr.Restore ();
-    cr.Restore ();
-    if (dx*dx < 1 && dy*dy < 1) return false;
-    return true;
-  }
-
-  string FlareGradientImage = "res/flare_gradient.png";
-  string FlareSpikeImage = "res/flare_spike.png";
-  string RainbowSpriteImage = "res/rainbow_sprite.png";
-  RadialGradient FlareGradient = null;
-  RadialGradient BlackGradient;
-  int FGRadius;
-  ImageSurface FlareSpike;
-  ImageSurface RainbowSprite;
 
 
 

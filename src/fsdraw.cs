@@ -176,13 +176,47 @@ public class FSDraw
     return GetColor(filetype, perm);
   }
 
+  Color GetBgColor (Matrix matrix, Rectangle target)
+  {
+    bool useLightTheme = (BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88;
+    Color bg = new Color (0,0,0,0.3);
+//     bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+    if (useLightTheme) {
+      bg = DirectoryBGColor;
+      bg.A = 0.3;
+      bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+    }
+    return bg;
+  }
+
+  Color GetFgColor (DrawEntry d, Matrix matrix, Rectangle target)
+  {
+    bool useLightTheme = (BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88;
+    Color co = GetColor (d.F.FileType, d.F.Permissions);
+    if ((!d.F.Complete && FSCache.Measurer.DependsOnTotals) || (matrix.Yy > 2 && !d.F.FilePassDone))
+      co = UnfinishedDirectoryColor;
+
+    if (useLightTheme) {
+      if (d.F.IsDirectory) // fade out dir based on size on screen
+        co.A *= 0.2 * Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
+      else
+        co.A *= 0.1 + 0.7 * Helpers.Clamp(1-0.5*(matrix.Yy / target.Height), 0.0, 1);
+    } else {
+      if (d.F.IsDirectory)
+        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
+      else
+        co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
+    }
+    return co;
+  }
+
 
   /* Drawing */
 
-  /** FAST */
+  /** FAST, ALLOCATEY */
   /**
     Checks if a 1 unit high object (DirStats is 1 unit high) is clipped by the
-    target area and whether it falls between quarter pixels.
+    target area and whether it falls between half-pixels.
     If either is true, returns false, otherwise reckons the DirStats would be
     visible and returns true.
     */
@@ -223,11 +257,11 @@ public class FSDraw
     Dictionary<string, string> prefixes,
     Dictionary<string, bool> selection,
     Context cr, Rectangle target) {
-    return Draw (new DrawEntry(d), prefixes, selection, cr, target, 0);
+    return Draw (new DrawEntry(d), prefixes, selection, cr.Matrix, cr, target, 0);
   }
   public uint Draw
   (DrawEntry d, Dictionary<string, string> prefixes,
-   Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
+   Dictionary<string, bool> selection, Matrix matrix, Context cr, Rectangle target, uint depth)
   {
     d.F.LastDraw = frame;
     if (depth == 0) {
@@ -236,47 +270,34 @@ public class FSDraw
         o.LastDraw = frame;
       FrameProfiler.Restart ();
     }
-    if (d.GroupTitle != null && d.GroupHeight * cr.Matrix.Yy > 1)
+    if (d.GroupTitle != null && d.GroupHeight * matrix.Yy > 1)
       DrawGroupTitle (d.GroupTitle, d.GroupHeight, cr, target);
-    if (depth > 0 && !IsVisible(d, cr, target)) {
+    if (depth > 0 && !IsVisible(d, matrix, target)) {
       return 0;
     }
     double h = depth == 0 ? 1 : d.Height;
     uint c = 1;
+    double Yy = matrix.Yy;
+    double X0 = matrix.X0;
     cr.Save ();
-      bool useLightTheme = (BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88;
       cr.Scale (1, h);
-      Matrix matrix = cr.Matrix;
-      double rBoxWidth = BoxWidth / target.Height; // to keep pixel boxwidth the same
-      Color bg = new Color (0,0,0,0.3);
-//       bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
-      if (useLightTheme) {
-        bg = DirectoryBGColor;
-        bg.A = 0.3;
-        bg.A *= Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
-      }
-      cr.Color = bg;
+      matrix.Yy *= h;
+
+      // keep pixel boxwidth the same regardless of height
+      double rBoxWidth = BoxWidth / target.Height;
+      cr.Color = GetBgColor (matrix, target);
+
+      // outline tweak for top dir
       if (depth == 0) {
         cr.Translate (0.005*rBoxWidth, 0);
         matrix.X0 += 0.005*rBoxWidth*matrix.Xx;
       }
+      // draw background
       Helpers.DrawRectangle(cr, -0.01*rBoxWidth, 0.0, rBoxWidth*1.02, 1.02, target);
       cr.Fill ();
-      Color co = GetColor (d.F.FileType, d.F.Permissions);
-      if (!d.F.Complete && FSCache.Measurer.DependsOnTotals)
-        co = UnfinishedDirectoryColor;
 
-      if (useLightTheme) {
-        if (d.F.IsDirectory) // fade out dir based on size on screen
-          co.A *= 0.2 * Helpers.Clamp(1-0.2*(matrix.Yy / target.Height), 0.0, 1);
-        else
-          co.A *= 0.1 + 0.7 * Helpers.Clamp(1-0.5*(matrix.Yy / target.Height), 0.0, 1);
-      } else {
-        if (d.F.IsDirectory)
-          co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.2);
-        else
-          co.A *= Helpers.Clamp(1-(matrix.Yy / target.Height), 0.1, 0.8);
-      }
+      // draw foreground and thumb
+      Color co = GetFgColor (d, matrix, target);
       cr.Color = co;
       if (d.F.Thumbnail != null) {
         DrawThumb (d.F, cr, target);
@@ -284,40 +305,18 @@ public class FSDraw
         Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
         cr.Fill ();
       }
-      if (d.F.IsDirectory) {
-        cr.Save ();
-          if (matrix.Yy > 8 && matrix.Yy < 4000) {
-            Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
-            using (LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96)) {
-              g.AddColorStop (0, new Color (0,0,0,0.8));
-              g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
-              if ((BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88) {
-                g.AddColorStop (1, new Color (0,0,0,0));
-              } else {
-                g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
-                g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
-              }
-              cr.Pattern = g;
-              cr.Fill ();
-              Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);
-              cr.Color = new Color (0,0,0,0.8);
-              cr.Fill ();
-            }
-          }
-          if (matrix.Yy > 2) {
-            cr.Color = (!d.F.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
-            double lh = (matrix.Yy * 0.02 > 3) ? (3 / matrix.Yy) : 0.02;
-            Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
-            Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
-            cr.Fill ();
-          }
-        cr.Restore ();
-        co = DirectoryFGColor;
-      }
+
+      // draw directory flourishes
+      if (d.F.IsDirectory)
+        DrawDirectoryFlourish(cr, matrix, target, rBoxWidth, co, d);
+
+      // draw title
       // Color is a struct, so changing the A doesn't propagate
       co.A = 1;
       cr.Color = co;
       DrawTitle (d.F, prefixes, cr, target, depth);
+
+      // draw children
       if (d.F.IsDirectory) {
         bool childrenVisible = matrix.Yy > 2;
         bool shouldDrawChildren = depth == 0 || childrenVisible;
@@ -325,19 +324,13 @@ public class FSDraw
           c += DrawChildren(d, prefixes, selection ,cr, target, depth);
         }
       }
-      if (selection.ContainsKey(d.F.FullName)) {
-        using (LinearGradient g = new LinearGradient (0.0, 0.0, 1.0, 0.0)) {
-          Helpers.DrawRectangle (cr, 0.0, 0.02, 1.0, 0.96, target);
-          Color co2 = RegularFileColor;
-          co2.A = 0.1;
-          g.AddColorStop (0, co2);
-          co2.A = 0.7;
-          g.AddColorStop (1, co2);
-          cr.Pattern = g;
-          cr.Fill ();
-        }
-      }
+
+      if (selection.ContainsKey(d.F.FullName))
+        DrawSelectionMarker (cr, target);
+
     cr.Restore ();
+    matrix.Yy = Yy;
+    matrix.X0 = X0;
     if (depth == 0) {
       FrameProfiler.Stop ();
       frame++;
@@ -345,7 +338,88 @@ public class FSDraw
     return c;
   }
 
+
   /** BLOCKING */
+  /**
+    Draws the children of a FSEntry.
+    Bails out if no children are yet created and frame has run out of time.
+
+    Sets up the child area transform and draws each child.
+
+    @returns The total amount of subtree files drawn.
+    */
+  uint DrawChildren
+  (DrawEntry d, Dictionary<string, string> prefixes,
+   Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
+  {
+    List<DrawEntry> entries = d.F.DrawEntries;
+    if (entries == null) return 0;
+    cr.Save ();
+      ChildTransform (d, cr, target);
+      Matrix m = cr.Matrix;
+      uint c = 0;
+      foreach (DrawEntry child in entries) {
+        c += Draw (child, prefixes, selection, m, cr, target, depth+1);
+        cr.Translate (0.0, child.Height);
+        m.Y0 += child.Height * m.Yy;
+      }
+    cr.Restore ();
+    return c;
+  }
+
+  double ChildYOffset = 0.48;
+  double ChildBoxHeight = 0.44;
+
+  /** FAST */
+  /**
+    Sets up child area transform for the FSEntry.
+    */
+  void ChildTransform (DrawEntry d, Context cr, Rectangle target)
+  {
+    double rBoxWidth = BoxWidth / target.Height;
+    double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
+    cr.Translate (0.5*fac*rBoxWidth, ChildYOffset);
+    cr.Scale (1.0-fac, ChildBoxHeight);
+  }
+
+  /** BLOCKING */
+  void DrawDirectoryFlourish
+  (
+    Context cr, Matrix matrix, Rectangle target,
+    double rBoxWidth, Color co, DrawEntry d
+  )
+  {
+    cr.Save ();
+      if (matrix.Yy > 8 && matrix.Yy < 4000) {
+        Helpers.DrawRectangle (cr, 0.0, 0.02, rBoxWidth, 0.96, target);
+        using (LinearGradient g = new LinearGradient (0.0,0.02,0.0,0.96)) {
+          g.AddColorStop (0, new Color (0,0,0,0.8));
+          g.AddColorStop (Helpers.Clamp(1 / matrix.Yy, 0.001, 0.01), new Color (0,0,0,0));
+          if ((BackgroundColor.R + BackgroundColor.G + BackgroundColor.B) / 3 > 0x88) {
+            g.AddColorStop (1, new Color (0,0,0,0));
+          } else {
+            g.AddColorStop (0.75, new Color (0, 0, 0, co.A));
+            g.AddColorStop (1, new Color (0,0,0,co.A*1.8));
+          }
+          cr.Pattern = g;
+          cr.Fill ();
+          Helpers.DrawRectangle (cr, 0.0, 0.98, rBoxWidth, Math.Min(0.01, 1 / matrix.Yy), target);
+          cr.Color = new Color (0,0,0,0.8);
+          cr.Fill ();
+        }
+      }
+      if (matrix.Yy > 2) {
+        cr.Color = (!d.F.Complete && FSCache.Measurer.DependsOnTotals) ? FifoColor : RegularFileColor;
+        double lh = (matrix.Yy * 0.02 > 3) ? (3 / matrix.Yy) : 0.02;
+        Helpers.DrawRectangle (cr, rBoxWidth * 0.95, 0.02, 0.05*rBoxWidth, lh, target);
+        Helpers.DrawRectangle (cr, 0, 0.02, 0.05*rBoxWidth, lh, target);
+        cr.Fill ();
+      }
+    cr.Restore ();
+    co = DirectoryFGColor;
+  }
+
+  /** BLOCKING, FSEntry-level LOCK with thumbnail destroyer */
   /**
     Draws the thumbnail of the FSEntry.
     */
@@ -399,21 +473,6 @@ public class FSDraw
         cr.Restore ();
       }
     }
-  }
-
-  double ChildYOffset = 0.48;
-  double ChildBoxHeight = 0.44;
-
-  /** FAST */
-  /**
-    Sets up child area transform for the FSEntry.
-    */
-  void ChildTransform (DrawEntry d, Context cr, Rectangle target)
-  {
-    double rBoxWidth = BoxWidth / target.Height;
-    double fac = 0.1 * Helpers.Clamp(1-(cr.Matrix.Yy / target.Height), 0.0, 1.0);
-    cr.Translate (0.5*fac*rBoxWidth, ChildYOffset);
-    cr.Scale (1.0-fac, ChildBoxHeight);
   }
 
   /** BLOCKING */
@@ -533,31 +592,18 @@ public class FSDraw
     cr.Restore ();
   }
 
-  /** BLOCKING */
-  /**
-    Draws the children entries of a FSEntry.
-    Bails out if no children are yet created and frame has run out of time.
-
-    Sets up the child area transform and draws each child.
-
-    @returns The total amount of subtree files drawn.
-    */
-  uint DrawChildren
-  (DrawEntry d, Dictionary<string, string> prefixes,
-   Dictionary<string, bool> selection, Context cr, Rectangle target, uint depth)
+  void DrawSelectionMarker (Context cr, Rectangle target)
   {
-    List<DrawEntry> entries = d.F.DrawEntries;
-    if (entries == null) return 0;
-    cr.Save ();
-      ChildTransform (d, cr, target);
-      uint c = 0;
-      foreach (DrawEntry child in entries) {
-        double h = child.Height;
-        c += Draw (child, prefixes, selection, cr, target, depth+1);
-        cr.Translate (0.0, h);
-      }
-    cr.Restore ();
-    return c;
+    using (LinearGradient g = new LinearGradient (0.0, 0.0, 1.0, 0.0)) {
+      Helpers.DrawRectangle (cr, 0.0, 0.02, 1.0, 0.96, target);
+      Color co2 = RegularFileColor;
+      co2.A = 0.1;
+      g.AddColorStop (0, co2);
+      co2.A = 0.7;
+      g.AddColorStop (1, co2);
+      cr.Pattern = g;
+      cr.Fill ();
+    }
   }
 
 
@@ -573,54 +619,64 @@ public class FSDraw
   /** ASYNC */
   public bool PreDraw (FSEntry d, Context cr, Rectangle target, uint depth)
   {
-    return PreDraw (new DrawEntry (d), cr, target, depth);
+    return PreDraw (new DrawEntry (d), cr.Matrix, cr, target, depth);
   }
-  public bool PreDraw (DrawEntry d, Context cr, Rectangle target, uint depth)
+  public bool PreDraw (DrawEntry d, Matrix matrix, Context cr, Rectangle target, uint depth)
   {
     if (depth == 0) PreDrawCancelled = false;
-    bool rv = true;
-    if (depth == 0  && d.F.IsDirectory && FSCache.Measurer.DependsOnTotals && (d.F.Complete || !d.F.InProgress))
-        FSCache.RequestTraversal(d.F.FullName);
-    if (depth > 0 && !IsVisible(d, cr, target)) return true;
+    if (depth == 0  && d.F.IsDirectory && FSCache.Measurer.DependsOnTotals && !d.F.Complete && !d.F.InProgress)
+      FSCache.RequestTraversal(d.F.FullName);
+    if (depth > 0 && !IsVisible(d, matrix, target)) return true;
     double h = depth == 0 ? 1 : d.Height;
     if (PreDrawCancelled) {
-      rv = false;
+      return false;
     } else {
+      bool rv = true;
+      double Yy = matrix.Yy;
       cr.Save ();
         cr.Scale (1, h);
+        matrix.Yy *= h;
         d.F.LastThumbDraw = d.F.LastDraw = FSDraw.frame;
-        RequestThumbnail (d.F.FullName, (int)cr.Matrix.Yy);
+        RequestThumbnail (d.F.FullName, (int)matrix.Yy);
         ImageSurface thumb = d.F.Thumbnail;
         if (thumb != null) {
           if (cr.Matrix.Yy > 64)
-            RequestFullSizeThumbnail(d.F.FullName, (int)cr.Matrix.Yy);
+            RequestFullSizeThumbnail(d.F.FullName, (int)matrix.Yy);
         }
         if (d.F.IsDirectory) {
-          bool childrenVisible = cr.Matrix.Yy > 2;
+          bool childrenVisible = matrix.Yy > 2;
           bool shouldDrawChildren = (depth == 0 || childrenVisible);
           if (shouldDrawChildren)
             rv &= PreDrawChildren(d, cr, target, depth);
         }
       cr.Restore ();
+      matrix.Yy = Yy;
+      return rv;
     }
-    return rv;
   }
 
   /** ASYNC */
   bool PreDrawChildren (DrawEntry d, Context cr, Rectangle target, uint depth)
   {
+//     Console.WriteLine("PreDrawChildren: {0}", d.F.FullName);
     ChildTransform (d, cr, target);
+    Matrix m = cr.Matrix;
+//     Profiler pdp = new Profiler ("PreDrawChildren");
     FSCache.FilePass(d.F.FullName);
     // do not put a cancel check here
     // it will trigger a race loop with large directories
     // and since it doesn't add anything to DrawEntries, it's invisible
+//     pdp.Time("FilePass");
     FSCache.UpdateDrawEntries(d.F);
-    if (PreDrawCancelled) return false;
+//     pdp.Time("UpdateDrawEntries");
+    if (PreDrawCancelled && depth > 0) return false;
     foreach (DrawEntry ch in d.F.DrawEntries) {
-      PreDraw (ch, cr, target, depth+1);
+      PreDraw (ch, m, cr, target, depth+1);
       cr.Translate (0.0, ch.Height);
-      if (PreDrawCancelled) return false;
+      m.Y0 += m.Yy * ch.Height;
+      if (PreDrawCancelled && depth > 0) return false;
     }
+//     pdp.Time("Crawl children");
     return true;
   }
 
