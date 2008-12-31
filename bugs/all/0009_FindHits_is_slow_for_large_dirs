@@ -1,0 +1,24 @@
+title: FindHits is slow for large dirs
+status: OPEN
+reported by: 
+date: 2008-12-31 14:26:05+0200
+author: Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
+assigned to: 
+
+-- opened by Ilmari Heikkinen <ilmari.heikkinen@gmail.com> on 2008-12-31 14:26:05+0200
+
+Problem description:
+  Filezoo.FindHits is slow for large (10 k+ entries) directories.
+  The FindHits runtimes oscillate between 10 ms and 50 ms, which
+  would point to it triggering some transient effect.
+
+How to reproduce:
+  Go to a dir with ten thousand entries, zoom in, throw-pan, move mouse 
+  around.
+  
+What happens:
+  Mouse movement causes framerate to drop.
+
+Proposed solution:
+  Either find a way to make FindHits fast or do FindHits only once per 
+  frame.
