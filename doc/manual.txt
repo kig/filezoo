@@ -24,17 +24,17 @@ Breadcrumb bar: ("/home/username/")
   Click on a directory name to navigate there.
 
 
-Sort bar: (Sort Name Size Date Type)
+Sort bar: (Sort Type Name Size Date)
 
   Click on a sort label to sort the directory entries by that property.
   Directories are always before files.
   There is no need to have a reversed sort as both ends of the list take an
   equal time to access.
 
-  Name sorts alphabetically.
+  Type sorts alphabetically by the file extension.
+  Name sorts alphabetically by the file name.
   Size sorts largest first.
   Date sorts newest first.
-  Type sorts alphabetically by the file extension.
 
 
 Size bar: (Size Flat Size Date Entries Total)

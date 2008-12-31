@@ -421,7 +421,7 @@ public class Filezoo : DrawingArea
   {
     /// Tell currently running PreDraw to stop.
     Renderer.CancelPreDraw();
-    /// Tell PreDraw to start a new PreDraw after the current has stopped.
+    /// Tell PreDrawThread to start a new PreDraw after the current has stopped.
     PreDrawRequested = PreDrawInProgress = true;
   }
 
