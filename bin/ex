@@ -2,7 +2,7 @@
 require 'fileutils'
 
 extractors = {
-  'application/x-zip' => lambda{|fn| system('unzip', fn) },
+  'application/zip' => lambda{|fn| system('unzip', fn) },
   'application/x-tar' => lambda{|fn| system('tar', 'xf', fn) },
   'application/x-rar' => lambda{|fn| system('unrar', 'x', fn) },
   'application/x-gzip' => lambda{|fn|
