@@ -321,7 +321,7 @@ public static class Helpers {
   /** DESTRUCTIVE, ASYNC */
   public static void ExtractFile (string path)
   {
-    Process.Start ("ex", EscapePath(path));
+    Process.Start ("exa", EscapePath(path));
   }
 
   /** DESTRUCTIVE, BLOCKING */
