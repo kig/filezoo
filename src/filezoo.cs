@@ -1703,7 +1703,7 @@ public class Filezoo : DrawingArea
     } else if (mime.StartsWith("video/")) {
       Helpers.RunCommandInDir("mplayer", epath, dir);
     } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
-      Helpers.RunCommandInDir("ex", epath, dir);
+      Helpers.RunCommandInDir("exa", epath, dir);
     } else if (mime == "application/x-bittorrent") {
       Helpers.RunCommandInDir("transmission", epath, dir);
     } else if (mime == "text/html") {
