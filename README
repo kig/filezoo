@@ -8,6 +8,14 @@ than 20fps.
 
 Filezoo is written in C# using Mono, Gtk# and Cairo.
 
+Note: While this thing works and is the bestest file manager ever, 
+I'm not working on it actively. Making Filezoo into a Gnome panel applet 
+would be useful. Making the drag-drop-selection-fiddle-UI less bad would
+also be useful. Not to mention making the commandline completion work better 
+and have a command history. And using the same file opening framework as the
+rest of Gnome, and fixing the UI to flow better. And porting the renderer
+over to OpenGL as CAIRO DOES NOT GET FASTER, EVER.
+
 Requirements:
   mono
   libgtk2.0-cil
