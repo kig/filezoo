@@ -74,14 +74,14 @@ public class FilezooContextMenu : Menu {
 
     if (HasEntryWithSuffix(u, imageSuffixes)) {
       Separator (menu);
-      AddCommandItem(menu, "View images", "gqview", "", targetPath);
+      AddCommandItem(menu, "View images", "eog", "", targetPath);
     }
 
     Separator(menu);
-    AddCommandItem(menu, "Set as playlist", "amarok", "-p --load", targetPath);
-    AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
-/*    Separator(menu);
-    AddCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", targetPath);*/
+    AddCommandItem(menu, "Set as playlist", "rhythmbox-client", "--clear-queue --enqueue", targetPath);
+    AddCommandItem(menu, "Append to playlist", "rhythmbox-client", "--enqueue", targetPath);
+    Separator(menu);
+    AddCommandItem(menu, "Recursive slideshow", "slideshow-qgl", "", targetPath);
   }
 
   // File menu items
@@ -101,11 +101,11 @@ public class FilezooContextMenu : Menu {
     });
 
     if (videoSuffixes.Contains (c.Target.Suffix)) {
-      AddCommandItem(menu, "Play video", "mplayer", "", targetPath);
+      AddCommandItem(menu, "Play video", "totem", "", targetPath);
     }
 
     if (imageSuffixes.Contains (c.Target.Suffix)) {
-      AddCommandItem(menu, "View image", "gqview", "", targetPath);
+      AddCommandItem(menu, "View image", "eog", "", targetPath);
       Separator(menu);
       AddCommandItem(menu, "Rotate ↱", "mogrify", "-rotate 90", targetPath, true);
       AddCommandItem(menu, "Rotate ↰", "mogrify", "-rotate 270", targetPath, true);
@@ -113,8 +113,8 @@ public class FilezooContextMenu : Menu {
     }
 
     if (audioSuffixes.Contains (c.Target.Suffix)) {
-      AddCommandItem(menu, "Play audio", "amarok", "-p --load", targetPath);
-      AddCommandItem(menu, "Append to playlist", "amarok", "--append", targetPath);
+      AddCommandItem(menu, "Play audio", "rhythmbox-client", "--clear-queue --enqueue", targetPath);
+      AddCommandItem(menu, "Append to playlist", "rhythmbox-client", "--enqueue", targetPath);
     }
 
     /** DESTRUCTIVE */
@@ -216,27 +216,27 @@ public class FilezooContextMenu : Menu {
 
     if (HasEntryWithSuffix(keys, videoSuffixes)) {
       Separator (menu);
-      AddMultiArgCommandItem(menu, "Play selected videos", "mplayer", "", keys, videoSuffixes);
+      AddMultiArgCommandItem(menu, "Play selected videos", "totem", "", keys, videoSuffixes);
     }
 
     if (HasEntryWithSuffix(keys, imageSuffixes)) {
       Separator (menu);
-      AddMultiArgCommandItem(menu, "View selected images", "gqview", "", keys, imageSuffixes);
-/*      Separator(menu);
-      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", keys);*/
+      AddMultiArgCommandItem(menu, "View selected images", "eog", "", keys, imageSuffixes);
+      Separator(menu);
+      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow-qgl", "", keys);
       Separator (menu);
       AddCommandItem(menu, "Rotate selected images ↱", "mogrify", "-rotate 90", keys, imageSuffixes, true);
       AddCommandItem(menu, "Rotate selected images ↰", "mogrify", "-rotate 270", keys, imageSuffixes, true);
       AddCommandItem(menu, "Rotate selected images 180°", "mogrify", "-rotate 180", keys, imageSuffixes, true);
     } else if (keys.Any(Helpers.IsDir)) {
-/*      Separator(menu);
-      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow", "--recursive", keys);*/
+      Separator(menu);
+      AddMultiArgCommandItem(menu, "Recursive slideshow", "slideshow-qgl", "", keys);
     }
 
     if (HasEntryWithSuffix(keys, audioSuffixes) || keys.Any(Helpers.IsDir)) {
       Separator (menu);
-      AddMultiArgCommandItem(menu, "Set selection as playlist", "amarok", "-p --load", keys);
-      AddMultiArgCommandItem(menu, "Append selection to playlist", "amarok", "--append", keys);
+      AddMultiArgCommandItem(menu, "Set selection as playlist", "rhythmbox-client", "--clear-queue --enqueue", keys);
+      AddMultiArgCommandItem(menu, "Append selection to playlist", "rhythmbox-client",  "--enqueue", keys);
     }
 
     /** DESTRUCTIVE */
@@ -354,7 +354,7 @@ public class FilezooContextMenu : Menu {
       if (targets.Count() > 0) {
         string fp = targets.First ();
         string filenames = String.Join(" ", targets.Select(o => Helpers.EscapePath(o)).ToArray ());
-//         Console.WriteLine(filenames);
+//         Helpers.LogDebug(filenames);
         Helpers.RunCommandInDir (cmd, args + " " + filenames, Helpers.Dirname(fp));
       }
     }));

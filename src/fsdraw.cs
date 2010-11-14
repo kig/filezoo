@@ -432,7 +432,7 @@ public class FSDraw
       if (thumb == null) return;
       d.LastThumbDraw = FSDraw.frame;
       double rBoxWidth = BoxWidth / target.Height;
-      using (Pattern p = new Pattern (thumb)) {
+      using (SurfacePattern p = new SurfacePattern (thumb)) {
         cr.Save ();
           Matrix matrix = cr.Matrix;
           double wr = matrix.Xx * rBoxWidth;

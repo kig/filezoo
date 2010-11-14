@@ -533,7 +533,7 @@ public class Filezoo : DrawingArea
         cr.Fill ();
       cr.Restore ();
     }
-    using (Pattern p = new Pattern (CachedSurface)) {
+    using (SurfacePattern p = new SurfacePattern (CachedSurface)) {
       cr.Source = p;
       cr.Paint ();
       cr.Operator = Operator.Over;
@@ -701,7 +701,7 @@ public class Filezoo : DrawingArea
       cr.Save ();
         cr.Scale (s, s);
         cr.Operator = Operator.Add;
-        using (Pattern p = new Pattern(RainbowSprite)) {
+        using (SurfacePattern p = new SurfacePattern(RainbowSprite)) {
           cr.Save ();
           cr.Translate (10, -RainbowSprite.Height/2);
           cr.Rectangle (0, 0, RainbowSprite.Width, RainbowSprite.Height);
@@ -719,7 +719,7 @@ public class Filezoo : DrawingArea
       cr.Restore ();
       cr.Save ();
         cr.Scale (Math.Sqrt(s), Math.Sqrt(s));
-        using (Pattern p = new Pattern(FlareSpike)) {
+        using (SurfacePattern p = new SurfacePattern(FlareSpike)) {
           cr.Translate (-FlareSpike.Width/2.0, -FlareSpike.Height/2.0);
           cr.Rectangle (0, 0, FlareSpike.Width, FlareSpike.Height);
           cr.Operator = Operator.Add;
@@ -1691,23 +1691,14 @@ public class Filezoo : DrawingArea
   /** BLOCKING */
   public void OpenFile (string path)
   {
-  // oh screw you xdg-open/kfmclient/gnome-open trifecta of uselessness
     string suffix = Helpers.Extname(path).ToLower ();
     string epath = Helpers.EscapePath(path);
     string dir = Helpers.IsDir(path) ? path : Helpers.Dirname(path);
     string mime = Helpers.GetMime (path);
-    if (mime.StartsWith("image/")) {
-      Helpers.RunCommandInDir("gqview", epath, dir);
-    } else if (mime.StartsWith("audio/")) {
-      Helpers.RunCommandInDir("amarok", "-p --load " + epath, dir);
-    } else if (mime.StartsWith("video/")) {
-      Helpers.RunCommandInDir("mplayer", epath, dir);
+    if (mime.StartsWith("audio/")) {
+      Helpers.RunCommandInDir("rhythmbox-client", "--clear-queue --enqueue " + epath, dir);
     } else if (FilezooContextMenu.archiveSuffixes.Contains(suffix)) {
       Helpers.RunCommandInDir("exa", epath, dir);
-    } else if (mime == "application/x-bittorrent") {
-      Helpers.RunCommandInDir("transmission", epath, dir);
-    } else if (mime == "text/html") {
-      Helpers.RunCommandInDir("firefox -new-tab", epath, dir);
     } else {
       Helpers.OpenFile(path);
     }

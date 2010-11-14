@@ -48,7 +48,10 @@ public static class Helpers {
 
   public static string Shell = UnixEnvironment.RealUser.ShellProgram;
 
-  public static string TrashDir = HomeDir + DirSepS + ".Trash";
+  public static string TerminalApp = "gnome-terminal";
+  public static string OpenApp = "gnome-open";
+
+  public static string TrashDir = HomeDir + DirSepS + ".local" + DirSepS + "share" + DirSepS + "Trash";
   public static string ThumbDir = HomeDir + DirSepS + ".thumbnails";
   public static string NormalThumbDir = ThumbDir + DirSepS + "normal";
   public static string LargeThumbDir = ThumbDir + DirSepS + "large";
@@ -227,7 +230,7 @@ public static class Helpers {
   /** ASYNC */
   public static Process OpenTerminal (string path)
   {
-    return RunCommandInDir ("urxvt", "", path);
+    return RunCommandInDir (Helpers.TerminalApp, "", path);
   }
 
   /** ASYNC */
@@ -251,13 +254,13 @@ public static class Helpers {
   /** ASYNC */
   public static Process RunShellCommandInDir (string cmd, string args, string path)
   {
-    return Helpers.RunCommandInDir (Shell, "-c " + Helpers.EscapePath(cmd + (args == "" ? args : " " + args)), path);
+    return Helpers.RunCommandInDir (Helpers.Shell, "-c " + Helpers.EscapePath(cmd + (args == "" ? args : " " + args)), path);
   }
 
   /** ASYNC */
   public static Process OpenFile (string path)
   {
-    return Process.Start ("kfmclient exec", EscapePath(path));
+    return Process.Start (Helpers.OpenApp, EscapePath(path));
   }
 
   public static string GetMime (string path)
@@ -268,17 +271,17 @@ public static class Helpers {
 
   /** ASYNC */
   public static Process OpenURL (string url) {
-    return Process.Start ("firefox", "-new-tab " + Helpers.EscapePath(url));
+    return Helpers.OpenFile (url);
   }
 
   /** ASYNC */
   public static Process Search (string query) {
-    return OpenURL ("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
+    return Helpers.OpenURL ("http://google.com/search?q=" + System.Uri.EscapeDataString(query));
   }
 
   /** BLOCKING */
   public static bool IsValidCommand (string cmd) {
-    int l = ReadCmd ("which", EscapePath (cmd)).Length;
+    int l = Helpers.ReadCmd ("which", Helpers.EscapePath (cmd)).Length;
     return (l > 0 && l >= cmd.Length);
   }
 
@@ -288,7 +291,7 @@ public static class Helpers {
     if (cmdline.Length == 0) return false;
     string[] split = cmdline.Trim(' ').Split(' ');
     string cmd = split[0];
-    return IsValidCommand(cmd);
+    return Helpers.IsValidCommand(cmd);
   }
 
   /** BLOCKING */
@@ -297,7 +300,7 @@ public static class Helpers {
     if (cmdline.Length == 0) return false;
     string[] split = cmdline.Trim(' ').Split(' ');
     string cmd = split[0];
-    if (!IsValidCommand(cmd)) return false;
+    if (!Helpers.IsValidCommand(cmd)) return false;
     bool first = true;
     string cd = UnixDirectoryInfo.GetCurrentDirectory ();
     UnixDirectoryInfo.SetCurrentDirectory (dir);
@@ -305,7 +308,7 @@ public static class Helpers {
     foreach (string arg in split) {
       if (first) first = false;
       else {
-        if (arg[0] == '-' || arg.Contains("*") || arg.Contains("?") || FileExists(arg)) {
+        if (arg[0] == '-' || arg.Contains("*") || arg.Contains("?") || Helpers.FileExists(arg)) {
           retval = true;
           break;
         } else {
@@ -585,7 +588,7 @@ public static class Helpers {
     int nh = Math.Max(1, (int)(s.Height * scale));
     ImageSurface rv = new ImageSurface (Format.ARGB32, nw, nh);
     using (Context cr = new Context(rv)) {
-      using (Pattern p = new Pattern(s)) {
+      using (SurfacePattern p = new SurfacePattern(s)) {
         cr.Rectangle (0,0, rv.Width, rv.Height);
         cr.Scale (scale, scale);
         cr.Pattern = p;
