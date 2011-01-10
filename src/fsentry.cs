@@ -99,6 +99,8 @@ public class FSEntry
     IsDirectory = FileType == FileTypes.Directory;
     if (FileType == FileTypes.SymbolicLink) {
       LinkTarget = Helpers.ReadLink(FullName);
+      var lt = new UnixSymbolicLinkInfo(LinkTarget);
+      IsDirectory = Helpers.FileExists(LinkTarget) && Helpers.FileType(lt) == FileTypes.Directory;
     }
 
     Suffix = IsDirectory ? "" : Helpers.Extname(Name).ToLower();
